@@ -1,6 +1,6 @@
 # **Walbert — Feature Specification**
 
-## **Version:** 1.7
+## **Version:** 1.8
 ## **Author:** Daniel
 ## **Purpose:** Define the complete feature set for the Walbert local agent system, explicitly built on llama.cpp compiled binaries.
 
@@ -214,16 +214,50 @@ Walbert must emit **all responses and internal deliberations** using the followi
 
 ---
 
-# **9. Testing Features (TEST)**
+# **9. Hardware & Peripheral Features (HW)**
+
+- **HW-001: USB Device Detection**
+  Walbert must detect and identify USB devices connected to the host system.
+
+- **HW-002: Serial Communication**
+  Walbert must support bidirectional serial communication with connected devices.
+
+- **HW-003: Bluetooth Device Pairing**
+  Walbert must discover, pair, and communicate with Bluetooth devices.
+
+- **HW-004: Device Firmware Generation**
+  Walbert must generate and upload firmware (e.g., Arduino scripts) to compatible microcontrollers.
+
+- **HW-005: Peripheral Integration**
+  Walbert must integrate peripheral devices into its decision-making and response loops.
+
+- **HW-006: Autonomous Hardware Interaction**
+  Walbert must autonomously decide when and how to interact with connected hardware.
+
+# **10. Autonomous Execution Features (AUTO)**
+
+- **AUTO-001: Autonomous Decision-Making**
+  Walbert must autonomously evaluate and execute actions without explicit user input.
+
+- **AUTO-002: Self-Triggered Actions**
+  Walbert must initiate actions based on internal state, datastore queries, or external events.
+
+- **AUTO-003: Continuous Operation**
+  Walbert must support long-running autonomous operation with periodic state resets.
+
+- **AUTO-004: Event-Driven Execution**
+  Walbert must respond to external events (e.g., hardware signals, timers) autonomously.
+
+# **11. Testing Features (TEST)**
 
 - **TEST-001: Unit Test Coverage**
   All major components must have comprehensive unit tests.
 
 - **TEST-002: Integration Tests**
-  System integration must be verified with integration tests, including llama.cpp binary execution.
+  System integration must be verified with integration tests, including llama.cpp binary execution and hardware interactions.
 
 - **TEST-003: Mocking Infrastructure**
-  All external dependencies (including llama.cpp binaries) must be mockable for testing.
+  All external dependencies (including llama.cpp binaries and hardware peripherals) must be mockable for testing.
 
 - **TEST-004: Factory Pattern**
   All components must be instantiatable through factory methods.

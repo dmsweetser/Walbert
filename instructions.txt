@@ -1,9 +1,3 @@
-I want to be able to ask Walbert to generate an Arduino script for an ESP32 module with x capabilities, be able to see the USB device get connected, be able to upload the script, and then when I turn on the board as a Bluetooth device, I want Walbert to be able to pair with the device, send and receive data to it, and use it as part of its interactions.
+Input and output should be conceptually centralized and unified with one interface. So chat or image input from the user, chat responses, serial input or output, should look similar to Walbert. The idea is that walbert_ blocks determine the next channel to use, and what to provide to it. In theory, Walbert could receive a request from the user, call its smarter cousin, execute a command against a Bluetooth device, get a response, and then return the response in a chat to the user.
 
-***
-
-Also, I want Walbert to be able to execute autonomously.
-
-***
-
-Expand the feature-spec.md and implementation-guide.md to ensure that these KINDS of capabilities are possible, such that implementing the app would make me able to do what I want. Avoid being hyper-specific in the two documents, though.
+Revise the feature-spec.md and implementation-guide.md to reflect these intentions.

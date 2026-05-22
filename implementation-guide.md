@@ -423,3 +423,123 @@ class TestModelExecution(unittest.TestCase):
         result = run_llama_model("dummy_path", "test prompt")
         self.assertEqual(result, "Mocked response")
 ```
+
+# **9. Hardware & Peripheral Implementation**
+
+## **HW-001: USB Device Detection**
+Detect and identify USB devices connected to the host system.
+
+```python
+def detect_usb_devices():
+    import usb.core
+    devices = usb.core.find(find_all=True)
+    return [(dev.idVendor, dev.idProduct) for dev in devices]
+```
+
+## **HW-002: Serial Communication**
+Bidirectional serial communication with devices.
+
+```python
+def list_serial_ports():
+    import serial.tools.list_ports
+    ports = serial.tools.list_ports.comports()
+    return [port.device for port in ports]
+
+def serial_connect(port, baudrate=9600):
+    import serial
+    return serial.Serial(port, baudrate)
+```
+
+## **HW-003: Bluetooth Device Pairing**
+Discover, pair, and communicate with Bluetooth devices.
+
+```python
+def discover_bluetooth_devices():
+    import bluetooth
+    nearby_devices = bluetooth.discover_devices(lookup_names=True)
+    return nearby_devices
+
+def bluetooth_pair(address):
+    import bluetooth
+    sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+    sock.connect((address, 1))
+    return sock
+```
+
+## **HW-004: Device Firmware Generation**
+Generate and upload firmware to compatible microcontrollers.
+
+```python
+def generate_arduino_script(capabilities):
+    script = f"""
+// Auto-generated Arduino script
+void setup() {{
+    {capabilities.get('setup_code', '')}
+}}
+
+void loop() {{
+    {capabilities.get('loop_code', '')}
+}}
+"""
+    return script
+
+def upload_firmware(port, script):
+    import tempfile
+    import subprocess
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ino") as f:
+        f.write(script)
+        f.flush()
+        result = subprocess.run(
+            ["arduino-cli", "compile", "--upload", "--port", port, f.name],
+            capture_output=True,
+            text=True
+        )
+    return result.stdout
+```
+
+## **HW-005: Autonomous Hardware Interaction**
+Autonomously decide and execute hardware interactions.
+
+```python
+def handle_hardware_interaction(parsed_response):
+    if parsed_response.get("should_interact_with_hardware") == "YES":
+        hardware_action = parsed_response.get("hardware_action", {})
+        peripheral_type = hardware_action.get("peripheral_type")
+        action = hardware_action.get("action")
+        data = hardware_action.get("data", {})
+
+        if peripheral_type == "usb":
+            usb_io = IOLayerFactory.create_io_layer("usb")
+            if action == "detect":
+                return usb_io.detect_devices()
+            elif action == "connect":
+                return usb_io.connect(data["vendor_id"], data["product_id"])
+            elif action == "read":
+                return usb_io.read()
+            elif action == "write":
+                return usb_io.write(data["data"])
+
+        elif peripheral_type == "bluetooth":
+            bluetooth_io = IOLayerFactory.create_io_layer("bluetooth")
+            if action == "detect":
+                return bluetooth_io.detect_devices()
+            elif action == "pair":
+                return bluetooth_io.pair_device(data["address"])
+            elif action == "read":
+                return bluetooth_io.read()
+            elif action == "write":
+                return bluetooth_io.write(data["data"])
+
+        elif peripheral_type == "serial":
+            serial_io = IOLayerFactory.create_io_layer("serial")
+            if action == "detect":
+                return serial_io.detect_devices()
+            elif action == "connect":
+                return serial_io.connect(data["port"], data["baudrate"])
+            elif action == "read":
+                return serial_io.read()
+            elif action == "write":
+                return serial_io.write(data["data"])
+    return None
+```
