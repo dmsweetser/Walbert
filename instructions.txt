@@ -1,11 +1,9 @@
-I want the app to attempt to download the required files:
+I want to be able to ask Walbert to generate an Arduino script for an ESP32 module with x capabilities, be able to see the USB device get connected, be able to upload the script, and then when I turn on the board as a Bluetooth device, I want Walbert to be able to pair with the device, send and receive data to it, and use it as part of its interactions.
 
-https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf?download=true
+***
 
-https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf?download=true
+Also, I want Walbert to be able to execute autonomously.
 
-https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true
+***
 
-https://github.com/ggml-org/llama.cpp/releases/download/b9279/llama-b9279-bin-ubuntu-x64.tar.gz
-
-Update the implementation-guide.md to account for this.
+Expand the feature-spec.md and implementation-guide.md to ensure that these KINDS of capabilities are possible, such that implementing the app would make me able to do what I want. Avoid being hyper-specific in the two documents, though.

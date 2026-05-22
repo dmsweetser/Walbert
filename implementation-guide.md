@@ -17,8 +17,14 @@ import os
 def validate_environment():
     if not os.path.exists("/usr/bin/python3"):
         raise EnvironmentError("Python 3 is required.")
-    if not os.path.exists("llama.cpp/build/bin/llama-completion"):
+    if not os.path.exists("llama.cpp/bin/llama-completion"):
         raise FileNotFoundError("llama.cpp binary not found.")
+    if not os.path.exists("models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"):
+        raise FileNotFoundError("Primary model not found.")
+    if not os.path.exists("models/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf"):
+        raise FileNotFoundError("Multimodal projector not found.")
+    if not os.path.exists("models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"):
+        raise FileNotFoundError("Devstral model not found.")
 ```
 
 ## **GEN-002: Multi-Model llama.cpp Runtime**
@@ -29,7 +35,7 @@ import subprocess
 
 def run_llama_model(model_path, prompt, mmproj_path=None):
     cmd = [
-        "./llama.cpp/build/bin/llama-completion",
+        "./llama.cpp/bin/llama-completion",
         "-m", model_path,
         "--prompt", prompt,
         "--temp", "0.7",
@@ -76,12 +82,12 @@ def init_db():
 # **2. AI / Model Implementation**
 
 ## **AI-001: Primary Model Execution**
-Execute Ministral-3B with mmproj for multimodal support.
+Execute Ministral-3-3B with mmproj for multimodal support.
 
 ```python
 def execute_ministral(prompt, mmproj_path):
     return run_llama_model(
-        model_path="models/ministral-3b-instruct.gguf",
+        model_path="models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
         prompt=prompt,
         mmproj_path=mmproj_path
     )
@@ -111,7 +117,7 @@ def route_model(prompt):
 
 def execute_devstral(prompt):
     return run_llama_model(
-        model_path="models/devstral-24b.gguf",
+        model_path="models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf",
         prompt=prompt
     )
 ```
@@ -364,13 +370,20 @@ Define paths in a config file.
 
 ```python
 import json
+import os
 
 def load_config():
     with open("config.json", "r") as f:
         return json.load(f)
 
 def validate_config(config):
-    required_keys = ["model_paths", "llama_binary_path"]
+    required_keys = [
+        "model_paths",
+        "llama_binary_path",
+        "primary_model_path",
+        "mmproj_path",
+        "devstral_model_path"
+    ]
     for key in required_keys:
         if key not in config:
             raise ValueError(f"Missing config key: {key}")
@@ -385,9 +398,14 @@ Validate binary at startup.
 def validate_llama_binary(config):
     if not os.path.isfile(config["llama_binary_path"]):
         raise FileNotFoundError(f"llama.cpp binary not found at {config['llama_binary_path']}")
-```
+    if not os.path.isfile(config["primary_model_path"]):
+        raise FileNotFoundError(f"Primary model not found at {config['primary_model_path']}")
+    if not os.path.isfile(config["mmproj_path"]):
+        raise FileNotFoundError(f"Multimodal projector not found at {config['mmproj_path']}")
+    if not os.path.isfile(config["devstral_model_path"]):
+        raise FileNotFoundError(f"Devstral model not found at {config['devstral_model_path']}")
 
----
+```
 
 # **8. Testing Implementation**
 
@@ -404,4 +422,4 @@ class TestModelExecution(unittest.TestCase):
         mock_run.return_value.stdout = "Mocked response"
         result = run_llama_model("dummy_path", "test prompt")
         self.assertEqual(result, "Mocked response")
-
+```
