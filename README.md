@@ -1,2 +1,2 @@
 # Walbert
-A local-first, emergent AI agentic framework
+A local-first, console-based AI agentic framework built on llama.cpp

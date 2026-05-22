@@ -1,65 +1,9 @@
-Revise my feature-spec.md - clean it up and reorganize it. Make it explicitly rely on llama.cpp compiled binaries. Here is a similar implementation you can mimic:
+I want you to expand out the walbert_ block format so there are more line types available. The idea is that Walbert should be able to use these to self-determine - for example, like this:
 
-    model_path = Config.get_model_path()
-                            if not model_path:
-                                logging.error("MODEL_PATH environment variable not set for local model.")
-                                raise ValueError("MODEL_PATH environment variable not set.")
+~walbert_should_call_smarter_cousin_start~
+YES
+~walbert_should_call_smarter_cousin_end~
 
-                            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-                            llama_binary = os.path.join(BASE_DIR, "llama.cpp", "build", "bin", "llama-completion")
+The idea is that Walbert's response to the user prompt should direct its next steps, which may not include a response to the user yet. And adding nuance to the options available for these walbert_ blocks will give it that flexibility.
 
-                            if not os.path.isfile(llama_binary):
-                                raise FileNotFoundError(f"llama binary not found at: {llama_binary}")
-
-                            ticks = int(time.time() * 1000)
-                            filename = f"aibuilder_prompt_{ticks}.txt"
-                            with open(filename, "w", encoding='utf-8') as f:
-                                f.write(prompt)
-
-                            cmd = [
-                                llama_binary,
-                                "-m", model_path,
-                                "-f", filename,
-                                "--temp", str(Config.get_temperature()),
-                                "--top-p", str(Config.get_top_p()),
-                                "--top-k", str(Config.get_top_k()),
-                                "--min-p", str(Config.get_min_p()),
-                                "-n", str(Config.get_output_tokens()),
-                                "--ctx-size", str(Config.get_model_context()),
-                                "--no-display-prompt",
-                                "-st"
-                            ]
-
-                            process = subprocess.Popen(
-                                cmd,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE,
-                                text=True,
-                                bufsize=1
-                            )
-
-                            response_content = ""
-                            current_iteration = 0
-
-                            while True:
-                                token = process.stdout.read(1)
-                                if current_iteration % 100 == 0 or not token:
-                                    with open(self.response_file, 'w', encoding='utf-8') as response_log:
-                                        response_log.write(response_content)
-                                if not token:
-                                    os.remove(filename)
-                                    break
-                                response_content += token
-                                current_iteration += 1
-                            process.wait()
-
-The mmproj is a parameter in the binary call.
-
-****
-
-You did pretty well but I want you to push it further. Create a new document that is some kind of implementation guide, based on the requirements of feature-spec.md. Call it implementation-guide.md. In that, begin providing specific examples of how to implement each feature.
-
-****
-
-Also, get rid of the web UI entirely. Make this just a console app. Clean up the feature-spec.md and implementation-guide.md to reflect that.
-
+Revise the feature-spec.md and implementation-guide.md to account for this. Also, in the implementation-guide.md, include a working system prompt as part of the detail there.
