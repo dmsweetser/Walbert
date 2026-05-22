@@ -1,9 +1,3 @@
-I had you build the app, and found that some things were lacking.
+Please build the application outlined in feature-spec.md and implementation-guide.md.
 
-I want the app to be well structured according to SOLID principles.
-
-Also, I want logging throughout.
-
-Also, I want configuration to be centralized and modifyiable via a .env file.
-
-Please generate revisions of implementation-guide.md and feature-spec.md to reflect these new requirements.
+Include complete implementations of every feature, and make the application production-ready.
