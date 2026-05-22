@@ -54,3 +54,12 @@ Revise my feature-spec.md - clean it up and reorganize it. Make it explicitly re
                             process.wait()
 
 The mmproj is a parameter in the binary call.
+
+****
+
+You did pretty well but I want you to push it further. Create a new document that is some kind of implementation guide, based on the requirements of feature-spec.md. Call it implementation-guide.md. In that, begin providing specific examples of how to implement each feature.
+
+****
+
+Also, get rid of the web UI entirely. Make this just a console app. Clean up the feature-spec.md and implementation-guide.md to reflect that.
+

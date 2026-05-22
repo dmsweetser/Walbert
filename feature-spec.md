@@ -1,22 +1,22 @@
 # **Walbert — Feature Specification**
 
-## **Version:** 1.5
+## **Version:** 1.6
 ## **Author:** Daniel
-## **Purpose:** Define the complete feature set required for the Walbert local agent system, including a unified I/O layer interface, autonomous internal reasoning, and comprehensive testing infrastructure.
+## **Purpose:** Define the complete feature set required for the Walbert local agent system, explicitly built on llama.cpp compiled binaries.
 
 ---
 
 # **1. General System Features (GEN)**
 
 - **GEN‑001: Local‑Only Execution**
-  Walbert must run entirely on Linux using only local llama.cpp models.
+  Walbert must run entirely on Linux using only local llama.cpp compiled binaries.
 
 - **GEN‑002: Multi‑Model llama.cpp Runtime**
-  Walbert must load and manage multiple GGUF models simultaneously (Ministral‑3B, mmproj, Devstral‑24B).
-  The mmproj is a parameter during llama-cpp-python execution of the Ministral-3B model
+  Walbert must load and manage multiple GGUF models simultaneously (Ministral‑3B, mmproj, Devstral‑24B) via llama.cpp binaries.
+  The mmproj is passed as a parameter to the llama.cpp binary during Ministral-3B execution.
 
 - **GEN‑003: Minimal Dependency Footprint**
-  The system must rely on a minimal set of Python libraries and avoid heavy frameworks.
+  The system must rely only on Python and llama.cpp compiled binaries.
 
 - **GEN‑004: Virtual Environment Setup**
   Installation must create a Python venv and install only essential packages.
@@ -43,7 +43,7 @@
   Walbert must autonomously determine when a conversation is complete and reset its state.
 
 - **GEN‑012: Dual Conversation Logging**
-  All conversations must be logged to both the database (both as summary and in full form, in separate columns) and a raw log file.
+  All conversations must be logged to both the database (summary and full form) and a raw log file.
 
 - **GEN‑013: Comprehensive Testing Framework**
   The system must include unit tests, integration tests, and mocking infrastructure for all major components.
@@ -51,22 +51,28 @@
 - **GEN‑014: Factory Pattern Implementation**
   All major components must be instantiatable through factory methods for dependency injection and testability.
 
+- **GEN‑015: llama.cpp Binary Path Configuration**
+  The system must define and validate paths to llama.cpp compiled binaries (e.g., `llama-completion`).
+
 ---
 
 # **2. AI / Model Features (AI)**
 
 - **AI‑001: Primary Model — Ministral‑3B‑Instruct‑2512‑GGUF**
-  Used for all default reasoning and decision-making. 
-  The MMPROJ will be included as a parameter to allow for image processing.
+  Used for all default reasoning and decision-making via llama.cpp binary.
+  The MMPROJ is passed as a parameter to enable image processing.
+
+- **AI‑002: llama.cpp Binary Execution**
+  All model inference must be performed using llama.cpp compiled binaries with subprocess execution.
 
 - **AI‑003: Smarter Cousin — Devstral‑24B (Local)**
-  Used only when the primary model decides it needs deeper reasoning or coding assistance.
+  Used only when the primary model decides it needs deeper reasoning or coding assistance via llama.cpp binary.
 
 - **AI‑004: Autonomous Model Router**
   The primary model must autonomously decide when to:
   - Query its datastore
   - Invoke a stored skill
-  - Call Devstral‑24B
+  - Call Devstral‑24B via llama.cpp binary
   - Perform multi-step reasoning
 
   **The user never selects Devstral directly.**
@@ -143,7 +149,7 @@ Walbert must treat all external communication channels as **I/O layers** impleme
   Must support many-to-many relationships between items and tags.
 
 - **DATA‑004: Conversations Table**
-  Must store summarized conversation sessions and full conversation data, using the summary to avoid context bloat.
+  Must store summarized conversation sessions and full conversation data.
 
 - **DATA‑005: Messages Table**
   Must store individual messages with metadata (queryable by tag/category).
@@ -152,7 +158,7 @@ Walbert must treat all external communication channels as **I/O layers** impleme
   Must support storing and retrieving persistent memories with tiered relevance.
 
 - **DATA‑007: Image Storage**
-  Must store raw image bytes and metadata for multimodal inference.
+  Must store raw image bytes and metadata for multimodal inference via llama.cpp binary.
 
 - **DATA‑008: Raw Conversation Logs**
   Must log all conversations to file in raw format, separate from the database.
@@ -225,16 +231,19 @@ Walbert must emit **all responses and internal deliberations** using the followi
 # **8. Scripts & Environment Features (ENV)**
 
 - **ENV‑001: install.sh**
-  Must create venv and install minimal dependencies.
+  Must create venv, install minimal dependencies, and validate llama.cpp binary paths.
 
 - **ENV‑002: run.sh**
-  Must activate venv and start the web interface.
+  Must activate venv, validate llama.cpp binaries, and start the web interface.
 
 - **ENV‑003: requirements.txt**
   Must list only essential Python packages.
 
 - **ENV‑004: Config System**
-  Must define paths to all GGUF models and llama.cpp binaries.
+  Must define paths to all GGUF models and llama.cpp compiled binaries.
+
+- **ENV‑005: llama.cpp Binary Validation**
+  The system must validate the existence of llama.cpp binaries at startup.
 
 ---
 
@@ -260,10 +269,10 @@ Walbert must emit **all responses and internal deliberations** using the followi
   All major components must have comprehensive unit tests.
 
 - **TEST‑002: Integration Tests**
-  System integration must be verified with integration tests.
+  System integration must be verified with integration tests, including llama.cpp binary execution.
 
 - **TEST‑003: Mocking Infrastructure**
-  All external dependencies must be mockable for testing.
+  All external dependencies (including llama.cpp binaries) must be mockable for testing.
 
 - **TEST‑004: Factory Pattern**
   All components must be instantiatable through factory methods.
