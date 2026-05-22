@@ -30,8 +30,11 @@
 - **GEN-007: Unified Walbert Response Protocol**
   All model outputs must use a simplified block-based format for responses and internal deliberation.
 
-- **GEN-008: Console I/O Layer**
-  All external communication must occur via a console interface.
+- **GEN-008: Configurable I/O Layers**
+  All I/O layers must be enabled or disabled via user configuration.
+
+- **GEN-009: Console I/O Layer**
+  The system must accept text input and display text output via the console as the default I/O layer.
 
 - **GEN-009: Zero-State Boot**
   Walbert must operate with an empty database and learn its identity and skills over time.
@@ -91,22 +94,37 @@
 
 ---
 
-# **3. Console I/O Layer Features (IOL)**
+# **3. Unified I/O Layer Features (IOL)**
 
-- **IOL-001: Console Input**
-  The system must accept text input from the console.
+- **IOL-001: I/O Layer Configuration**
+  The system must allow users to enable or disable I/O layers via configuration.
 
-- **IOL-002: Console Output**
-  The system must display text output to the console.
+- **IOL-002: User Authorization for Execution**
+  Each I/O layer must support a user authorization step before executing actions (e.g., code execution, hardware interaction).
 
-- **IOL-003: Input Types**
+- **IOL-003: Console I/O Layer**
+  The system must accept text input and display text output via the console.
+
+- **IOL-004: Console Input**
   Supported input types:
   - Text
 
-- **IOL-004: Output Types**
+- **IOL-005: Console Output**
   Supported output types:
   - Text
   - Skill-generated artifacts
+
+- **IOL-006: Python Code Execution Layer**
+  The system must support executing Python code with user authorization.
+
+- **IOL-007: Serial I/O Layer**
+  The system must support bidirectional serial communication with user authorization for device interactions.
+
+- **IOL-008: Bluetooth I/O Layer**
+  The system must support Bluetooth device discovery, pairing, and communication with user authorization.
+
+- **IOL-009: USB I/O Layer**
+  The system must support USB device detection and communication with user authorization.
 
 ---
 
@@ -237,22 +255,22 @@ Walbert must emit **all responses and internal deliberations** using the followi
 # **10. Autonomous Execution Features (AUTO)**
 
 - **AUTO-001: Autonomous Decision-Making**
-  Walbert must autonomously evaluate and execute actions without explicit user input.
+  Walbert must autonomously evaluate and execute actions with user authorization for sensitive operations.
 
 - **AUTO-002: Self-Triggered Actions**
-  Walbert must initiate actions based on internal state, datastore queries, or external events.
+  Walbert must initiate actions based on internal state, datastore queries, or external events, with user authorization for execution.
 
 - **AUTO-003: Continuous Operation**
-  Walbert must support long-running autonomous operation with periodic state resets.
+  Walbert must support long-running autonomous operation with periodic state resets and user-configurable authorization checks.
 
 - **AUTO-004: Event-Driven Execution**
-  Walbert must respond to external events (e.g., hardware signals, timers) autonomously.
+  Walbert must respond to external events (e.g., hardware signals, timers) autonomously, with user authorization for critical actions.
 
 - **AUTO-005: Unified Channel Routing**
-  Walbert must use `walbert_response_channel` blocks to determine the appropriate channel for each action or response.
+  Walbert must use `walbert_response_channel` blocks to determine the appropriate channel for each action or response, respecting user configuration.
 
 - **AUTO-006: Cross-Channel Workflows**
-  Walbert must support workflows that span multiple channels (e.g., receive input via console, interact with Bluetooth device, return response via console).
+  Walbert must support workflows that span multiple channels (e.g., receive input via console, interact with Bluetooth device, return response via console) with user authorization for each step.
 
 # **11. Testing Features (TEST)**
 

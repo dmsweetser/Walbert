@@ -507,6 +507,39 @@ def validate_llama_binary(config):
 
 ```
 
+## **ENV-006: I/O Layer Configuration**
+Define and validate I/O layer configurations.
+
+```python
+import json
+import os
+
+def load_io_config():
+    default_config = {
+        "io_layers": {
+            "console": {"enabled": True},
+            "serial": {"enabled": False},
+            "bluetooth": {"enabled": False},
+            "usb": {"enabled": False},
+            "python_code": {"enabled": True}
+        }
+    }
+
+    if not os.path.exists("io_config.json"):
+        with open("io_config.json", "w") as f:
+            json.dump(default_config, f, indent=4)
+        return default_config
+
+    with open("io_config.json", "r") as f:
+        return json.load(f)
+
+def validate_io_config(config):
+    required_layers = ["console", "serial", "bluetooth", "usb", "python_code"]
+    for layer in required_layers:
+        if layer not in config.get("io_layers", {}):
+            raise ValueError(f"Missing I/O layer configuration: {layer}")
+```
+
 # **8. Testing Implementation**
 
 ## **TEST-003: Mocking Infrastructure**

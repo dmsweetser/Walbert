@@ -3,3 +3,7 @@ While I want Walbert to operate autonomously, I want some simple controls in pla
 IO layers should be enabled or disabled by the user via configuration. In addition, each IO layer should let the user indicate that the user needs to authorize the execution before it is done. So for example, one IO layer should be the terminal / python code execution. The input to that should be code from Walbert, the output will be std out and std err. But I want to approve that execution before it happens.
 
 Revise the feature-spec.md and implementation-guide.md to reflect these intentions..
+
+***
+
+You got close, but I don't just want to enable or disable an IO layer. I also want to indicate whether permission is needed to send output to that layer.
