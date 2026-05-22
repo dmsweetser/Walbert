@@ -31,7 +31,7 @@
   All model outputs must use a simplified block-based format for responses and internal deliberation.
 
 - **GEN-008: Configurable I/O Layers**
-  All I/O layers must be enabled or disabled via user configuration.
+  All I/O layers must be enabled, disabled, or set to require user authorization via configuration.
 
 - **GEN-009: Console I/O Layer**
   The system must accept text input and display text output via the console as the default I/O layer.
@@ -97,10 +97,10 @@
 # **3. Unified I/O Layer Features (IOL)**
 
 - **IOL-001: I/O Layer Configuration**
-  The system must allow users to enable or disable I/O layers via configuration.
+  The system must allow users to configure I/O layers as enabled, disabled, or requiring user authorization via `io_config.json`.
 
 - **IOL-002: User Authorization for Execution**
-  Each I/O layer must support a user authorization step before executing actions (e.g., code execution, hardware interaction).
+  Each I/O layer must support a user authorization step before executing actions if configured to require authorization (e.g., code execution, hardware interaction).
 
 - **IOL-003: Console I/O Layer**
   The system must accept text input and display text output via the console.

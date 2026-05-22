@@ -293,6 +293,19 @@ def emit_input_channel(channel):
 
 ```
 
+# **IOL-008: User Authorization Flow**
+Handle user authorization for I/O layer actions.
+
+```python
+def request_user_authorization(layer_name, action_description):
+    print(f"\n[Authorization Request]")
+    print(f"Layer: {layer_name}")
+    print(f"Action: {action_description}")
+    print("Do you authorize this action? (yes/no): ", end="")
+    response = input().strip().lower()
+    return response == "yes"
+```
+
 # **4. Data & Storage Implementation**
 
 ## **DATA-001: Items Table**
