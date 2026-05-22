@@ -77,7 +77,62 @@ def init_db():
     conn.close()
 ```
 
----
+## **GEN-006: Configuration File Example**
+Example `.env` file for Walbert configuration.
+
+```ini
+# Path to llama.cpp binary
+LLAMA_BINARY_PATH=./llama.cpp/bin/llama-completion
+
+# Model paths
+PRIMARY_MODEL_PATH=models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
+MMPROJ_PATH=models/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf
+DEVSTRAL_MODEL_PATH=models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf
+
+# Model parameters
+MODEL_TEMPERATURE=0.7
+MODEL_CONTEXT_SIZE=2048
+
+# Logging configuration
+LOG_LEVEL=INFO
+
+# Database configuration
+DATABASE_PATH=walbert.db
+
+# I/O Layer configuration
+IO_CONFIG_PATH=io_config.json
+```
+
+## **GEN-007: I/O Configuration File Example**
+Example `io_config.json` file for I/O layer configuration.
+
+```json
+{
+    "io_layers": {
+        "console": {
+            "enabled": true,
+            "require_authorization": false
+        },
+        "serial": {
+            "enabled": false,
+            "require_authorization": true,
+            "default_baudrate": 9600
+        },
+        "bluetooth": {
+            "enabled": false,
+            "require_authorization": true
+        },
+        "usb": {
+            "enabled": false,
+            "require_authorization": true
+        },
+        "python_code": {
+            "enabled": true,
+            "require_authorization": true
+        }
+    }
+}
+```
 
 # **2. AI / Model Implementation**
 

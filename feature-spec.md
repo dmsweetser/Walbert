@@ -285,3 +285,66 @@ Walbert must emit **all responses and internal deliberations** using the followi
 
 - **TEST-004: Factory Pattern**
   All components must be instantiatable through factory methods.
+# **12. SOLID Principles Features (SOLID)**
+
+- **SOLID-001: Single Responsibility Principle**
+  Each class must have only one reason to change, with clear separation of concerns across all components.
+
+- **SOLID-002: Open/Closed Principle**
+  The system must be open for extension but closed for modification, allowing new functionality to be added without changing existing code.
+
+- **SOLID-003: Liskov Substitution Principle**
+  Subclasses must be substitutable for their base classes without altering the correctness of the program.
+
+- **SOLID-004: Interface Segregation Principle**
+  Clients must not be forced to depend on interfaces they do not use, with small, focused interfaces for all components.
+
+- **SOLID-005: Dependency Inversion Principle**
+  High-level modules must not depend on low-level modules, both must depend on abstractions, with dependency injection throughout the system.
+
+- **SOLID-006: Dependency Injection Container**
+  The system must implement a centralized dependency injection container for managing all component dependencies.
+
+- **SOLID-007: Abstract Base Classes**
+  The system must use abstract base classes to define interfaces for all major components.
+
+- **SOLID-008: Factory Pattern**
+  The system must implement factory patterns for creating instances of complex objects.
+
+- **SOLID-009: Strategy Pattern**
+  The system must use strategy pattern for interchangeable algorithms and behaviors.
+
+- **SOLID-010: Configuration as Dependency**
+  Configuration must be treated as a dependency and injected into components that require it.
+
+# **13. Logging Features (LOG)**
+
+- **LOG-001: Comprehensive Logging**
+  The system must implement comprehensive logging throughout all components with configurable log levels.
+
+- **LOG-002: Standardized Log Format**
+  All log messages must follow a standardized format with timestamp, logger name, log level, and message.
+
+- **LOG-003: Multiple Log Handlers**
+  The system must support multiple log handlers including console and file handlers.
+
+- **LOG-004: Log Rotation**
+  File-based logging must implement log rotation to prevent excessive disk usage.
+
+- **LOG-005: Contextual Logging**
+  The system must provide contextual information in log messages where appropriate.
+
+- **LOG-006: Error Logging**
+  All exceptions must be logged with full stack traces at the appropriate log level.
+
+- **LOG-007: Performance Logging**
+  The system must log performance metrics for critical operations.
+
+- **LOG-008: Configuration Logging**
+  The system must log all configuration values at startup for debugging purposes.
+
+- **LOG-009: Sensitive Data Handling**
+  The system must never log sensitive data such as passwords or API keys.
+
+- **LOG-010: Log Filtering**
+  The system must support log filtering based on log level and logger name.
