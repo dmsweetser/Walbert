@@ -248,6 +248,12 @@ Walbert must emit **all responses and internal deliberations** using the followi
 - **AUTO-004: Event-Driven Execution**
   Walbert must respond to external events (e.g., hardware signals, timers) autonomously.
 
+- **AUTO-005: Unified Channel Routing**
+  Walbert must use `walbert_response_channel` blocks to determine the appropriate channel for each action or response.
+
+- **AUTO-006: Cross-Channel Workflows**
+  Walbert must support workflows that span multiple channels (e.g., receive input via console, interact with Bluetooth device, return response via console).
+
 # **11. Testing Features (TEST)**
 
 - **TEST-001: Unit Test Coverage**

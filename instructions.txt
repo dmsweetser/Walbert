@@ -1,3 +1,5 @@
-Input and output should be conceptually centralized and unified with one interface. So chat or image input from the user, chat responses, serial input or output, should look similar to Walbert. The idea is that walbert_ blocks determine the next channel to use, and what to provide to it. In theory, Walbert could receive a request from the user, call its smarter cousin, execute a command against a Bluetooth device, get a response, and then return the response in a chat to the user.
+While I want Walbert to operate autonomously, I want some simple controls in place.
 
-Revise the feature-spec.md and implementation-guide.md to reflect these intentions.
+IO layers should be enabled or disabled by the user via configuration. In addition, each IO layer should let the user indicate that the user needs to authorize the execution before it is done. So for example, one IO layer should be the terminal / python code execution. The input to that should be code from Walbert, the output will be std out and std err. But I want to approve that execution before it happens.
+
+Revise the feature-spec.md and implementation-guide.md to reflect these intentions..

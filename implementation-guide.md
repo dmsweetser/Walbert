@@ -124,36 +124,121 @@ def execute_devstral(prompt):
 
 ---
 
-# **3. Console I/O Layer Implementation**
+# **3. Unified I/O Layer Implementation**
 
-## **IOL-001: Console Input**
-Read input from the console.
+## **IOL-001: I/O Layer Factory**
+Create I/O layer instances for different channels.
 
 ```python
-def get_console_input():
-    return input("> ")
+class IOLayerFactory:
+    @staticmethod
+    def create_io_layer(channel_type):
+        if channel_type == "console":
+            return ConsoleIOLayer()
+        elif channel_type == "serial":
+            return SerialIOLayer()
+        elif channel_type == "bluetooth":
+            return BluetoothIOLayer()
+        elif channel_type == "usb":
+            return USBIOLayer()
+        else:
+            raise ValueError(f"Unsupported channel type: {channel_type}")
 ```
 
-## **IOL-002: Console Output**
-Display output to the console.
+## **IOL-002: Console I/O Layer**
+Read input from and display output to the console.
 
 ```python
-def display_console_output(text):
-    print(text)
+class ConsoleIOLayer:
+    def read(self):
+        return input("> ")
+
+    def write(self, text):
+        print(text)
 ```
 
-## **IOL-003: Input/Output Loop**
-Main console interaction loop.
+## **IOL-003: Serial I/O Layer**
+Bidirectional serial communication.
 
 ```python
-def console_loop():
+class SerialIOLayer:
+    def __init__(self, port=None, baudrate=9600):
+        import serial
+        self.port = port or self.detect_ports()[0]
+        self.serial = serial.Serial(self.port, baudrate)
+
+    def detect_ports(self):
+        import serial.tools.list_ports
+        ports = serial.tools.list_ports.comports()
+        return [port.device for port in ports]
+
+    def read(self):
+        return self.serial.readline().decode('utf-8').strip()
+
+    def write(self, text):
+        self.serial.write(text.encode('utf-8'))
+```
+
+## **IOL-004: Bluetooth I/O Layer**
+Discover, pair, and communicate with Bluetooth devices.
+
+```python
+class BluetoothIOLayer:
+    def discover_devices(self):
+        import bluetooth
+        nearby_devices = bluetooth.discover_devices(lookup_names=True)
+        return nearby_devices
+
+    def pair_device(self, address):
+        import bluetooth
+        sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+        sock.connect((address, 1))
+        return sock
+
+    def read(self, sock):
+        return sock.recv(1024).decode('utf-8').strip()
+
+    def write(self, sock, text):
+        sock.send(text.encode('utf-8'))
+```
+
+## **IOL-005: USB I/O Layer**
+Detect and communicate with USB devices.
+
+```python
+class USBIOLayer:
+    def detect_devices(self):
+        import usb.core
+        devices = usb.core.find(find_all=True)
+        return [(dev.idVendor, dev.idProduct) for dev in devices]
+
+    def connect(self, vendor_id, product_id):
+        import usb.core
+        dev = usb.core.find(idVendor=vendor_id, idProduct=product_id)
+        if dev is None:
+            raise ValueError("Device not found")
+        return dev
+
+    def read(self, dev, endpoint=0x81, size=64):
+        return dev.read(endpoint, size).tobytes()
+
+    def write(self, dev, data, endpoint=0x01):
+        dev.write(endpoint, data)
+```
+
+## **IOL-006: Unified Input/Output Loop**
+Main interaction loop supporting multiple channels.
+
+```python
+def io_loop():
     while True:
-        user_input = get_console_input()
-        if user_input.lower() == "exit":
-            break
+        # Determine input channel (simplified for example)
+        input_channel = "console"  # Could be determined dynamically
+        io_layer = IOLayerFactory.create_io_layer(input_channel)
 
-        # Initialize with system prompt
-        full_prompt = SYSTEM_PROMPT + "\n\nUser: " + user_input
+        # Read input with channel metadata
+        user_input = io_layer.read()
+        full_prompt = SYSTEM_PROMPT + "\n\n" + emit_input_channel(input_channel) + "\nUser: " + user_input
 
         # Process until conversation is complete
         conversation_active = True
@@ -183,15 +268,30 @@ def console_loop():
                 memory = parsed.get("memory_storage", {})
                 store_item(memory["content"], memory["tags"])
 
+            if parsed.get("should_interact_with_hardware") == "YES":
+                handle_hardware_interaction(parsed)
+
             if parsed.get("conversation_complete") == "YES":
                 conversation_active = False
 
-            # Display final response if channel is console
-            if parsed.get("channel") == "console" and parsed.get("response"):
-                display_console_output(parsed["response"])
+            # Route response to appropriate channel
+            response_channel = parsed.get("channel", "console")
+            if parsed.get("response"):
+                io_layer = IOLayerFactory.create_io_layer(response_channel)
+                io_layer.write(parsed["response"])
 ```
 
----
+## **IOL-007: Emit Input Channel**
+Emit the input channel block for context.
+
+```python
+def emit_input_channel(channel):
+    return f"""~walbert_input_channel_start~
+{channel}
+~walbert_input_channel_end~
+"""
+
+```
 
 # **4. Data & Storage Implementation**
 
@@ -499,7 +599,7 @@ def upload_firmware(port, script):
 ```
 
 ## **HW-005: Autonomous Hardware Interaction**
-Autonomously decide and execute hardware interactions.
+Autonomously decide and execute hardware interactions through the unified I/O layer.
 
 ```python
 def handle_hardware_interaction(parsed_response):
@@ -509,37 +609,36 @@ def handle_hardware_interaction(parsed_response):
         action = hardware_action.get("action")
         data = hardware_action.get("data", {})
 
-        if peripheral_type == "usb":
-            usb_io = IOLayerFactory.create_io_layer("usb")
-            if action == "detect":
-                return usb_io.detect_devices()
-            elif action == "connect":
-                return usb_io.connect(data["vendor_id"], data["product_id"])
-            elif action == "read":
-                return usb_io.read()
-            elif action == "write":
-                return usb_io.write(data["data"])
+        io_layer = IOLayerFactory.create_io_layer(peripheral_type)
 
-        elif peripheral_type == "bluetooth":
-            bluetooth_io = IOLayerFactory.create_io_layer("bluetooth")
-            if action == "detect":
-                return bluetooth_io.detect_devices()
-            elif action == "pair":
-                return bluetooth_io.pair_device(data["address"])
-            elif action == "read":
-                return bluetooth_io.read()
-            elif action == "write":
-                return bluetooth_io.write(data["data"])
-
-        elif peripheral_type == "serial":
-            serial_io = IOLayerFactory.create_io_layer("serial")
-            if action == "detect":
-                return serial_io.detect_devices()
-            elif action == "connect":
-                return serial_io.connect(data["port"], data["baudrate"])
-            elif action == "read":
-                return serial_io.read()
-            elif action == "write":
-                return serial_io.write(data["data"])
+        if action == "detect":
+            return io_layer.detect_devices()
+        elif action == "connect":
+            if peripheral_type == "usb":
+                return io_layer.connect(data["vendor_id"], data["product_id"])
+            elif peripheral_type == "bluetooth":
+                return io_layer.pair_device(data["address"])
+            elif peripheral_type == "serial":
+                return io_layer.connect(data["port"], data["baudrate"])
+        elif action == "read":
+            if peripheral_type == "bluetooth":
+                return io_layer.read(data["sock"])
+            else:
+                return io_layer.read()
+        elif action == "write":
+            if peripheral_type == "bluetooth":
+                return io_layer.write(data["sock"], data["data"])
+            else:
+                return io_layer.write(data["data"])
     return None
+```
+
+## **HW-006: Multimodal Input Processing**
+Process image inputs from connected peripherals.
+
+```python
+def process_image_input(image_data):
+    # Convert image data to text description or embeddings
+    # This is a placeholder for actual multimodal processing
+    return "Image received and processed"
 ```
