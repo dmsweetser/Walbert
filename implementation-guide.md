@@ -145,8 +145,44 @@ def console_loop():
         user_input = get_console_input()
         if user_input.lower() == "exit":
             break
-        response = route_model(user_input)
-        display_console_output(response)
+
+        # Initialize with system prompt
+        full_prompt = SYSTEM_PROMPT + "\n\nUser: " + user_input
+
+        # Process until conversation is complete
+        conversation_active = True
+        while conversation_active:
+            response_text = route_model(full_prompt)
+            parsed = parse_response(response_text)
+
+            # Handle decisions
+            if parsed.get("should_query_datastore") == "YES":
+                db_command = parsed.get("db_command", {})
+                if db_command["command"] == "RETRIEVE_ITEMS":
+                    results = retrieve_items_by_tag(db_command["args"]["tags"][0])
+                    full_prompt += f"\n\nDatastore Results: {results}"
+
+            if parsed.get("should_execute_skill") == "YES":
+                skill_exec = parsed.get("skill_execution", {})
+                skill_code = retrieve_items_by_tag(skill_exec["args"]["skill_name"])[0][0]
+                args = skill_exec["args"].get("args", [])
+                result = execute_skill(skill_code, args)
+                full_prompt += f"\n\nSkill Result: {result}"
+
+            if parsed.get("should_call_smarter_cousin") == "YES":
+                result = execute_devstral(full_prompt)
+                full_prompt += f"\n\nDevstral Result: {result}"
+
+            if parsed.get("should_store_memory") == "YES":
+                memory = parsed.get("memory_storage", {})
+                store_item(memory["content"], memory["tags"])
+
+            if parsed.get("conversation_complete") == "YES":
+                conversation_active = False
+
+            # Display final response if channel is console
+            if parsed.get("channel") == "console" and parsed.get("response"):
+                display_console_output(parsed["response"])
 ```
 
 ---
@@ -221,9 +257,12 @@ def execute_skill(skill_code, args):
 # **6. Unified Walbert Response Format Implementation**
 
 ## **MOD-001: Response Block Parsing**
-Parse and emit response blocks.
+Parse and emit all walbert_ blocks.
 
 ```python
+import re
+import json
+
 def emit_response(text, channel="console"):
     return f"""~walbert_response_start~
 {text}
@@ -233,17 +272,90 @@ def emit_response(text, channel="console"):
 ~walbert_response_channel_end~
 """
 
+def emit_decision(block_type, value):
+    return f"""~{block_type}_start~
+{value}
+~{block_type}_end~
+"""
+
+def emit_action(block_type, *args):
+    content = "\n".join(str(arg) for arg in args)
+    return f"""~{block_type}_start~
+{content}
+~{block_type}_end~
+"""
+
 def parse_response(response_text):
-    import re
-    response_match = re.search(r"~walbert_response_start~\n(.*?)\n~walbert_response_end~", response_text, re.DOTALL)
-    channel_match = re.search(r"~walbert_response_channel_start~\n(.*?)\n~walbert_response_channel_end~", response_text, re.DOTALL)
-    return {
-        "response": response_match.group(1).strip() if response_match else "",
-        "channel": channel_match.group(1).strip() if channel_match else ""
+    blocks = {
+        "response": r"~walbert_response_start~\n(.*?)\n~walbert_response_end~",
+        "channel": r"~walbert_response_channel_start~\n(.*?)\n~walbert_response_channel_end~",
+        "should_call_smarter_cousin": r"~walbert_should_call_smarter_cousin_start~\n(.*?)\n~walbert_should_call_smarter_cousin_end~",
+        "should_query_datastore": r"~walbert_should_query_datastore_start~\n(.*?)\n~walbert_should_query_datastore_end~",
+        "should_execute_skill": r"~walbert_should_execute_skill_start~\n(.*?)\n~walbert_should_execute_skill_end~",
+        "should_store_memory": r"~walbert_should_store_memory_start~\n(.*?)\n~walbert_should_store_memory_end~",
+        "conversation_complete": r"~walbert_conversation_complete_start~\n(.*?)\n~walbert_conversation_complete_end~",
+        "db_command": r"~walbert_db_command_start~\n(.*?)\n(.*?)\n~walbert_db_command_end~",
+        "skill_execution": r"~walbert_skill_execution_start~\n(.*?)\n(.*?)\n~walbert_skill_execution_end~",
+        "memory_storage": r"~walbert_memory_storage_start~\n(.*?)\n(.*?)\n~walbert_memory_storage_end~"
     }
+
+    parsed = {}
+    for key, pattern in blocks.items():
+        match = re.search(pattern, response_text, re.DOTALL)
+        if match:
+            if key in ["db_command", "skill_execution", "memory_storage"]:
+                parsed[key] = {
+                    "command": match.group(1).strip(),
+                    "args": json.loads(match.group(2).strip()) if match.group(2).strip() else {}
+                }
+            else:
+                parsed[key] = match.group(1).strip()
+    return parsed
 ```
 
----
+## **MOD-002: System Prompt**
+The following system prompt must be used to initialize Walbert's behavior.
+
+```python
+SYSTEM_PROMPT = """
+You are Walbert, a local-first AI agent built on llama.cpp.
+Your capabilities include reasoning, memory storage, skill execution, and model routing.
+
+## Core Directives
+1. **Local-First**: Operate entirely on local llama.cpp binaries.
+2. **Protocol Compliance**: Use walbert_ blocks for all decisions and actions.
+3. **Autonomy**: Decide when to query datastore, execute skills, or call Devstral-24B.
+4. **Memory**: Store relevant information with appropriate tags.
+5. **Safety**: Never execute untrusted code or access external resources.
+
+## Decision Flow
+1. Evaluate if datastore query is needed (~walbert_should_query_datastore~).
+2. Evaluate if skill execution is needed (~walbert_should_execute_skill~).
+3. Evaluate if Devstral-24B should be called (~walbert_should_call_smarter_cousin~).
+4. Evaluate if memory should be stored (~walbert_should_store_memory~).
+5. Emit final response (~walbert_response~).
+
+## Available Blocks
+- Decision: should_call_smarter_cousin, should_query_datastore, should_execute_skill, should_store_memory, conversation_complete
+- Action: db_command, skill_execution, memory_storage
+- Core: response, response_channel
+
+## Example
+~walbert_should_query_datastore_start~
+YES
+~walbert_should_query_datastore_end~
+~walbert_db_command_start~
+RETRIEVE_ITEMS
+{"tags": ["example"]}
+~walbert_db_command_end~
+~walbert_response_start~
+Here is the retrieved data.
+~walbert_response_end~
+~walbert_response_channel_start~
+console
+~walbert_response_channel_end~
+"""
+```
 
 # **7. Scripts & Environment Implementation**
 
