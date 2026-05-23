@@ -5,3 +5,9 @@ Have the current DB schema be part of the prompt - extract it from the database 
 And instead of giving granular, structured access to the DB, allow Walbert to execute any arbitrary SQLITE-compatible SQL statement.
 
 Replace the existing functionality with this new approach.
+
+****
+
+You tried before, but rather than extracting the current schema from the database, you hard-coded it. Gross.
+
+Try again, and this time have it export the current schema as it is in the DB.
