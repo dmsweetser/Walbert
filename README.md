@@ -56,7 +56,7 @@ cd walbert
     },
     "llama_binary_path": "/path/to/llama.cpp/bin/llama-server",
     "mmproj_path": "/path/to/mmproj.gguf",
-    "log_level": "INFO"
+    "log_level": "DEBUG"
 }
 ```
 

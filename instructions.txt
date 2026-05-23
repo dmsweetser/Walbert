@@ -3,3 +3,7 @@ Please add comprehensive logging at the debug level so I can see all the process
 I also want you to store raw conversation data in the instance folder under a conversations subdirectory, where a RAW version has all the details, and a CHAT version has just the chat text back and forth.
 
 I plan to use this for archival and diagnostic purposes.
+
+***
+
+Also, I don't see anything actually get saved to the DB. I think it's all sitting in a journal. Can you fix that?
