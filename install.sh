@@ -4,6 +4,8 @@
 
 set -e
 
+mkdir -p instance
+mkdir -p instance/llama.cpp
 mkdir -p instance/llama.cpp/bin
 
 # Create virtual environment

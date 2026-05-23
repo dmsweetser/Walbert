@@ -52,7 +52,7 @@ class TestResponseParser(unittest.TestCase):
         """
         parsed = self.parser.parse_response(response)
         self.assertEqual(parsed.get("db_command", {}).get("command"), "RETRIEVE_ITEMS")
-        self.assertEqual(parsed.get("db_command", {}).get("args").get("tags"), ["test"])
+        self.assertEqual(parsed.get("db_command", {}).get("args", {}).get("tags"), ["test"])
 
     def test_parse_complex_response(self):
         response = """

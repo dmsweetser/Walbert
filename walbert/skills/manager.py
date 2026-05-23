@@ -28,17 +28,21 @@ class SkillManager:
     def execute_skill(self, skill_code: str, args: List[str] = None) -> str:
         """Execute a skill in sandboxed environment"""
         args = args or []
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py') as f:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
             f.write(skill_code)
             f.flush()
+            temp_path = f.name
 
+        try:
             result = subprocess.run(
-                ['python3', f.name] + args,
+                ['python3', temp_path] + args,
                 capture_output=True,
                 text=True
             )
-
-            # Clean up
-            os.unlink(f.name)
-
             return result.stdout
+        finally:
+            # Clean up
+            try:
+                os.unlink(temp_path)
+            except:
+                pass

@@ -27,38 +27,27 @@ class ModelManager:
                 raise FileNotFoundError(f"{model_name} model not found at {model_path}")
 
     def execute_model(self, model_path: str, prompt: str, mmproj_path: Optional[str] = None) -> str:
-        """Execute model through llama.cpp server binary with multimodal support"""
+        """Execute model through llama.cpp binary with direct CLI execution"""
         cmd = [
             self.config.llama_binary_path,
             "-m", model_path,
             "--ctx-size", "2048",
-            "--temp", "0.7"
+            "--temp", "0.7",
+            "-p", prompt,
+            "-n", "256"
         ]
 
         if mmproj_path:
             cmd.extend(["--mmproj", mmproj_path])
 
-        logger.info(f"Starting llama-server: {' '.join(cmd)}")
-        server = subprocess.Popen(cmd)
+        logger.info(f"Executing model: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True)
 
-        try:
-            # Wait for server to start
-            import time
-            time.sleep(5)
+        if result.returncode != 0:
+            logger.error(f"Model execution failed: {result.stderr}")
+            raise RuntimeError(f"Model execution failed: {result.stderr}")
 
-            # Now send the prompt via the OpenAI-compatible API
-            payload = {
-                "model": "default",
-                "messages": [{"role": "user", "content": prompt}]
-            }
-            response = requests.post("http://localhost:8080/v1/chat/completions", json=payload, timeout=30)
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
-        except Exception as e:
-            logger.error(f"Error executing model: {e}")
-            raise
-        finally:
-            server.terminate()
+        return result.stdout
 
     def execute_ministral(self, prompt: str, mmproj_path: Optional[str] = None) -> str:
         """Execute Ministral model"""

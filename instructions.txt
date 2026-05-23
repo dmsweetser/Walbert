@@ -1,17 +1,1 @@
-
-I want to merge "download_models.sh" into "install.sh", and have it only download if the files aren't already present.
-
-***
-
-I want to move all the classes into individual files.
-
-***
-
-Consolidate any instance-specific content (like logs, the db, configs, etc...) into an instance subdirectory.
-
-***
-
-It seems like it tries to send empty input to llama. I believe that is related to my run errors. Please fix the run errors.
-
-***
-
+Please fix the issues in my run.results and tests.results, as well as any other issues you see, so that the app is fully-functional.

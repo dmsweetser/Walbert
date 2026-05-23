@@ -25,7 +25,8 @@ class TestModelManager(unittest.TestCase):
             llama_binary_path="test_llama",
             log_level="DEBUG"
         )
-        self.model_manager = ModelManager(self.config)
+        with patch('os.path.isfile', return_value=True):
+            self.model_manager = ModelManager(self.config)
 
     @patch('os.path.isfile')
     def test_validate_binaries_success(self, mock_isfile):
