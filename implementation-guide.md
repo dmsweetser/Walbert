@@ -161,22 +161,6 @@ def execute_model(model_path, prompt):
     return run_llama_model(model_path, prompt)
 ```
 
-## **AI-004: Autonomous Model Router**
-Route between models based on prompt complexity.
-
-```python
-def route_model(prompt):
-    if "code" in prompt.lower() or "complex" in prompt.lower():
-        return execute_devstral(prompt)
-    return execute_ministral(prompt, mmproj_path=None)
-
-def execute_devstral(prompt):
-    return run_llama_model(
-        model_path="models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf",
-        prompt=prompt
-    )
-```
-
 ---
 
 # **3. Unified I/O Layer Implementation**
@@ -298,7 +282,7 @@ def io_loop():
         # Process until conversation is complete
         conversation_active = True
         while conversation_active:
-            response_text = route_model(full_prompt)
+            response_text = self.model_manager.execute_ministral(prompt)
             parsed = parse_response(response_text)
 
             # Handle decisions
