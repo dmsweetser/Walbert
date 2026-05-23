@@ -49,7 +49,7 @@ config = {
         'mmproj': 'models/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf',
         'devstral': 'models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf'
     },
-    'llama_binary_path': 'llama.cpp/bin/llama-completion',
+    'llama_binary_path': 'llama.cpp/bin/llama-server',
     'log_level': 'INFO'
 }
 

@@ -17,9 +17,11 @@ import tempfile
 import re
 import importlib
 import inspect
+from urllib import request
 import usb.core
 import serial
 import serial.tools.list_ports
+import requests
 
 # Add current directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -269,27 +271,30 @@ class ModelManager:
                 raise FileNotFoundError(f"{model_name} model not found at {model_path}")
 
     def execute_model(self, model_path: str, prompt: str, mmproj_path: Optional[str] = None) -> str:
-        """Execute model through llama.cpp binary"""
+        """Execute model through llama.cpp server binary with multimodal support"""
         cmd = [
             self.config.llama_binary_path,
             "-m", model_path,
-            "--prompt", prompt,
-            "--temp", "0.7",
-            "--ctx-size", "2048"
+            "--ctx-size", "2048",
+            "--temp", "0.7"
         ]
 
         if mmproj_path:
             cmd.extend(["--mmproj", mmproj_path])
 
-        logger.info(f"Executing model with command: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        logger.info(f"Starting llama-server: {' '.join(cmd)}")
+        server = subprocess.Popen(cmd)
 
-        if result.returncode != 0:
-            error_msg = f"Model execution failed: {result.stderr}"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
+        # Now send the prompt via the OpenAI-compatible API
+        payload = {
+            "model": "default",
+            "messages": [{"role": "user", "content": prompt}]
+        }
+        response = requests.post("http://localhost:8080/v1/chat/completions", json=payload)
+        server.terminate()
 
-        return result.stdout
+        return response.json()["choices"][0]["message"]["content"]
+
 
     def execute_ministral(self, prompt: str, mmproj_path: Optional[str] = None) -> str:
         """Execute Ministral model"""
