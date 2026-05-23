@@ -237,6 +237,10 @@ class WalbertAgent:
             self.db.conn.commit()
             self.logger.debug("Database changes committed")
 
+        # Ensure database connection is active
+        if not self.db.conn:
+            self.db.connect()
+
         # Execute actions
         if parsed.get("should_query_datastore") == "YES":
             self.logger.debug("Querying datastore as requested")
@@ -275,10 +279,14 @@ class WalbertAgent:
             tags = memory.get("tags", [])
 
             if content and tags:
-                item_id = self.db.store_item(content, tags)
-                self.logger.debug(f"Memory stored with ID {item_id}")
-                self.db.conn.commit()
-                parsed["memory_stored"] = True
+                try:
+                    item_id = self.db.store_item(content, tags)
+                    self.logger.debug(f"Memory stored with ID {item_id}")
+                    self.db.conn.commit()
+                    parsed["memory_stored"] = True
+                except Exception as e:
+                    self.logger.error(f"Error storing memory: {e}")
+                    parsed["memory_stored"] = False
 
         if parsed.get("hardware_action") is not None:
             self.logger.debug(f"Executing hardware action: {parsed['hardware_action']}")
@@ -298,8 +306,13 @@ class WalbertAgent:
 
     def start_conversation(self, channel: ChannelType):
         """Start a new conversation"""
-        self.current_conversation_id = self.db.start_conversation(channel.value)
-        self.db.add_message(self.current_conversation_id, self.SYSTEM_PROMPT, "system")
+        try:
+            self.current_conversation_id = self.db.start_conversation(channel.value)
+            self.db.add_message(self.current_conversation_id, self.SYSTEM_PROMPT, "system")
+            self.db.conn.commit()
+        except Exception as e:
+            self.logger.error(f"Error starting conversation: {e}")
+            raise
 
     def end_conversation(self):
         """End current conversation"""
@@ -313,19 +326,28 @@ class WalbertAgent:
         if not self.current_conversation_id:
             return ""
 
-        messages = self.db.cursor.execute("""
-            SELECT sender, content FROM messages
-            WHERE conversation_id = ?
-            ORDER BY timestamp ASC
-        """, (self.current_conversation_id,)).fetchall()
+        try:
+            messages = self.db.cursor.execute("""
+                SELECT sender, content FROM messages
+                WHERE conversation_id = ?
+                ORDER BY timestamp ASC
+            """, (self.current_conversation_id,)).fetchall()
 
-        context = ""
-        for sender, content in messages:
-            if sender == "system":
-                continue
-            context += f"{sender.capitalize()}: {content}\n\n"
+            context = ""
+            for sender, content in messages:
+                if sender == "system":
+                    continue
+                context += f"{sender.capitalize()}: {content}\n\n"
 
-        return context
+            # Add user context from memory
+            user_items = self.db.retrieve_items_by_tag("user_name")
+            for item in user_items:
+                context += f"System Memory: User name is {item[1]}\n\n"
+
+            return context
+        except Exception as e:
+            self.logger.error(f"Error building conversation context: {e}")
+            return ""
 
     def save_conversation_files(self, conversation_id: int):
         """Save conversation to raw and chat files"""

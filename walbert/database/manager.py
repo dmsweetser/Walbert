@@ -16,6 +16,8 @@ class DatabaseManager:
     def connect(self):
         """Connect to SQLite database"""
         self.conn = sqlite3.connect(self.db_path)
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA synchronous=NORMAL")
         self.cursor = self.conn.cursor()
         self.init_schema()
         self.logger = logging.getLogger('walbert.database')
@@ -83,60 +85,73 @@ class DatabaseManager:
     def store_item(self, content: str, tags: List[str], item_type: str = "text") -> int:
         """Store an item with tags"""
         self.logger.debug(f"Storing item of type {item_type} with tags: {tags}")
-        self.cursor.execute(
-            "INSERT INTO items (content, type) VALUES (?, ?)",
-            (content, item_type)
-        )
-        item_id = self.cursor.lastrowid
-        self.logger.debug(f"Item stored with ID {item_id}")
-
-        for tag in tags:
-            # Add tag if it doesn't exist
+        try:
             self.cursor.execute(
-                "INSERT OR IGNORE INTO tags (name) VALUES (?)",
-                (tag,)
+                "INSERT INTO items (content, type) VALUES (?, ?)",
+                (content, item_type)
             )
-            # Link item to tag
-            self.cursor.execute("""
-                INSERT INTO item_tags (item_id, tag_id)
-                VALUES (?, (SELECT id FROM tags WHERE name = ?))
-            """, (item_id, tag))
-            self.logger.debug(f"Linked item {item_id} to tag '{tag}'")
+            item_id = self.cursor.lastrowid
+            self.logger.debug(f"Item stored with ID {item_id}")
 
-        self.conn.commit()
-        self.logger.debug(f"Committed item {item_id} to database")
-        return item_id
+            for tag in tags:
+                # Add tag if it doesn't exist
+                self.cursor.execute(
+                    "INSERT OR IGNORE INTO tags (name) VALUES (?)",
+                    (tag,)
+                )
+                # Link item to tag
+                self.cursor.execute("""
+                    INSERT INTO item_tags (item_id, tag_id)
+                    VALUES (?, (SELECT id FROM tags WHERE name = ?))
+                """, (item_id, tag))
+                self.logger.debug(f"Linked item {item_id} to tag '{tag}'")
+
+            self.conn.commit()
+            self.logger.debug(f"Committed item {item_id} to database")
+            return item_id
+        except Exception as e:
+            self.logger.error(f"Error storing item: {e}")
+            self.conn.rollback()
+            raise
 
     def retrieve_items_by_tag(self, tag: str) -> List[Tuple]:
         """Retrieve items by tag"""
         self.logger.debug(f"Retrieving items with tag '{tag}'")
-        self.cursor.execute("""
-            SELECT i.id, i.content, i.type, i.created_at
-            FROM items i
-            JOIN item_tags it ON i.id = it.item_id
-            JOIN tags t ON it.tag_id = t.id
-            WHERE t.name = ?
-        """, (tag,))
-        results = self.cursor.fetchall()
-        self.logger.debug(f"Found {len(results)} items with tag '{tag}'")
-        return results
+        try:
+            self.cursor.execute("""
+                SELECT i.id, i.content, i.type, i.created_at
+                FROM items i
+                JOIN item_tags it ON i.id = it.item_id
+                JOIN tags t ON it.tag_id = t.id
+                WHERE t.name = ?
+            """, (tag,))
+            results = self.cursor.fetchall()
+            self.logger.debug(f"Found {len(results)} items with tag '{tag}'")
+            return results
+        except Exception as e:
+            self.logger.error(f"Error retrieving items by tag: {e}")
+            raise
 
     def retrieve_items_by_multiple_tags(self, tags: List[str]) -> List[Tuple]:
         """Retrieve items by multiple tags (AND logic)"""
         self.logger.debug(f"Retrieving items with tags: {tags}")
-        placeholders = ','.join(['?'] * len(tags))
-        self.cursor.execute(f"""
-            SELECT i.id, i.content, i.type, i.created_at
-            FROM items i
-            JOIN item_tags it ON i.id = it.item_id
-            JOIN tags t ON it.tag_id = t.id
-            WHERE t.name IN ({placeholders})
-            GROUP BY i.id
-            HAVING COUNT(DISTINCT t.name) = {len(tags)}
-        """, tags)
-        results = self.cursor.fetchall()
-        self.logger.debug(f"Found {len(results)} items with tags {tags}")
-        return results
+        try:
+            placeholders = ','.join(['?'] * len(tags))
+            self.cursor.execute(f"""
+                SELECT i.id, i.content, i.type, i.created_at
+                FROM items i
+                JOIN item_tags it ON i.id = it.item_id
+                JOIN tags t ON it.tag_id = t.id
+                WHERE t.name IN ({placeholders})
+                GROUP BY i.id
+                HAVING COUNT(DISTINCT t.name) = {len(tags)}
+            """, tags)
+            results = self.cursor.fetchall()
+            self.logger.debug(f"Found {len(results)} items with tags {tags}")
+            return results
+        except Exception as e:
+            self.logger.error(f"Error retrieving items by multiple tags: {e}")
+            raise
 
     def start_conversation(self, channel: str) -> int:
         """Start a new conversation"""
