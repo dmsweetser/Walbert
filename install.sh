@@ -32,23 +32,38 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Create default configuration files
-if [ ! -f "instance/config.json" ]; then
-    cat > instance/config.json <<EOL
+# Create default config file
+cat > instance/config.json << 'EOL'
 {
-    "model_paths": {
-        "primary": "instance/models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
-        "mmproj": "instance/models/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf",
-        "devstral": "instance/models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
+    "model_configs": {
+        "ministral": {
+            "model_path": "instance/models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
+            "context_size": 125000,
+            "output_tokens": 125000,
+            "temperature": 0.15,
+            "top_p": 1.0,
+            "top_k": 20,
+            "min_p": 0.01
+        },
+        "devstral": {
+            "model_path": "instance/models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf",
+            "context_size": 125000,
+            "output_tokens": 62500,
+            "temperature": 0.9,
+            "top_p": 0.95,
+            "top_k": 20,
+            "min_p": 0.0
+        }
     },
     "llama_binary_path": "instance/llama.cpp/bin/llama-server",
+    "mmproj_path": "instance/models/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf",
     "log_level": "INFO"
 }
 EOL
-fi
 
+# Create default I/O config file
 if [ ! -f "instance/io_config.json" ]; then
-    cat > instance/io_config.json <<EOL
+    cat > instance/io_config.json << 'EOL'
 {
     "io_layers": {
         "console": {
@@ -57,18 +72,22 @@ if [ ! -f "instance/io_config.json" ]; then
         },
         "serial": {
             "enabled": false,
-            "require_authorization": true
+            "require_authorization": true,
+            "port": null,
+            "baudrate": 9600
         },
         "bluetooth": {
             "enabled": false,
-            "require_authorization": true
+            "require_authorization": true,
+            "port": "/dev/rfcomm0",
+            "baudrate": 9600
         },
         "usb": {
             "enabled": false,
             "require_authorization": true
         },
         "python_code": {
-            "enabled": true,
+            "enabled": false,
             "require_authorization": true
         }
     }

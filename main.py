@@ -8,6 +8,7 @@ import sys
 import os
 import logging
 from walbert import Config, IOConfig, WalbertAgent
+from walbert.config import ModelConfig
 
 # Add current directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -30,9 +31,30 @@ def load_config() -> Config:
         with open('instance/config.json', 'r') as f:
             import json
             config_data = json.load(f)
+            model_configs = {
+                'ministral': ModelConfig(
+                    model_path=config_data['model_configs']['ministral']['model_path'],
+                    context_size=config_data['model_configs']['ministral']['context_size'],
+                    output_tokens=config_data['model_configs']['ministral']['output_tokens'],
+                    temperature=config_data['model_configs']['ministral']['temperature'],
+                    top_p=config_data['model_configs']['ministral']['top_p'],
+                    top_k=config_data['model_configs']['ministral']['top_k'],
+                    min_p=config_data['model_configs']['ministral']['min_p']
+                ),
+                'devstral': ModelConfig(
+                    model_path=config_data['model_configs']['devstral']['model_path'],
+                    context_size=config_data['model_configs']['devstral']['context_size'],
+                    output_tokens=config_data['model_configs']['devstral']['output_tokens'],
+                    temperature=config_data['model_configs']['devstral']['temperature'],
+                    top_p=config_data['model_configs']['devstral']['top_p'],
+                    top_k=config_data['model_configs']['devstral']['top_k'],
+                    min_p=config_data['model_configs']['devstral']['min_p']
+                )
+            }
             return Config(
-                model_paths=config_data['model_paths'],
+                model_configs=model_configs,
                 llama_binary_path=config_data['llama_binary_path'],
+                mmproj_path=config_data['mmproj_path'],
                 log_level=config_data['log_level']
             )
     except FileNotFoundError:

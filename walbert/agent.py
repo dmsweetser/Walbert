@@ -70,7 +70,7 @@ class WalbertAgent:
 
     def load_io_layer(self, channel_type: ChannelType) -> IOLayer:
         """Load I/O layer with proper configuration"""
-        layer_name = channel_type.value
+        layer_name = channel_type.name.lower()
         if layer_name not in self.io_config.io_layers:
             raise ValueError(f"Unknown I/O layer: {layer_name}")
 
@@ -260,7 +260,7 @@ class WalbertAgent:
 
                 while conversation_active:
                     # Execute model
-                    model_response = self.model_manager.execute_ministral(full_prompt)
+                    model_response = self.model_manager.execute_ministral(full_prompt, self.config.mmproj_path)
                     response_text = self.process_response(model_response, ChannelType.CONSOLE)
 
                     # Parse response

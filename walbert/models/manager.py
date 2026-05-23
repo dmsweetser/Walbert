@@ -5,9 +5,8 @@ Model manager implementation
 import os
 import subprocess
 import logging
-from typing import Optional
-import requests
-from ..config import Config
+from typing import Optional, Dict
+from ..config import Config, ModelConfig
 
 logger = logging.getLogger('walbert')
 
@@ -22,19 +21,22 @@ class ModelManager:
         if not os.path.isfile(self.config.llama_binary_path):
             raise FileNotFoundError(f"llama.cpp binary not found at {self.config.llama_binary_path}")
 
-        for model_name, model_path in self.config.model_paths.items():
-            if not os.path.isfile(model_path):
-                raise FileNotFoundError(f"{model_name} model not found at {model_path}")
+        for model_name, model_config in self.config.model_configs.items():
+            if not os.path.isfile(model_config.model_path):
+                raise FileNotFoundError(f"{model_name} model not found at {model_config.model_path}")
 
-    def execute_model(self, model_path: str, prompt: str, mmproj_path: Optional[str] = None) -> str:
+    def execute_model(self, model_config: ModelConfig, prompt: str, mmproj_path: Optional[str] = None) -> str:
         """Execute model through llama.cpp binary with direct CLI execution"""
         cmd = [
             self.config.llama_binary_path,
-            "-m", model_path,
-            "--ctx-size", "2048",
-            "--temp", "0.7",
+            "-m", model_config.model_path,
+            "--ctx-size", str(model_config.context_size),
+            "--temp", str(model_config.temperature),
+            "--top-p", str(model_config.top_p),
+            "--top-k", str(model_config.top_k),
+            "--min-p", str(model_config.min_p),
             "-p", prompt,
-            "-n", "256"
+            "-n", str(model_config.output_tokens)
         ]
 
         if mmproj_path:
@@ -51,9 +53,8 @@ class ModelManager:
 
     def execute_ministral(self, prompt: str, mmproj_path: Optional[str] = None) -> str:
         """Execute Ministral model"""
-        mmproj_path = mmproj_path or self.config.model_paths.get('mmproj')
         return self.execute_model(
-            model_path=self.config.model_paths['primary'],
+            model_config=self.config.model_configs['ministral'],
             prompt=prompt,
             mmproj_path=mmproj_path
         )
@@ -61,6 +62,6 @@ class ModelManager:
     def execute_devstral(self, prompt: str) -> str:
         """Execute Devstral model"""
         return self.execute_model(
-            model_path=self.config.model_paths['devstral'],
+            model_config=self.config.model_configs['devstral'],
             prompt=prompt
         )
