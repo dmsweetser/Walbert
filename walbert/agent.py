@@ -343,8 +343,8 @@ class WalbertAgent:
         timestamp = self.db.cursor.execute("""
             SELECT start_time FROM conversations WHERE id = ?
         """, (conversation_id,)).fetchone()[0].replace(" ", "_").replace(":", "-")
-        raw_filename = f"instance/conversations/raw/conversation_{conversation_id}_{timestamp}.txt"
-        chat_filename = f"instance/conversations/chat/conversation_{conversation_id}_{timestamp}.txt"
+        raw_filename = f"instance/conversations/raw/conversation_{conversation_id}.txt"
+        chat_filename = f"instance/conversations/chat/conversation_{conversation_id}.txt"
 
         # Save raw conversation
         with open(raw_filename, 'w') as f:
@@ -451,6 +451,8 @@ class WalbertAgent:
                     self.save_conversation_files(self.current_conversation_id)
                     self.start_conversation(ChannelType.CONSOLE)
                     self.logger.debug(f"Started new conversation with ID {self.current_conversation_id}")
+
+                self.save_conversation_files(self.current_conversation_id)
 
             except KeyboardInterrupt:
                 print("\nGoodbye!")

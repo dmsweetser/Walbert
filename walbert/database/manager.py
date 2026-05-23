@@ -6,12 +6,11 @@ import sqlite3
 import logging
 from typing import List, Tuple
 
-logger = logging.getLogger('walbert')
-
 class DatabaseManager:
     """Manages SQLite database operations"""
     def __init__(self, db_path: str = "instance/walbert.db"):
         self.db_path = db_path
+        self.logger = logging.getLogger('walbert')
         self.connect()
 
     def connect(self):
