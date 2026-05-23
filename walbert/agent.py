@@ -68,6 +68,13 @@ class WalbertAgent:
         self.io_factory = IOLayerFactory()
         self.current_conversation_id = None
 
+        # Ensure console layer exists in config
+        if 'console' not in self.io_config.io_layers:
+            self.io_config.io_layers['console'] = {
+                'enabled': True,
+                'require_authorization': False
+            }
+
     def load_io_layer(self, channel_type: ChannelType) -> IOLayer:
         """Load I/O layer with proper configuration"""
         layer_name = channel_type.name.lower()

@@ -1,29 +1,3 @@
-My test.results indicates failure for a variety of tests. Can you fix the app so these tests pass?
-
-***
-
-Also, I want the config to include a variety of parameters for the model, and let me specify them for the Ministral and Devstral models. These are the params I want to specify:
-
-Devstral-Small-2-24B-Instruct-2512-IQ4_NL.gguf
-MODEL_CONTEXT=125000
-OUTPUT_TOKENS=62500
-TEMPERATURE=0.9
-TOP_P=0.95
-TOP_K=20
-MIN_P=0.0
-
-Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
-MODEL_CONTEXT=125000
-OUTPUT_TOKENS=125000
-TEMPERATURE=0.15
-TOP_P=1.0
-TOP_K=20
-MIN_P=0.01
-
-Please also update my install.sh to reflect this.
-
-***
-
 I get this error when I try to start the app:
 
 2026-05-23 04:56:36,060 - walbert - ERROR - Error reading from CONSOLE: Unknown I/O layer: console
@@ -33,3 +7,7 @@ It happens like a bazillion times. Can you fix it?
 ****
 
 Can you generate the README for the app?
+
+***
+
+I recently changed how models are loaded from the config, but the tests don't reflect this change. Can you refactor the tests to align with the rest of the app?
