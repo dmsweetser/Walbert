@@ -267,7 +267,7 @@ class WalbertAgent:
 
                 while conversation_active:
                     # Execute model
-                    model_response = self.model_manager.execute_ministral(full_prompt, self.config.mmproj_path)
+                    model_response = self.model_manager.execute_ministral(full_prompt)
                     response_text = self.process_response(model_response, ChannelType.CONSOLE)
 
                     # Parse response
@@ -294,6 +294,7 @@ class WalbertAgent:
             except KeyboardInterrupt:
                 print("\nGoodbye!")
                 self.end_conversation()
+                self.model_manager.shutdown()
                 break
             except Exception as e:
                 logger.error(f"Error in main loop: {e}", exc_info=True)
