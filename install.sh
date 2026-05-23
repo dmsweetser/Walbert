@@ -74,12 +74,12 @@ download_model() {
 }
 
 # Ministral-3B model
-download_model "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf" "https://example.com/models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
+download_model "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf" "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf?download=true"
 
 # Ministral-3B mmproj
-download_model "Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf" "https://example.com/models/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf"
+download_model "Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf" "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf?download=true"
 
 # Devstral-24B model
-download_model "Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf" "https://example.com/models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
+download_model "Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf" "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true"
 
 echo "Installation complete."
