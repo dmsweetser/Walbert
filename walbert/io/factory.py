@@ -13,11 +13,11 @@ from .python_code import PythonCodeIOLayer
 
 class ChannelType(Enum):
     """Supported input/output channels"""
-    CONSOLE = auto()
-    SERIAL = auto()
-    BLUETOOTH = auto()
-    USB = auto()
-    PYTHON_CODE = auto()
+    CONSOLE = "console"
+    SERIAL = "serial"
+    BLUETOOTH = "bluetooth"
+    USB = "usb"
+    PYTHON_CODE = "python_code"
 
 class IOLayerFactory:
     """Factory for creating I/O layer instances"""

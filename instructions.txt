@@ -1,1 +1,11 @@
-Please fix the issues in my run.results and tests.results, as well as any other issues you see, so that the app is fully-functional.
+I get this error when I run the app:
+
+2026-05-23 04:50:53,445 - walbert - ERROR - Error reading from CONSOLE: Unknown I/O layer: console
+
+Can you fix it?
+
+****
+
+My test.results indicates failure for a variety of tests. Can you fix the app so these tests pass?
+
+****

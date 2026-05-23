@@ -70,7 +70,7 @@ class WalbertAgent:
 
     def load_io_layer(self, channel_type: ChannelType) -> IOLayer:
         """Load I/O layer with proper configuration"""
-        layer_name = channel_type.name.lower()
+        layer_name = channel_type.value
         if layer_name not in self.io_config.io_layers:
             raise ValueError(f"Unknown I/O layer: {layer_name}")
 
@@ -215,13 +215,13 @@ class WalbertAgent:
     def emit_input_channel(self, channel: ChannelType) -> str:
         """Emit the input channel block for context"""
         return f"""~walbert_input_channel_start~
-{channel.name.lower()}
+{channel.value}
 ~walbert_input_channel_end~
 """
 
     def start_conversation(self, channel: ChannelType):
         """Start a new conversation"""
-        self.current_conversation_id = self.db.start_conversation(channel.name.lower())
+        self.current_conversation_id = self.db.start_conversation(channel.value)
         self.db.add_message(self.current_conversation_id, self.SYSTEM_PROMPT, "system")
 
     def end_conversation(self):
