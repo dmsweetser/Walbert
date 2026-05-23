@@ -1,3 +1,5 @@
-Please build the application outlined in feature-spec.md and implementation-guide.md.
 
-Include complete implementations of every feature, and make the application production-ready.
+I want to merge "download_models.sh" into "install.sh", and have it only download if the files aren't already present.
+
+***
+
