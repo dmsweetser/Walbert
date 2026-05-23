@@ -87,11 +87,11 @@ Walbert supports multiple I/O layers that can be configured to be enabled, disab
 ```json
 {
     "model_paths": {
-        "primary": "models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
-        "mmproj": "models/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf",
-        "devstral": "models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
+        "primary": "instance/models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
+        "mmproj": "instance/models/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf",
+        "devstral": "instance/models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
     },
-    "llama_binary_path": "llama.cpp/bin/llama-server",
+    "llama_binary_path": "instance/llama.cpp/bin/llama-server",
     "log_level": "INFO"
 }
 ```

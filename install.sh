@@ -1,16 +1,34 @@
 #!/bin/bash
+# Walbert installation script
+# Creates virtual environment, installs dependencies, and downloads required files
 
-# Create instance directory
-mkdir -p instance
+set -e
+
+mkdir -p instance/llama.cpp/bin
 
 # Create virtual environment
+echo "Creating Python virtual environment..."
 python3 -m venv venv
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to create virtual environment"
+    exit 1
+fi
 
 # Activate virtual environment
+echo "Activating virtual environment..."
 source venv/bin/activate
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to activate virtual environment"
+    exit 1
+fi
 
 # Install dependencies
+echo "Installing Python dependencies..."
 pip install -r requirements.txt
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to install dependencies"
+    exit 1
+fi
 
 # Create default configuration files
 if [ ! -f "instance/config.json" ]; then
@@ -21,7 +39,7 @@ if [ ! -f "instance/config.json" ]; then
         "mmproj": "instance/models/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf",
         "devstral": "instance/models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
     },
-    "llama_binary_path": "llama.cpp/bin/llama-server",
+    "llama_binary_path": "instance/llama.cpp/bin/llama-server",
     "log_level": "INFO"
 }
 EOL
@@ -81,5 +99,23 @@ download_model "Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf" "https://huggingf
 
 # Devstral-24B model
 download_model "Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf" "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true"
+
+# Download llama.cpp binary
+echo "Downloading llama.cpp binary..."
+wget -O llama.cpp.tar.gz \
+    "https://github.com/ggml-org/llama.cpp/releases/download/b9279/llama-b9279-bin-ubuntu-x64.tar.gz"
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to download llama.cpp binary"
+    exit 1
+fi
+
+# Extract binary
+echo "Extracting llama.cpp binary..."
+tar -xzf llama.cpp.tar.gz -C instance/llama.cpp/bin --strip-components=1
+rm llama.cpp.tar.gz
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to extract llama.cpp binary"
+    exit 1
+fi
 
 echo "Installation complete."
