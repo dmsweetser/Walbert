@@ -9,7 +9,7 @@ venv/
 .env
 
 # Models and binaries
-models/
+instance/
 llama.cpp/
 *.gguf
 

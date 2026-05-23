@@ -11,7 +11,9 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from main import ConsoleIOLayer, SerialIOLayer, IOLayerFactory, ChannelType
+from walbert.io.console import ConsoleIOLayer
+from walbert.io.serial import SerialIOLayer
+from walbert.io.factory import IOLayerFactory, ChannelType
 
 class TestIOLayers(unittest.TestCase):
     def test_console_io_read(self):

@@ -10,7 +10,7 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from main import ResponseParser
+from walbert.response.parser import ResponseParser
 
 class TestResponseParser(unittest.TestCase):
     def setUp(self):

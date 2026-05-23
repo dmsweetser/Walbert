@@ -1,89 +1,85 @@
 #!/bin/bash
-# Walbert installation script
-# Creates virtual environment, installs dependencies, and downloads required files
 
-set -e
+# Create instance directory
+mkdir -p instance
 
 # Create virtual environment
-echo "Creating Python virtual environment..."
 python3 -m venv venv
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to create virtual environment"
-    exit 1
-fi
 
 # Activate virtual environment
-echo "Activating virtual environment..."
 source venv/bin/activate
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to activate virtual environment"
-    exit 1
-fi
 
 # Install dependencies
-echo "Installing Python dependencies..."
 pip install -r requirements.txt
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to install dependencies"
-    exit 1
-fi
-
-# Download models and binaries
-echo "Downloading models and binaries..."
-chmod +x download_models.sh
-./download_models.sh
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to download models"
-    exit 1
-fi
 
 # Create default configuration files
-echo "Creating default configuration files..."
-python3 -c "
-import json
-
-# Create default config.json
-config = {
-    'model_paths': {
-        'primary': 'models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf',
-        'mmproj': 'models/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf',
-        'devstral': 'models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf'
+if [ ! -f "instance/config.json" ]; then
+    cat > instance/config.json <<EOL
+{
+    "model_paths": {
+        "primary": "instance/models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
+        "mmproj": "instance/models/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf",
+        "devstral": "instance/models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
     },
-    'llama_binary_path': 'llama.cpp/bin/llama-server',
-    'log_level': 'INFO'
+    "llama_binary_path": "llama.cpp/bin/llama-server",
+    "log_level": "INFO"
 }
+EOL
+fi
 
-with open('config.json', 'w') as f:
-    json.dump(config, f, indent=4)
-
-# Create default io_config.json
-io_config = {
-    'io_layers': {
-        'console': {
-            'enabled': True,
-            'require_authorization': False
+if [ ! -f "instance/io_config.json" ]; then
+    cat > instance/io_config.json <<EOL
+{
+    "io_layers": {
+        "console": {
+            "enabled": true,
+            "require_authorization": false
         },
-        'serial': {
-            'enabled': False,
-            'require_authorization': True
+        "serial": {
+            "enabled": false,
+            "require_authorization": true
         },
-        'bluetooth': {
-            'enabled': False,
-            'require_authorization': True
+        "bluetooth": {
+            "enabled": false,
+            "require_authorization": true
         },
-        'usb': {
-            'enabled': False,
-            'require_authorization': True
+        "usb": {
+            "enabled": false,
+            "require_authorization": true
         },
-        'python_code': {
-            'enabled': True,
-            'require_authorization': True
+        "python_code": {
+            "enabled": true,
+            "require_authorization": true
         }
     }
 }
+EOL
+fi
 
-with open('io_config.json', 'w') as f:
-    json.dump(io_config, f, indent=4)
-"
+# Create models directory
+mkdir -p instance/models
 
-echo "Installation completed successfully!"
+# Download models if they don't exist
+download_model() {
+    local model_name=$1
+    local model_url=$2
+    local model_path="instance/models/$model_name"
+
+    if [ ! -f "$model_path" ]; then
+        echo "Downloading $model_name..."
+        wget -O "$model_path" "$model_url"
+    else
+        echo "$model_name already exists, skipping download."
+    fi
+}
+
+# Ministral-3B model
+download_model "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf" "https://example.com/models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
+
+# Ministral-3B mmproj
+download_model "Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf" "https://example.com/models/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf"
+
+# Devstral-24B model
+download_model "Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf" "https://example.com/models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
+
+echo "Installation complete."

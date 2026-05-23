@@ -11,7 +11,8 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from main import SkillManager, DatabaseManager
+from walbert.skills.manager import SkillManager
+from walbert.database.manager import DatabaseManager
 
 class TestSkillManager(unittest.TestCase):
     def setUp(self):
