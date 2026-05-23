@@ -1,0 +1,7 @@
+Right now, the response from the model isn't being parsed successfully. Here was a sample response:
+
+'~walbert_should_query_datastore_start~\nNO\n~walbert_should_execute_skill_start~\nNO\n~walbert_should_call_smarter_cousin_start~\nNO (operating locally with basic reasoning)\n~walbert_should_store_memory_start~\nYES (storing initial greeting)\n~walbert_memory_storage_start~\n{"tags": ["greeting", "initial_interaction"], "content": "User greeted me", "timestamp": "{today}"}\n~walbert_memory_storage_end~\n\n~walbert_response_start~\nHello! I\'m just a local AI assistant running on my llama.cpp instance. Thanks for asking—feeling as good as always! How can I assist you today? 😊\n~walbert_response_end~\n\n~walbert_response_channel_start~\nconsole\n~walbert_response_channel_end~'
+
+First, we should update the prompt to make it clear that only certain values are allowed in each walbert block. Also, I don't think we are processing every possible variation of response from Walbert. For example, the console response never made it back to the user.
+
+Can you fix these issues?

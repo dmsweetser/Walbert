@@ -19,7 +19,7 @@ class ResponseParser:
             "conversation_complete": r"~walbert_conversation_complete_start~\s*(.*?)\s*~walbert_conversation_complete_end~",
             "db_command": r"~walbert_db_command_start~\s*(.*?)\s*(.*?)\s*~walbert_db_command_end~",
             "skill_execution": r"~walbert_skill_execution_start~\s*(.*?)\s*(.*?)\s*~walbert_skill_execution_end~",
-            "memory_storage": r"~walbert_memory_storage_start~\s*(.*?)\s*(.*?)\s*~walbert_memory_storage_end~",
+            "memory_storage": r"~walbert_memory_storage_start~\s*(.*?)\s*~walbert_memory_storage_end~",
             "hardware_action": r"~walbert_hardware_action_start~\s*(.*?)\s*~walbert_hardware_action_end~"
         }
 
@@ -29,7 +29,7 @@ class ResponseParser:
         for key, pattern in self.block_patterns.items():
             match = re.search(pattern, response_text, re.DOTALL)
             if match:
-                if key in ["db_command", "skill_execution", "memory_storage", "hardware_action"]:
+                if key in ["db_command", "skill_execution"]:
                     try:
                         args = json.loads(match.group(2).strip()) if match.group(2).strip() else {}
                     except json.JSONDecodeError:
@@ -38,6 +38,18 @@ class ResponseParser:
                         "command": match.group(1).strip(),
                         "args": args
                     }
+                elif key == "memory_storage":
+                    try:
+                        args = json.loads(match.group(1).strip()) if match.group(1).strip() else {}
+                    except json.JSONDecodeError:
+                        args = {}
+                    parsed[key] = args
+                elif key == "hardware_action":
+                    try:
+                        args = json.loads(match.group(1).strip()) if match.group(1).strip() else {}
+                    except json.JSONDecodeError:
+                        args = {}
+                    parsed[key] = args
                 else:
                     parsed[key] = match.group(1).strip()
         return parsed

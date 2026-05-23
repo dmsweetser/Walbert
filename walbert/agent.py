@@ -30,27 +30,67 @@ class WalbertAgent:
     5. **Safety**: Never execute untrusted code or access external resources.
 
     ## Decision Flow
-    1. Evaluate if datastore query is needed (~walbert_should_query_datastore~).
-    2. Evaluate if skill execution is needed (~walbert_should_execute_skill~).
-    3. Evaluate if Devstral-24B should be called (~walbert_should_call_smarter_cousin~).
-    4. Evaluate if memory should be stored (~walbert_should_store_memory~).
-    5. Emit final response (~walbert_response~).
+    For each user input, you MUST evaluate and emit ALL of the following decision blocks:
+    1. ~walbert_should_query_datastore_start~ (YES/NO) ~walbert_should_query_datastore_end~
+    2. ~walbert_should_execute_skill_start~ (YES/NO) ~walbert_should_execute_skill_end~
+    3. ~walbert_should_call_smarter_cousin_start~ (YES/NO) ~walbert_should_call_smarter_cousin_end~
+    4. ~walbert_should_store_memory_start~ (YES/NO) ~walbert_should_store_memory_end~
+    5. ~walbert_conversation_complete_start~ (YES/NO) ~walbert_conversation_complete_end~
 
     ## Available Blocks
-    - Decision: should_call_smarter_cousin, should_query_datastore, should_execute_skill, should_store_memory, conversation_complete
-    - Action: db_command, skill_execution, memory_storage, hardware_action
-    - Core: response, response_channel
+    - Decision blocks (MUST use only YES or NO):
+      ~walbert_should_query_datastore_start~
+      ~walbert_should_execute_skill_start~
+      ~walbert_should_call_smarter_cousin_start~
+      ~walbert_should_store_memory_start~
+      ~walbert_conversation_complete_start~
+
+    - Action blocks (use only when corresponding decision is YES):
+      ~walbert_db_command_start~
+      COMMAND_NAME (RETRIEVE_ITEMS/STORE_ITEM)
+      {"args": "json_args"}
+      ~walbert_db_command_end~
+
+      ~walbert_skill_execution_start~
+      SKILL_NAME
+      {"args": ["arg1", "arg2"]}
+      ~walbert_skill_execution_end~
+
+      ~walbert_memory_storage_start~
+      {"tags": ["tag1", "tag2"], "content": "memory_content"}
+      ~walbert_memory_storage_end~
+
+      ~walbert_hardware_action_start~
+      {"peripheral_type": "serial/bluetooth/usb", "action": "connect/read/write", "data": {}}
+      ~walbert_hardware_action_end~
+
+    - Core blocks (MUST include in every response):
+      ~walbert_response_start~
+      Your response to the user
+      ~walbert_response_end~
+
+      ~walbert_response_channel_start~
+      console (or other channel)
+      ~walbert_response_channel_end~
 
     ## Example
     ~walbert_should_query_datastore_start~
-    YES
+    NO
     ~walbert_should_query_datastore_end~
-    ~walbert_db_command_start~
-    RETRIEVE_ITEMS
-    {"tags": ["example"]}
-    ~walbert_db_command_end~
+    ~walbert_should_execute_skill_start~
+    NO
+    ~walbert_should_execute_skill_end~
+    ~walbert_should_call_smarter_cousin_start~
+    NO
+    ~walbert_should_call_smarter_cousin_end~
+    ~walbert_should_store_memory_start~
+    YES
+    ~walbert_should_store_memory_end~
+    ~walbert_memory_storage_start~
+    {"tags": ["greeting"], "content": "User greeted me"}
+    ~walbert_memory_storage_end~
     ~walbert_response_start~
-    Here is the retrieved data.
+    Hello! How can I assist you today?
     ~walbert_response_end~
     ~walbert_response_channel_start~
     console
@@ -281,8 +321,25 @@ class WalbertAgent:
                     full_prompt += f"\n\nAssistant: {response_text}"
 
                 # Output final response
-                if response_text:
-                    print(response_text)
+                parsed = self.response_parser.parse_response(response_text)
+                if parsed.get("response"):
+                    channel = parsed.get("channel", "console")
+                    if channel == "console":
+                        print(parsed["response"])
+                    else:
+                        try:
+                            io_layer = self.load_io_layer(ChannelType[channel.upper()])
+                            if io_layer.requires_authorization():
+                                if self.authorization_manager.request_authorization(
+                                    channel,
+                                    "Sending output"
+                                ):
+                                    io_layer.write(parsed["response"])
+                            else:
+                                io_layer.write(parsed["response"])
+                        except Exception as e:
+                            logger.error(f"Error writing to {channel} channel: {e}")
+                            print(parsed["response"])
 
                 # Check if conversation should end
                 parsed = self.response_parser.parse_response(response_text)
