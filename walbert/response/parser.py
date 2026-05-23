@@ -26,7 +26,17 @@ class ResponseParser:
     def parse_response(self, response_text: str) -> Dict:
         """Parse response text into structured data"""
         parsed = {}
+
+        # Check for conversation complete first
+        conv_complete_match = re.search(self.block_patterns["conversation_complete"], response_text, re.DOTALL)
+        if conv_complete_match:
+            parsed["conversation_complete"] = conv_complete_match.group(1).strip()
+
+        # Parse all other blocks
         for key, pattern in self.block_patterns.items():
+            if key == "conversation_complete":
+                continue
+
             match = re.search(pattern, response_text, re.DOTALL)
             if match:
                 if key in ["db_command", "skill_execution"]:
@@ -38,13 +48,7 @@ class ResponseParser:
                         "command": match.group(1).strip(),
                         "args": args
                     }
-                elif key == "memory_storage":
-                    try:
-                        args = json.loads(match.group(1).strip()) if match.group(1).strip() else {}
-                    except json.JSONDecodeError:
-                        args = {}
-                    parsed[key] = args
-                elif key == "hardware_action":
+                elif key in ["memory_storage", "hardware_action"]:
                     try:
                         args = json.loads(match.group(1).strip()) if match.group(1).strip() else {}
                     except json.JSONDecodeError:
@@ -52,4 +56,5 @@ class ResponseParser:
                     parsed[key] = args
                 else:
                     parsed[key] = match.group(1).strip()
+
         return parsed

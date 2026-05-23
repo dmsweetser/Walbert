@@ -209,7 +209,7 @@ class WalbertAgent:
             logger.error(f"Hardware interaction failed: {e}")
             return f"Error: {e}"
 
-    def process_response(self, response_text: str, input_channel: ChannelType) -> str:
+    def process_response(self, response_text: str, input_channel: ChannelType) -> dict:
         """Process model response and execute actions"""
         parsed = self.response_parser.parse_response(response_text)
 
@@ -224,7 +224,7 @@ class WalbertAgent:
                 tags = db_command["args"].get("tags", [])
                 if tags:
                     results = self.db.retrieve_items_by_multiple_tags(tags)
-                    response_text += f"\n\nDatastore Results: {results}"
+                    parsed["datastore_results"] = results
 
         if parsed.get("should_execute_skill") == "YES":
             skill_exec = parsed.get("skill_execution", {})
@@ -236,28 +236,27 @@ class WalbertAgent:
                 if skill_code:
                     try:
                         result = self.skill_manager.execute_skill(skill_code, args)
-                        response_text += f"\n\nSkill Result: {result}"
+                        parsed["skill_result"] = result
                     except Exception as e:
-                        response_text += f"\n\nSkill Execution Error: {e}"
+                        parsed["skill_error"] = str(e)
                 else:
-                    response_text += f"\n\nError: Skill '{skill_name}' not found"
+                    parsed["skill_error"] = f"Skill '{skill_name}' not found"
 
         if parsed.get("should_store_memory") == "YES":
             memory = parsed.get("memory_storage", {})
-            content = memory["args"].get("content", "")
-            tags = memory["args"].get("tags", [])
+            content = memory.get("content", "")
+            tags = memory.get("tags", [])
 
             if content and tags:
                 self.db.store_item(content, tags)
-                response_text += "\n\nMemory stored successfully"
+                parsed["memory_stored"] = True
 
         if parsed.get("hardware_action") is not None:
-            hardware_action = parsed["hardware_action"]
-            result = self.handle_hardware_interaction(hardware_action)
+            result = self.handle_hardware_interaction(parsed["hardware_action"])
             if result:
-                response_text += f"\n\nHardware Result: {result}"
+                parsed["hardware_result"] = result
 
-        return response_text
+        return parsed
 
     def emit_input_channel(self, channel: ChannelType) -> str:
         """Emit the input channel block for context"""
@@ -278,6 +277,25 @@ class WalbertAgent:
             self.db.end_conversation(self.current_conversation_id, summary)
             self.current_conversation_id = None
 
+    def build_conversation_context(self) -> str:
+        """Build conversation context from database"""
+        if not self.current_conversation_id:
+            return ""
+
+        messages = self.db.cursor.execute("""
+            SELECT sender, content FROM messages
+            WHERE conversation_id = ?
+            ORDER BY timestamp ASC
+        """, (self.current_conversation_id,)).fetchall()
+
+        context = ""
+        for sender, content in messages:
+            if sender == "system":
+                continue
+            context += f"{sender.capitalize()}: {content}\n\n"
+
+        return context
+
     def run(self):
         """Main agent execution loop"""
         print("Welcome to Walbert! Type 'exit' to quit.")
@@ -296,57 +314,56 @@ class WalbertAgent:
 
                 # Store user message
                 if self.current_conversation_id:
-                    self.db.add_message(self.current_conversation_id, user_input)
+                    self.db.add_message(self.current_conversation_id, user_input, "user")
 
                 # Build full prompt
-                full_prompt = self.SYSTEM_PROMPT + "\n\n" + self.emit_input_channel(ChannelType.CONSOLE) + "\nUser: " + user_input
+                conversation_context = self.build_conversation_context()
+                full_prompt = self.SYSTEM_PROMPT + "\n\n" + conversation_context + self.emit_input_channel(ChannelType.CONSOLE) + "\nUser: " + user_input
 
-                # Process until conversation is complete
-                conversation_active = True
-                response_text = ""
+                # Process until we get a response for the user
+                user_response = None
+                internal_cycles = 0
+                max_internal_cycles = 5
 
-                while conversation_active:
+                while not user_response and internal_cycles < max_internal_cycles:
                     # Execute model
                     model_response = self.model_manager.execute_ministral(full_prompt)
-                    response_text = self.process_response(model_response, ChannelType.CONSOLE)
+                    parsed_response = self.process_response(model_response, ChannelType.CONSOLE)
 
-                    # Parse response
-                    parsed = self.response_parser.parse_response(response_text)
+                    # Store the raw response in conversation history
+                    if self.current_conversation_id:
+                        self.db.add_message(self.current_conversation_id, model_response, "assistant")
 
-                    # Check if conversation should continue
-                    if parsed.get("conversation_complete") == "YES":
-                        conversation_active = False
+                    # Check if we have a response for the user
+                    if parsed_response.get("response"):
+                        user_response = parsed_response["response"]
+                        response_channel = parsed_response.get("channel", "console")
+                        break
 
-                    # Update full prompt with response
-                    full_prompt += f"\n\nAssistant: {response_text}"
+                    # If no user response, continue internal processing
+                    internal_cycles += 1
+                    full_prompt += f"\n\nAssistant (internal): {model_response}"
 
-                # Output final response
-                parsed = self.response_parser.parse_response(response_text)
-                if parsed.get("response"):
-                    channel = parsed.get("channel", "console")
-                    if channel == "console":
-                        print(parsed["response"])
+                # Output response to user if we have one
+                if user_response:
+                    if response_channel == "console":
+                        print(user_response)
                     else:
                         try:
-                            io_layer = self.load_io_layer(ChannelType[channel.upper()])
+                            io_layer = self.load_io_layer(ChannelType[response_channel.upper()])
                             if io_layer.requires_authorization():
                                 if self.authorization_manager.request_authorization(
-                                    channel,
+                                    response_channel,
                                     "Sending output"
                                 ):
-                                    io_layer.write(parsed["response"])
+                                    io_layer.write(user_response)
                             else:
-                                io_layer.write(parsed["response"])
+                                io_layer.write(user_response)
                         except Exception as e:
-                            logger.error(f"Error writing to {channel} channel: {e}")
-                            print(parsed["response"])
-
-                # Check if conversation should end
-                parsed = self.response_parser.parse_response(response_text)
-                if parsed.get("conversation_complete") == "YES":
-                    self.end_conversation()
-                    print("\nConversation ended.")
-                    self.start_conversation(ChannelType.CONSOLE)
+                            logger.error(f"Error writing to {response_channel} channel: {e}")
+                            print(user_response)
+                else:
+                    print("I've completed my internal processing but don't have a response for you yet.")
 
             except KeyboardInterrupt:
                 print("\nGoodbye!")
