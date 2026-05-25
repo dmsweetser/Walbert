@@ -1,11 +1,1 @@
-When I try to chat, I get no response from the model:
-
-2026-05-25 15:40:18,928 - walbert - INFO - Ministral server started successfully
-2026-05-25 15:40:46,995 - walbert - INFO - Devstral server started successfully
-Welcome to Walbert! Type 'exit' to quit.
-> How are you today?
-> 
-
-It just returns to me, and nothing is logged in chat or raw.
-
-Please fix this and any other issues so the app is fully functional.
+Can you expand the system prompt to Walbert to explain in more detail what its capabilities are? It didn't realize it could talk to its smarter cousin, because it didn't know what that meant.

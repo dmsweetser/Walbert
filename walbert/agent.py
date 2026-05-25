@@ -301,6 +301,8 @@ class WalbertAgent:
 
                     full_prompt += f"\n\nAssistant (internal): {model_response}"
 
+                    self.save_conversation_files(self.current_conversation_id)
+
                     # Handle user response
                     if user_response:
                         if response_channel == "console":
@@ -332,8 +334,6 @@ class WalbertAgent:
                         self.save_conversation_files(self.current_conversation_id)
                         self.start_conversation(ChannelType.CONSOLE)
                         print("Conversation complete. Starting new session.")
-
-                    self.save_conversation_files(self.current_conversation_id)
 
             except KeyboardInterrupt:
                 print("\nGoodbye!")
