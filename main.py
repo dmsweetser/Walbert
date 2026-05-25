@@ -51,7 +51,8 @@ def load_config() -> Config:
             return Config(
                 model_configs=model_configs,
                 llama_binary_path=config_data['llama_binary_path'],
-                log_level=config_data['log_level']
+                mmproj_path=config_data.get('mmproj_path', ""),
+                log_level=config_data.get('log_level', "INFO")
             )
     except FileNotFoundError:
         logger.error("instance/config.json not found")

@@ -40,6 +40,7 @@ class TestWalbertAgent(unittest.TestCase):
         self.config = Config(
             model_configs=model_configs,
             llama_binary_path="/fake/path/llama-server",
+            mmproj_path="/fake/path/mmproj",
             log_level="DEBUG"
         )
 

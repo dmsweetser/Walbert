@@ -21,8 +21,8 @@ class Config:
     """System configuration"""
     model_configs: Dict[str, ModelConfig]
     llama_binary_path: str
-    mmproj_path: str
-    log_level: str
+    mmproj_path: str = ""
+    log_level: str = "INFO"
 
 @dataclass
 class IOConfig:
