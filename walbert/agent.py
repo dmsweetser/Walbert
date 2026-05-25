@@ -81,6 +81,7 @@ class WalbertAgent:
         self.io_config = io_config
         self.model_manager = ModelManager(config)
         self.db = DatabaseManager()
+        self.skill_manager = SkillManager(self.db)
         self.response_parser = ResponseParser()
         self.authorization_manager = AuthorizationManager()
         self.io_factory = IOLayerFactory()
@@ -288,10 +289,9 @@ class WalbertAgent:
 
                 # Process model response
                 user_response = None
-                internal_cycles = 0
-                max_internal_cycles = 5
+                parsed_response = None
 
-                while not user_response and internal_cycles < max_internal_cycles:
+                while not user_response:
                     model_response = self.model_manager.execute_ministral(full_prompt)
                     self.logger.debug(f"Model response:\n{model_response}")
 
@@ -302,42 +302,41 @@ class WalbertAgent:
                         response_channel = parsed_response.get("channel", "console")
                         break
 
-                    internal_cycles += 1
                     full_prompt += f"\n\nAssistant (internal): {model_response}"
 
-                # Handle user response
-                if user_response:
-                    if response_channel == "console":
-                        print(user_response)
-                    else:
-                        try:
-                            io_layer = self.load_io_layer(ChannelType[response_channel.upper()])
-                            if io_layer.requires_authorization():
-                                if self.authorization_manager.request_authorization(
-                                    response_channel,
-                                    "Sending output"
-                                ):
-                                    io_layer.write(user_response)
-                            else:
-                                io_layer.write(user_response)
-                        except Exception as e:
-                            self.logger.error(f"Error writing to {response_channel} channel: {e}")
+                    # Handle user response
+                    if user_response:
+                        if response_channel == "console":
                             print(user_response)
+                        else:
+                            try:
+                                io_layer = self.load_io_layer(ChannelType[response_channel.upper()])
+                                if io_layer.requires_authorization():
+                                    if self.authorization_manager.request_authorization(
+                                        response_channel,
+                                        "Sending output"
+                                    ):
+                                        io_layer.write(user_response)
+                                else:
+                                    io_layer.write(user_response)
+                            except Exception as e:
+                                self.logger.error(f"Error writing to {response_channel} channel: {e}")
+                                print(user_response)
 
-                # If we consulted Devstral, continue internal processing
-                if parsed.get("should_consult_smarter_cousin_start") == "YES" and "devstral_response" in parsed:
-                    full_prompt += f"\n\nDevstral Response: {parsed['devstral_response']}"
-                    user_response = None
+                    # If we consulted Devstral, continue internal processing
+                    if parsed_response.get("should_consult_smarter_cousin_start") == "YES" and "devstral_response" in parsed_response:
+                        full_prompt += f"\n\nDevstral Response: {parsed_response['devstral_response']}"
+                        user_response = None
 
-                # Handle conversation completion
-                if parsed_response.get("conversation_complete") == "YES":
-                    self.logger.debug("Conversation marked as complete")
-                    self.end_conversation()
+                    # Handle conversation completion
+                    if parsed_response.get("conversation_complete") == "YES":
+                        self.logger.debug("Conversation marked as complete")
+                        self.end_conversation()
+                        self.save_conversation_files(self.current_conversation_id)
+                        self.start_conversation(ChannelType.CONSOLE)
+                        print("Conversation complete. Starting new session.")
+
                     self.save_conversation_files(self.current_conversation_id)
-                    self.start_conversation(ChannelType.CONSOLE)
-                    print("Conversation complete. Starting new session.")
-
-                self.save_conversation_files(self.current_conversation_id)
 
             except KeyboardInterrupt:
                 print("\nGoodbye!")

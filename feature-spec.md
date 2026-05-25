@@ -140,6 +140,7 @@ Walbert must emit **all responses and internal deliberations** using the followi
 ## **5.2 Decision Blocks**
 ```
 ~walbert_should_query_datastore_start~YES/NO
+~walbert_should_consult_smarter_cousin_start~YES/NO
 ~walbert_conversation_complete_start~YES/NO
 ```
 

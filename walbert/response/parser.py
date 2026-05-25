@@ -22,9 +22,10 @@ class ResponseParser:
             "~walbert_response_start~": "response",
             "~walbert_response_channel_start~": "channel",
             "~walbert_should_query_datastore_start~": "should_query_datastore",
-            "~walbert_should_consult_smarter_cousin_start~": "should_consult_smarter_cousin_start",
+            "~walbert_should_consult_smarter_cousin_start~": "should_consult_smarter_cousin",
             "~walbert_conversation_complete_start~": "conversation_complete",
             "~walbert_sql_execute_start~": "sql_execute",
+            "~walbert_skill_execute_start~": "skill_execute",
             "~walbert_input_channel_start~": "input_channel"
         }
 
