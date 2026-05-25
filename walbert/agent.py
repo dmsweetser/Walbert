@@ -294,7 +294,7 @@ class WalbertAgent:
         try:
             self.current_conversation_id = self.db.start_conversation(channel.value)
             db_schema = self.db.get_schema()
-            system_prompt = self.SYSTEM_PROMPT.format(db_schema=db_schema)
+            system_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", db_schema)
             self.db.add_message(self.current_conversation_id, system_prompt, "system")
             self.db.conn.commit()
         except Exception as e:
