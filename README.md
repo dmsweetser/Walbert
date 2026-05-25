@@ -7,7 +7,7 @@ Walbert is a local-first AI agent system built on llama.cpp compiled binaries.
 - **Local-Only Execution**: Runs entirely on your Linux system using local llama.cpp binaries
 - **Multi-Model Support**: Load and manage multiple GGUF models simultaneously
 - **SQLite Datastore**: Stores all items, tags, conversations, and memories
-- **Hardware Integration**: Interact with USB, serial, and Bluetooth devices
+- **Hardware Integration**: Interact with serial devices
 - **Unified Response Protocol**: Consistent block-based format for all responses
 - **Configurable I/O Layers**: Enable, disable, or require authorization for different I/O channels
 
@@ -68,18 +68,6 @@ cd walbert
         "require_authorization": true,
         "port": "/dev/ttyUSB0",
         "baudrate": 9600
-    },
-    "bluetooth": {
-        "enabled": false,
-        "require_authorization": true
-    },
-    "usb": {
-        "enabled": false,
-        "require_authorization": true
-    },
-    "python_code": {
-        "enabled": false,
-        "require_authorization": true
     }
 }
 ```

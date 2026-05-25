@@ -7,13 +7,11 @@ from typing import Dict, Any
 from .base import IOLayer
 from .console import ConsoleIOLayer
 from .serial import SerialIOLayer
-from .python_code import PythonCodeIOLayer
 
 class ChannelType(Enum):
     """Supported input/output channels"""
     CONSOLE = "console"
     SERIAL = "serial"
-    PYTHON_CODE = "python_code"
 
 class IOLayerFactory:
     """Factory for creating I/O layer instances"""
@@ -24,7 +22,5 @@ class IOLayerFactory:
             return ConsoleIOLayer(config)
         elif channel_type == ChannelType.SERIAL:
             return SerialIOLayer(config)
-        elif channel_type == ChannelType.PYTHON_CODE:
-            return PythonCodeIOLayer(config)
         else:
             raise ValueError(f"Unsupported channel type: {channel_type}")
