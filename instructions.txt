@@ -1,1 +1,11 @@
-When I try to chat, I get no response from the model. Something is screwy. Make any necessary fixes so the app is fully functional.
+When I try to chat, I get no response from the model:
+
+2026-05-25 15:40:18,928 - walbert - INFO - Ministral server started successfully
+2026-05-25 15:40:46,995 - walbert - INFO - Devstral server started successfully
+Welcome to Walbert! Type 'exit' to quit.
+> How are you today?
+> 
+
+It just returns to me, and nothing is logged in chat or raw.
+
+Please fix this and any other issues so the app is fully functional.

@@ -298,7 +298,6 @@ class WalbertAgent:
                     if parsed_response.get("response"):
                         user_response = parsed_response["response"]
                         response_channel = parsed_response.get("channel", "console")
-                        break
 
                     full_prompt += f"\n\nAssistant (internal): {model_response}"
 

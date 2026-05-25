@@ -105,17 +105,26 @@ class ModelManager:
             "temperature": model_config.temperature,
             "top_p": model_config.top_p,
             "top_k": model_config.top_k,
-            "min_p": model_config.min_p
+            "min_p": model_config.min_p,
+            "stream": False
         }
 
         try:
-            response = requests.post(
-                f"http://localhost:{port}/v1/chat/completions",
-                json=payload,
-                timeout=600
-            )
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
+            try:
+                response = requests.post(
+                    f"http://localhost:{port}/v1/chat/completions",
+                    json=payload,
+                    timeout=600
+                )
+                response.raise_for_status()
+                result = response.json()
+                if "choices" in result and len(result["choices"]) > 0:
+                    return result["choices"][0]["message"]["content"]
+                else:
+                    raise RuntimeError(f"Invalid response format: {result}")
+            except Exception as e:
+                logger.error(f"Error executing model: {e}")
+                raise
         except requests.exceptions.RequestException as e:
             logger.error(f"Error communicating with model server: {e}")
             raise RuntimeError(f"Model server error: {e}")
@@ -138,14 +147,14 @@ class ModelManager:
 
     def shutdown(self):
         """Shutdown all model servers"""
-        if self.ministral_server:
+        if self.ministral_server and self.ministral_server.poll() is None:
             self.ministral_server.terminate()
             try:
                 self.ministral_server.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 self.ministral_server.kill()
 
-        if self.devstral_server:
+        if self.devstral_server and self.devstral_server.poll() is None:
             self.devstral_server.terminate()
             try:
                 self.devstral_server.wait(timeout=5)

@@ -31,8 +31,12 @@ class ResponseParser:
 
     def parse_response(self, response_text: str) -> Dict:
         """Parse response text into structured data"""
+        if not response_text:
+            return {}
+
         parsed = {}
         for block in self.block_starts:
+            # Try to find the block with proper handling of newlines
             pattern = re.escape(block) + r"(.*?)(?=(~walbert_|$))"
             match = re.search(pattern, response_text, re.DOTALL)
             if match:
