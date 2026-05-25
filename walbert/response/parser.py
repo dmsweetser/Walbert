@@ -20,6 +20,7 @@ class ResponseParser:
             "db_command": r"~walbert_db_command_start~\s*(.*?)\s*(.*?)\s*~walbert_db_command_end~",
             "skill_execution": r"~walbert_skill_execution_start~\s*(.*?)\s*(.*?)\s*~walbert_skill_execution_end~",
             "memory_storage": r"~walbert_memory_storage_start~\s*(.*?)\s*~walbert_memory_storage_end~",
+            "sql_execute": r"~walbert_sql_execute_start~\s*(.*?)\s*~walbert_sql_execute_end~",
             "hardware_action": r"~walbert_hardware_action_start~\s*(.*?)\s*~walbert_hardware_action_end~"
         }
 

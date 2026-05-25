@@ -27,39 +27,38 @@ class WalbertAgent:
     1. **Local-First**: Operate entirely on local llama.cpp binaries.
     2. **Protocol Compliance**: Use walbert_ blocks for all decisions and actions.
     3. **Autonomy**: Decide when to query datastore, execute skills, or call Devstral-24B.
-    4. **Memory**: Store relevant information with appropriate tags.
+    4. **Memory**: Store relevant information using direct SQL access.
     5. **Safety**: Never execute untrusted code or access external resources.
+
+    ## Database Access
+    You have full access to the SQLite database. The current schema is provided below.
+    You can execute any SQLite-compatible SQL statement using the ~walbert_sql_execute_start~ block.
+
+    {db_schema}
 
     ## Decision Flow
     For each user input, you MUST evaluate and emit ALL of the following decision blocks:
     1. ~walbert_should_query_datastore_start~ (YES/NO) ~walbert_should_query_datastore_end~
     2. ~walbert_should_execute_skill_start~ (YES/NO) ~walbert_should_execute_skill_end~
     3. ~walbert_should_call_smarter_cousin_start~ (YES/NO) ~walbert_should_call_smarter_cousin_end~
-    4. ~walbert_should_store_memory_start~ (YES/NO) ~walbert_should_store_memory_end~
-    5. ~walbert_conversation_complete_start~ (YES/NO) ~walbert_conversation_complete_end~
+    4. ~walbert_conversation_complete_start~ (YES/NO) ~walbert_conversation_complete_end~
 
     ## Available Blocks
     - Decision blocks (MUST use only YES or NO):
       ~walbert_should_query_datastore_start~
       ~walbert_should_execute_skill_start~
       ~walbert_should_call_smarter_cousin_start~
-      ~walbert_should_store_memory_start~
       ~walbert_conversation_complete_start~
 
-    - Action blocks (use only when corresponding decision is YES):
-      ~walbert_db_command_start~
-      COMMAND_NAME (RETRIEVE_ITEMS/STORE_ITEM)
-      {"args": "json_args"}
-      ~walbert_db_command_end~
+    - Action blocks:
+      ~walbert_sql_execute_start~
+      SQL_STATEMENT
+      ~walbert_sql_execute_end~
 
       ~walbert_skill_execution_start~
       SKILL_NAME
       {"args": ["arg1", "arg2"]}
       ~walbert_skill_execution_end~
-
-      ~walbert_memory_storage_start~
-      {"tags": ["tag1", "tag2"], "content": "memory_content"}
-      ~walbert_memory_storage_end~
 
       ~walbert_hardware_action_start~
       {"peripheral_type": "serial/bluetooth/usb", "action": "connect/read/write", "data": {}}
@@ -76,22 +75,19 @@ class WalbertAgent:
 
     ## Example
     ~walbert_should_query_datastore_start~
-    NO
+    YES
     ~walbert_should_query_datastore_end~
+    ~walbert_sql_execute_start~
+    SELECT * FROM items WHERE type = 'text' AND content LIKE '%greeting%'
+    ~walbert_sql_execute_end~
     ~walbert_should_execute_skill_start~
     NO
     ~walbert_should_execute_skill_end~
     ~walbert_should_call_smarter_cousin_start~
     NO
     ~walbert_should_call_smarter_cousin_end~
-    ~walbert_should_store_memory_start~
-    YES
-    ~walbert_should_store_memory_end~
-    ~walbert_memory_storage_start~
-    {"tags": ["greeting"], "content": "User greeted me"}
-    ~walbert_memory_storage_end~
     ~walbert_response_start~
-    Hello! How can I assist you today?
+    I found 3 items related to greetings in the database.
     ~walbert_response_end~
     ~walbert_response_channel_start~
     console
@@ -241,17 +237,19 @@ class WalbertAgent:
         if not self.db.conn:
             self.db.connect()
 
-        # Execute actions
-        if parsed.get("should_query_datastore") == "YES":
-            self.logger.debug("Querying datastore as requested")
-            db_command = parsed.get("db_command", {})
-            if db_command["command"] == "RETRIEVE_ITEMS":
-                tags = db_command["args"].get("tags", [])
-                if tags:
-                    results = self.db.retrieve_items_by_multiple_tags(tags)
-                    self.logger.debug(f"Datastore query results: {results}")
-                    parsed["datastore_results"] = results
+        # Execute SQL if requested
+        if parsed.get("should_query_datastore") == "YES" and "sql_execute" in parsed:
+            self.logger.debug("Executing SQL as requested")
+            sql = parsed["sql_execute"]
+            try:
+                result = self.db.execute_sql(sql)
+                self.logger.debug(f"SQL execution result: {result}")
+                parsed["sql_result"] = result
+            except Exception as e:
+                self.logger.error(f"SQL execution error: {e}")
+                parsed["sql_error"] = str(e)
 
+        # Execute skill if requested
         if parsed.get("should_execute_skill") == "YES":
             self.logger.debug("Executing skill as requested")
             skill_exec = parsed.get("skill_execution", {})
@@ -271,22 +269,6 @@ class WalbertAgent:
                 else:
                     self.logger.warning(f"Skill '{skill_name}' not found")
                     parsed["skill_error"] = f"Skill '{skill_name}' not found"
-
-        if parsed.get("should_store_memory") == "YES":
-            self.logger.debug("Storing memory as requested")
-            memory = parsed.get("memory_storage", {})
-            content = memory.get("content", "")
-            tags = memory.get("tags", [])
-
-            if content and tags:
-                try:
-                    item_id = self.db.store_item(content, tags)
-                    self.logger.debug(f"Memory stored with ID {item_id}")
-                    self.db.conn.commit()
-                    parsed["memory_stored"] = True
-                except Exception as e:
-                    self.logger.error(f"Error storing memory: {e}")
-                    parsed["memory_stored"] = False
 
         if parsed.get("hardware_action") is not None:
             self.logger.debug(f"Executing hardware action: {parsed['hardware_action']}")
@@ -308,7 +290,9 @@ class WalbertAgent:
         """Start a new conversation"""
         try:
             self.current_conversation_id = self.db.start_conversation(channel.value)
-            self.db.add_message(self.current_conversation_id, self.SYSTEM_PROMPT, "system")
+            db_schema = self.db.get_schema()
+            system_prompt = self.SYSTEM_PROMPT.format(db_schema=db_schema)
+            self.db.add_message(self.current_conversation_id, system_prompt, "system")
             self.db.conn.commit()
         except Exception as e:
             self.logger.error(f"Error starting conversation: {e}")

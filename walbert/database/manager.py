@@ -82,76 +82,104 @@ class DatabaseManager:
         self.conn.commit()
         self.logger.debug("Database schema initialized")
 
-    def store_item(self, content: str, tags: List[str], item_type: str = "text") -> int:
-        """Store an item with tags"""
-        self.logger.debug(f"Storing item of type {item_type} with tags: {tags}")
+    def get_schema(self) -> str:
+        """Get current database schema"""
+        self.logger.debug("Retrieving database schema")
+        schema = {}
+
+        # Get table information
+        tables = self.cursor.execute("""
+            SELECT name FROM sqlite_master
+            WHERE type='table' AND name NOT LIKE 'sqlite_%'
+        """).fetchall()
+
+        for table in tables:
+            table_name = table[0]
+            schema[table_name] = {}
+
+            # Get columns
+            columns = self.cursor.execute(f"PRAGMA table_info({table_name})").fetchall()
+            schema[table_name]['columns'] = [
+                {
+                    'name': col[1],
+                    'type': col[2],
+                    'not_null': bool(col[3]),
+                    'default_value': col[4],
+                    'primary_key': bool(col[5])
+                } for col in columns
+            ]
+
+            # Get foreign keys
+            fks = self.cursor.execute(f"PRAGMA foreign_key_list({table_name})").fetchall()
+            schema[table_name]['foreign_keys'] = [
+                {
+                    'id': fk[0],
+                    'seq': fk[1],
+                    'table': fk[2],
+                    'from': fk[3],
+                    'to': fk[4],
+                    'on_update': fk[5],
+                    'on_delete': fk[6],
+                    'match': fk[7]
+                } for fk in fks
+            ]
+
+        # Format schema as string
+        schema_str = "Current Database Schema:\n\n"
+        for table_name, table_info in schema.items():
+            schema_str += f"Table: {table_name}\n"
+            schema_str += "Columns:\n"
+            for col in table_info['columns']:
+                schema_str += f"  - {col['name']} ({col['type']})"
+                if col['primary_key']:
+                    schema_str += " PRIMARY KEY"
+                if col['not_null']:
+                    schema_str += " NOT NULL"
+                if col['default_value'] is not None:
+                    schema_str += f" DEFAULT {col['default_value']}"
+                schema_str += "\n"
+
+            if table_info['foreign_keys']:
+                schema_str += "Foreign Keys:\n"
+                for fk in table_info['foreign_keys']:
+                    schema_str += f"  - {fk['from']} REFERENCES {fk['table']}({fk['to']})"
+                    if fk['on_delete'] != 'NO ACTION':
+                        schema_str += f" ON DELETE {fk['on_delete']}"
+                    if fk['on_update'] != 'NO ACTION':
+                        schema_str += f" ON UPDATE {fk['on_update']}"
+                    schema_str += "\n"
+
+            schema_str += "\n"
+
+        return schema_str
+
+    def execute_sql(self, sql: str) -> str:
+        """Execute arbitrary SQL statement"""
+        self.logger.debug(f"Executing SQL: {sql}")
         try:
-            self.cursor.execute(
-                "INSERT INTO items (content, type) VALUES (?, ?)",
-                (content, item_type)
-            )
-            item_id = self.cursor.lastrowid
-            self.logger.debug(f"Item stored with ID {item_id}")
+            result = self.cursor.execute(sql)
 
-            for tag in tags:
-                # Add tag if it doesn't exist
-                self.cursor.execute(
-                    "INSERT OR IGNORE INTO tags (name) VALUES (?)",
-                    (tag,)
-                )
-                # Link item to tag
-                self.cursor.execute("""
-                    INSERT INTO item_tags (item_id, tag_id)
-                    VALUES (?, (SELECT id FROM tags WHERE name = ?))
-                """, (item_id, tag))
-                self.logger.debug(f"Linked item {item_id} to tag '{tag}'")
+            if sql.strip().upper().startswith("SELECT"):
+                rows = result.fetchall()
+                if not rows:
+                    return "Query executed successfully. No rows returned."
 
-            self.conn.commit()
-            self.logger.debug(f"Committed item {item_id} to database")
-            return item_id
+                # Format results
+                output = "Query results:\n"
+                columns = [desc[0] for desc in result.description]
+                output += "\t".join(columns) + "\n"
+                output += "-" * (sum(len(col) for col in columns) + len(columns) * 3) + "\n"
+
+                for row in rows:
+                    output += "\t".join(str(val) for val in row) + "\n"
+
+                return output
+            else:
+                self.conn.commit()
+                return f"SQL executed successfully. Rows affected: {self.cursor.rowcount}"
         except Exception as e:
-            self.logger.error(f"Error storing item: {e}")
-            self.conn.rollback()
-            raise
-
-    def retrieve_items_by_tag(self, tag: str) -> List[Tuple]:
-        """Retrieve items by tag"""
-        self.logger.debug(f"Retrieving items with tag '{tag}'")
-        try:
-            self.cursor.execute("""
-                SELECT i.id, i.content, i.type, i.created_at
-                FROM items i
-                JOIN item_tags it ON i.id = it.item_id
-                JOIN tags t ON it.tag_id = t.id
-                WHERE t.name = ?
-            """, (tag,))
-            results = self.cursor.fetchall()
-            self.logger.debug(f"Found {len(results)} items with tag '{tag}'")
-            return results
-        except Exception as e:
-            self.logger.error(f"Error retrieving items by tag: {e}")
-            raise
-
-    def retrieve_items_by_multiple_tags(self, tags: List[str]) -> List[Tuple]:
-        """Retrieve items by multiple tags (AND logic)"""
-        self.logger.debug(f"Retrieving items with tags: {tags}")
-        try:
-            placeholders = ','.join(['?'] * len(tags))
-            self.cursor.execute(f"""
-                SELECT i.id, i.content, i.type, i.created_at
-                FROM items i
-                JOIN item_tags it ON i.id = it.item_id
-                JOIN tags t ON it.tag_id = t.id
-                WHERE t.name IN ({placeholders})
-                GROUP BY i.id
-                HAVING COUNT(DISTINCT t.name) = {len(tags)}
-            """, tags)
-            results = self.cursor.fetchall()
-            self.logger.debug(f"Found {len(results)} items with tags {tags}")
-            return results
-        except Exception as e:
-            self.logger.error(f"Error retrieving items by multiple tags: {e}")
-            raise
+            self.logger.error(f"SQL execution error: {e}")
+            return f"Error executing SQL: {e}"
 
     def start_conversation(self, channel: str) -> int:
         """Start a new conversation"""
