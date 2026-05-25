@@ -1,6 +1,6 @@
 # **Walbert — Feature Specification**
 
-## **Version:** 2.1
+## **Version:** 4.0
 ## **Author:** Daniel
 ## **Purpose:** Define the complete feature set for the Walbert local agent system.
 
@@ -50,6 +50,9 @@
 - **GEN-014: llama.cpp Binary Path Configuration**
   The system must define and validate paths to llama.cpp compiled binaries.
 
+- **GEN-015: Skill Management System**
+  Walbert must support dynamic skill execution and storage.
+
 ---
 
 # **2. AI / Model Features (AI)**
@@ -71,6 +74,9 @@
 
 - **AI-006: SQL Command Emission**
   Models must request DB reads/writes via structured SQL commands.
+
+- **AI-007: Skill Execution Blocks**
+  Models must emit skill execution blocks for dynamic capability extension.
 
 ---
 
@@ -116,6 +122,9 @@
 - **DATA-006: Raw Conversation Logs**
   Must log all conversations to file in raw format.
 
+- **DATA-007: Skill Storage**
+  Must store executable skills as items with type='skill'.
+
 ---
 
 # **5. Unified Walbert Response Format (MOD)**
@@ -137,6 +146,7 @@ Walbert must emit **all responses and internal deliberations** using the followi
 ## **5.3 Action Blocks**
 ```
 ~walbert_sql_execute_start~SQL_STATEMENT
+~walbert_skill_execute_start~SKILL_NAME
 ```
 
 ## **5.4 Rules**

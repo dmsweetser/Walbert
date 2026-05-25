@@ -1,13 +1,1 @@
-Have walbert blocks begin their text right after, instead of on a new line. Adjust the app accordingly to accommodate this.
-
-***
-
-Get rid of skill-specific code entirely.
-
-***
-
-Clean up the feature-spec.md.
-
-***
-
-Get rid of any lingering unused code.
+Remove any unused code and fully revise the feature-spec.md to reflect the new version.
