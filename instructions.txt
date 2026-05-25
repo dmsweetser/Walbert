@@ -1,0 +1,1 @@
+When I try to chat, I get no response from the model. Something is screwy. Make any necessary fixes so the app is fully functional.

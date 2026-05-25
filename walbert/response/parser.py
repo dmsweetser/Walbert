@@ -33,14 +33,9 @@ class ResponseParser:
         """Parse response text into structured data"""
         parsed = {}
         for block in self.block_starts:
-            if block in response_text:
-                start_idx = response_text.find(block) + len(block)
-                end_idx = len(response_text)
-                for other_block in self.block_starts:
-                    if other_block in response_text[start_idx:]:
-                        other_idx = response_text.find(other_block, start_idx)
-                        if other_idx < end_idx:
-                            end_idx = other_idx
-                content = response_text[start_idx:end_idx].strip()
+            pattern = re.escape(block) + r"(.*?)(?=(~walbert_|$))"
+            match = re.search(pattern, response_text, re.DOTALL)
+            if match:
+                content = match.group(1).strip()
                 parsed[self.block_mapping[block]] = content
         return parsed

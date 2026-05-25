@@ -149,7 +149,7 @@ class WalbertAgent:
             self.db.connect()
 
         # Handle SQL execution
-        if parsed.get("should_query_datastore") == "YES" and "sql_execute" in parsed:
+        if parsed.get("sql_execute"):
             self.logger.debug("Executing SQL as requested")
             sql = parsed["sql_execute"]
             try:
@@ -161,7 +161,7 @@ class WalbertAgent:
                 parsed["sql_error"] = str(e)
 
         # Handle smarter cousin consultation
-        if parsed.get("should_consult_smarter_cousin_start") == "YES":
+        if parsed.get("should_consult_smarter_cousin") == "YES":
             self.logger.debug("Consulting smarter cousin as requested")
             try:
                 conversation_context = self.build_conversation_context()
@@ -182,9 +182,7 @@ class WalbertAgent:
 
     def emit_input_channel(self, channel: ChannelType) -> str:
         """Emit the input channel block for context"""
-        return f"""~walbert_input_channel_start~
-{channel.value}
-"""
+        return f"~walbert_input_channel_start~{channel.value}"
 
     def start_conversation(self, channel: ChannelType):
         """Start a new conversation"""
