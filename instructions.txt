@@ -7,3 +7,7 @@ You started doing this and it went well. But all the skill code is messed up / i
 ***
 
 The key thing is that retrieve_items_by_multiple_tags and store_item aren't available in the DB anymore. I want a more universal approach to data now that the schema is provided to Walbert. Do this in both the command blocks and general handling. Fewer specific command blocks, use SQL to get the data, but have a schema that delinates skills as distinct.
+
+***
+
+Can you clean the code up even further? Also build a suite of tests to validate the functionality, and clean up the feature-spec.md.
