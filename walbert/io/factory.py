@@ -7,16 +7,12 @@ from typing import Dict, Any
 from .base import IOLayer
 from .console import ConsoleIOLayer
 from .serial import SerialIOLayer
-from .bluetooth import BluetoothIOLayer
-from .usb import USBIOLayer
 from .python_code import PythonCodeIOLayer
 
 class ChannelType(Enum):
     """Supported input/output channels"""
     CONSOLE = "console"
     SERIAL = "serial"
-    BLUETOOTH = "bluetooth"
-    USB = "usb"
     PYTHON_CODE = "python_code"
 
 class IOLayerFactory:
@@ -28,10 +24,6 @@ class IOLayerFactory:
             return ConsoleIOLayer(config)
         elif channel_type == ChannelType.SERIAL:
             return SerialIOLayer(config)
-        elif channel_type == ChannelType.BLUETOOTH:
-            return BluetoothIOLayer(config)
-        elif channel_type == ChannelType.USB:
-            return USBIOLayer(config)
         elif channel_type == ChannelType.PYTHON_CODE:
             return PythonCodeIOLayer(config)
         else:

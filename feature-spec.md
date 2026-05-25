@@ -1,8 +1,8 @@
 # **Walbert — Feature Specification**
 
-## **Version:** 1.9
+## **Version:** 2.0
 ## **Author:** Daniel
-## **Purpose:** Define the complete feature set for the Walbert local agent system, built on llama.cpp.
+## **Purpose:** Define the complete feature set for the Walbert local agent system.
 
 ---
 
@@ -12,7 +12,7 @@
   Walbert must run entirely on Linux using only local llama.cpp compiled binaries.
 
 - **GEN-002: Multi-Model llama.cpp Runtime**
-  Walbert must load and manage multiple GGUF models (Ministral-3B, Devstral-24B) via llama.cpp.
+  Walbert must load and manage multiple GGUF models via llama.cpp.
 
 - **GEN-003: Minimal Dependency Footprint**
   The system must rely only on Python and llama.cpp compiled binaries.
@@ -24,28 +24,28 @@
   A single SQLite database must store all items, tags, conversations, and memories.
 
 - **GEN-006: Unified Walbert Response Protocol**
-  All model outputs must use a simplified block-based format for responses and internal deliberation.
+  All model outputs must use a simplified block-based format for responses.
 
 - **GEN-007: Configurable I/O Layers**
-  All I/O layers must be enabled, disabled, or set to require user authorization via configuration.
+  All I/O layers must be enabled, disabled, or set to require user authorization.
 
 - **GEN-008: Console I/O Layer**
-  The system must accept text input and display text output via the console as the default I/O layer.
+  The system must accept text input and display text output via the console.
 
 - **GEN-009: Zero-State Boot**
-  Walbert must operate with an empty database and learn its identity and skills over time.
+  Walbert must operate with an empty database and learn its identity over time.
 
 - **GEN-010: Conversation Reset**
-  Walbert must autonomously determine when a conversation is complete and reset its state.
+  Walbert must autonomously determine when a conversation is complete.
 
 - **GEN-011: Dual Conversation Logging**
-  All conversations must be logged to both the database and a raw log file.
+  All conversations must be logged to both the database and raw log files.
 
 - **GEN-012: Comprehensive Testing Framework**
-  The system must include unit tests and integration tests for all major components.
+  The system must include unit tests and integration tests for all components.
 
 - **GEN-013: Factory Pattern Implementation**
-  All major components must be instantiatable through factory methods for testability.
+  All major components must be instantiatable through factory methods.
 
 - **GEN-014: llama.cpp Binary Path Configuration**
   The system must define and validate paths to llama.cpp compiled binaries.
@@ -67,17 +67,13 @@
   The primary model must autonomously decide when to:
   - Query its datastore via SQL
   - Invoke a stored skill
-  - Call Devstral-24B
   - Perform multi-step reasoning
 
 - **AI-005: System Prompt Awareness**
-  Models must understand the DB schema, tag system, skill system, and response protocol.
+  Models must understand the DB schema, tag system, and response protocol.
 
 - **AI-006: SQL Command Emission**
-  Models must be able to request DB reads/writes via structured SQL commands.
-
-- **AI-007: Skill Execution Commands**
-  Models must be able to request execution of stored skills with arguments.
+  Models must request DB reads/writes via structured SQL commands.
 
 ---
 
@@ -96,13 +92,13 @@
   The system must support executing Python code with user authorization.
 
 - **IOL-005: Serial I/O Layer**
-  The system must support bidirectional serial communication with user authorization.
+  The system must support bidirectional serial communication.
 
 - **IOL-006: Bluetooth I/O Layer**
-  The system must support Bluetooth device discovery and communication with user authorization.
+  The system must support Bluetooth device communication.
 
 - **IOL-007: USB I/O Layer**
-  The system must support USB device detection and communication with user authorization.
+  The system must support USB device detection and communication.
 
 ---
 
@@ -162,7 +158,29 @@ Walbert must emit **all responses and internal deliberations** using the followi
 ~walbert_response_channel_end~
 ```
 
-## **6.3 Rules**
+## **6.3 Decision Blocks**
+```
+~walbert_should_query_datastore_start~
+YES/NO
+~walbert_should_query_datastore_end~
+
+~walbert_conversation_complete_start~
+YES/NO
+~walbert_conversation_complete_end~
+```
+
+## **6.4 Action Blocks**
+```
+~walbert_sql_execute_start~
+SQL_STATEMENT
+~walbert_sql_execute_end~
+
+~walbert_skill_execute_start~
+SKILL_NAME
+~walbert_skill_execute_end~
+```
+
+## **6.5 Rules**
 - All text must appear within walbert_ blocks.
 - Walbert may execute multiple internal rounds before replying to the user.
 - Walbert must autonomously determine when a conversation is complete.

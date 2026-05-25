@@ -40,7 +40,6 @@ class TestWalbertAgent(unittest.TestCase):
         self.config = Config(
             model_configs=model_configs,
             llama_binary_path="/fake/path/llama-server",
-            mmproj_path="/fake/path/mmproj.gguf",
             log_level="DEBUG"
         )
 
@@ -98,13 +97,20 @@ class TestWalbertAgent(unittest.TestCase):
 
     @patch('walbert.database.manager.DatabaseManager')
     @patch('walbert.models.manager.ModelManager')
-    def test_process_response(self, mock_model, mock_db):
+    def test_process_response_with_sql(self, mock_model, mock_db):
         mock_db_instance = MagicMock()
         mock_db_instance.execute_sql.return_value = "Query results:\nid\tcontent\ntest\tskill code"
         mock_db.return_value = mock_db_instance
 
         mock_model_instance = MagicMock()
-        mock_model_instance.execute_ministral.return_value = "test response"
+        mock_model_instance.execute_ministral.return_value = """
+        ~walbert_response_start~
+        test response
+        ~walbert_response_end~
+        ~walbert_sql_execute_start~
+        SELECT * FROM items
+        ~walbert_sql_execute_end~
+        """
         mock_model.return_value = mock_model_instance
 
         agent = WalbertAgent(self.config, self.io_config)
@@ -120,7 +126,7 @@ class TestWalbertAgent(unittest.TestCase):
 
     @patch('walbert.database.manager.DatabaseManager')
     @patch('walbert.models.manager.ModelManager')
-    def test_skill_execution(self, mock_model, mock_db):
+    def test_process_response_with_skill(self, mock_model, mock_db):
         mock_db_instance = MagicMock()
         mock_db_instance.execute_sql.return_value = "Query results:\nid\tcontent\ntest\tskill code"
         mock_db.return_value = mock_db_instance
@@ -136,6 +142,23 @@ class TestWalbertAgent(unittest.TestCase):
             )
 
             self.assertEqual(response["skill_result"], "skill output")
+
+    @patch('walbert.database.manager.DatabaseManager')
+    @patch('walbert.models.manager.ModelManager')
+    def test_build_conversation_context(self, mock_model, mock_db):
+        mock_db_instance = MagicMock()
+        mock_db_instance.cursor.execute.return_value.fetchall.return_value = [
+            ("user", "test message"),
+            ("assistant", "test response")
+        ]
+        mock_db.return_value = mock_db_instance
+
+        agent = WalbertAgent(self.config, self.io_config)
+        agent.current_conversation_id = 1
+
+        context = agent.build_conversation_context()
+        self.assertIn("User: test message", context)
+        self.assertIn("Assistant: test response", context)
 
 if __name__ == "__main__":
     unittest.main()

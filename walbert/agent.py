@@ -3,7 +3,6 @@ Main Walbert agent implementation
 """
 
 import logging
-from enum import Enum
 import os
 from typing import Optional
 from .config import Config, IOConfig
@@ -152,18 +151,7 @@ class WalbertAgent:
                 parsed["sql_result"] = result
 
                 if "type='skill'" in sql.upper() and "SELECT" in sql.upper():
-                    skill_items = []
-                    try:
-                        lines = result.split('\n')
-                        if len(lines) > 2:
-                            for line in lines[2:]:
-                                if line.strip():
-                                    parts = line.split('\t')
-                                    if len(parts) >= 2:
-                                        skill_items.append(parts[1])
-                    except Exception as e:
-                        self.logger.error(f"Error parsing skill query result: {e}")
-
+                    skill_items = self._extract_skills_from_result(result)
                     if skill_items:
                         try:
                             skill_code = skill_items[0]
@@ -183,18 +171,32 @@ class WalbertAgent:
                 skill_name = parsed["skill_execute"]
                 sql = f"SELECT content FROM items WHERE type='skill' AND content LIKE '%{skill_name}%'"
                 result = self.db.execute_sql(sql)
-                lines = result.split('\n')
-                if len(lines) > 2:
-                    skill_code = lines[2].split('\t')[1] if len(lines[2].split('\t')) > 1 else ""
-                    if skill_code:
-                        result = self.skill_manager.execute_skill(skill_code)
-                        self.logger.debug(f"Skill execution result: {result}")
-                        parsed["skill_result"] = result
+                skill_items = self._extract_skills_from_result(result)
+                if skill_items:
+                    skill_code = skill_items[0]
+                    result = self.skill_manager.execute_skill(skill_code)
+                    self.logger.debug(f"Skill execution result: {result}")
+                    parsed["skill_result"] = result
             except Exception as e:
                 self.logger.error(f"Skill execution error: {e}")
                 parsed["skill_error"] = str(e)
 
         return parsed
+
+    def _extract_skills_from_result(self, result: str) -> list:
+        """Extract skill code from SQL query result"""
+        skill_items = []
+        try:
+            lines = result.split('\n')
+            if len(lines) > 2:
+                for line in lines[2:]:
+                    if line.strip():
+                        parts = line.split('\t')
+                        if len(parts) >= 2:
+                            skill_items.append(parts[1])
+        except Exception as e:
+            self.logger.error(f"Error parsing skill query result: {e}")
+        return skill_items
 
     def emit_input_channel(self, channel: ChannelType) -> str:
         """Emit the input channel block for context"""

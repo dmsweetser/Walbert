@@ -7,8 +7,6 @@ from unittest.mock import patch, MagicMock
 from walbert.io.factory import IOLayerFactory, ChannelType
 from walbert.io.console import ConsoleIOLayer
 from walbert.io.serial import SerialIOLayer
-from walbert.io.bluetooth import BluetoothIOLayer
-from walbert.io.usb import USBIOLayer
 from walbert.io.python_code import PythonCodeIOLayer
 
 class TestIOLayerFactory(unittest.TestCase):
@@ -21,16 +19,6 @@ class TestIOLayerFactory(unittest.TestCase):
         config = {"enabled": True, "require_authorization": False, "port": "/dev/ttyUSB0"}
         layer = IOLayerFactory.create_io_layer(ChannelType.SERIAL, config)
         self.assertIsInstance(layer, SerialIOLayer)
-
-    def test_create_bluetooth_layer(self):
-        config = {"enabled": True, "require_authorization": False}
-        layer = IOLayerFactory.create_io_layer(ChannelType.BLUETOOTH, config)
-        self.assertIsInstance(layer, BluetoothIOLayer)
-
-    def test_create_usb_layer(self):
-        config = {"enabled": True, "require_authorization": False}
-        layer = IOLayerFactory.create_io_layer(ChannelType.USB, config)
-        self.assertIsInstance(layer, USBIOLayer)
 
     def test_create_python_code_layer(self):
         config = {"enabled": True, "require_authorization": False}
