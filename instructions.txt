@@ -1,5 +1,9 @@
-Instead of walbert blocks having _start and _end, just have _start and parse until the next walbert block.
+Have walbert blocks begin their text right after, instead of on a new line. Adjust the app accordingly to accommodate this.
 
-Also, generate a single end-to-end test that validates the app, mocking any external dependencies.
+***
 
-Please also clean up as much of the app as you can.
+Get rid of skill-specific code entirely.
+
+***
+
+Clean up the feature-spec.md.
