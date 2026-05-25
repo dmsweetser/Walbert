@@ -3,6 +3,7 @@
 Unit tests for skill management
 """
 
+import subprocess
 import unittest
 from unittest.mock import patch, MagicMock
 import sys
@@ -20,16 +21,8 @@ class TestSkillManager(unittest.TestCase):
         self.db.init_schema()
         self.skill_manager = SkillManager(self.db)
 
-    def test_store_and_retrieve_skill(self):
-        skill_code = "def test_skill(): return 'test'"
-        skill_id = self.skill_manager.store_skill("test_skill", skill_code, ["example", "test"])
-        self.assertIsInstance(skill_id, int)
-
-        retrieved_code = self.skill_manager.retrieve_skill("test_skill")
-        self.assertEqual(retrieved_code, skill_code)
-
     @patch('subprocess.run')
-    def test_execute_skill(self, mock_run):
+    def test_execute_skill_success(self, mock_run):
         mock_run.return_value = MagicMock(stdout="skill output", stderr="", returncode=0)
         skill_code = """
 def main():
@@ -38,9 +31,25 @@ def main():
         result = self.skill_manager.execute_skill(skill_code, ["arg1", "arg2"])
         self.assertEqual(result, "skill output")
 
-    def test_retrieve_nonexistent_skill(self):
-        result = self.skill_manager.retrieve_skill("nonexistent_skill")
-        self.assertIsNone(result)
+    @patch('subprocess.run')
+    def test_execute_skill_failure(self, mock_run):
+        mock_run.return_value = MagicMock(stdout="", stderr="error", returncode=1)
+        skill_code = """
+def main():
+    raise Exception("Test error")
+"""
+        result = self.skill_manager.execute_skill(skill_code)
+        self.assertTrue("Error:" in result)
+
+    @patch('subprocess.run')
+    def test_execute_skill_timeout(self, mock_run):
+        mock_run.side_effect = subprocess.TimeoutExpired("cmd", 30)
+        skill_code = """
+import time
+time.sleep(60)
+"""
+        result = self.skill_manager.execute_skill(skill_code)
+        self.assertEqual(result, "Error: Skill execution timed out")
 
 if __name__ == '__main__':
     unittest.main()

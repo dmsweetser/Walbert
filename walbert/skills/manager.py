@@ -5,27 +5,16 @@ Skill manager implementation
 import tempfile
 import subprocess
 import os
-from typing import Optional, List
-from ..database.manager import DatabaseManager
+import logging
+
+logger = logging.getLogger('walbert.skills')
 
 class SkillManager:
     """Manages skill execution"""
-    def __init__(self, db: DatabaseManager):
+    def __init__(self, db):
         self.db = db
 
-    def store_skill(self, name: str, code: str, tags: List[str]) -> int:
-        """Store a new skill"""
-        tags = tags + ["skill", name]
-        return self.db.store_item(code, tags, item_type="skill")
-
-    def retrieve_skill(self, name: str) -> Optional[str]:
-        """Retrieve a skill by name"""
-        items = self.db.retrieve_items_by_multiple_tags(["skill", name])
-        if items:
-            return items[0][1]  # Return content
-        return None
-
-    def execute_skill(self, skill_code: str, args: List[str] = None) -> str:
+    def execute_skill(self, skill_code: str, args: list = None) -> str:
         """Execute a skill in sandboxed environment"""
         args = args or []
         with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
@@ -37,9 +26,19 @@ class SkillManager:
             result = subprocess.run(
                 ['python3', temp_path] + args,
                 capture_output=True,
-                text=True
+                text=True,
+                timeout=30
             )
+            if result.returncode != 0:
+                logger.error(f"Skill execution failed: {result.stderr}")
+                return f"Error: {result.stderr}"
             return result.stdout
+        except subprocess.TimeoutExpired:
+            logger.error("Skill execution timed out")
+            return "Error: Skill execution timed out"
+        except Exception as e:
+            logger.error(f"Skill execution error: {e}")
+            return f"Error: {str(e)}"
         finally:
             # Clean up
             try:

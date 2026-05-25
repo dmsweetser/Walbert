@@ -12,11 +12,8 @@ class ResponseParser:
         self.block_patterns = {
             "response": r"~walbert_response_start~\s*(.*?)\s*~walbert_response_end~",
             "channel": r"~walbert_response_channel_start~\s*(.*?)\s*~walbert_response_channel_end~",
-            "should_call_smarter_cousin": r"~walbert_should_call_smarter_cousin_start~\s*(.*?)\s*~walbert_should_call_smarter_cousin_end~",
             "should_query_datastore": r"~walbert_should_query_datastore_start~\s*(.*?)\s*~walbert_should_query_datastore_end~",
-            "should_execute_skill": r"~walbert_should_execute_skill_start~\s*(.*?)\s*~walbert_should_execute_skill_end~",
             "conversation_complete": r"~walbert_conversation_complete_start~\s*(.*?)\s*~walbert_conversation_complete_end~",
-            "skill_execution": r"~walbert_skill_execution_start~\s*(.*?)\s*(.*?)\s*~walbert_skill_execution_end~",
             "sql_execute": r"~walbert_sql_execute_start~\s*(.*?)\s*~walbert_sql_execute_end~",
             "hardware_action": r"~walbert_hardware_action_start~\s*(.*?)\s*~walbert_hardware_action_end~"
         }

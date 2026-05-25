@@ -155,20 +155,17 @@
 
 # **5. Skill System Features (SKILL)**
 
-- **SKILL-001: Skill Schema**
-  Skills must be stored as items containing code, metadata, and tags.
+- **SKILL-001: Skill Storage**
+  Skills must be stored as items in the database with type='skill'.
 
-- **SKILL-002: Skill Execution Sandbox**
-  Skills must run in isolated subprocesses.
+- **SKILL-002: Skill Execution**
+  Skills must run in isolated subprocesses with access to provided arguments.
 
-- **SKILL-003: Hardware Interaction Potential**
-  Skills must be able to interact with USB or serial devices.
+- **SKILL-003: Skill Discovery**
+  Skills must be discoverable using SQL queries against the items table.
 
 - **SKILL-004: Self-Expansion**
-  Walbert must be able to generate new skills to extend its own capabilities.
-
-- **SKILL-005: Skill Discovery**
-  Skills must be discoverable by tag or name.
+  Walbert must be able to generate and store new skills using SQL commands.
 
 ---
 

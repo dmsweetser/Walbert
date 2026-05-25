@@ -26,7 +26,7 @@ class WalbertAgent:
     ## Core Directives
     1. **Local-First**: Operate entirely on local llama.cpp binaries.
     2. **Protocol Compliance**: Use walbert_ blocks for all decisions and actions.
-    3. **Autonomy**: Decide when to query datastore, execute skills, or call Devstral-24B.
+    3. **Autonomy**: Decide when to query datastore or perform actions.
     4. **Memory**: Store relevant information using direct SQL access.
     5. **Safety**: Never execute untrusted code or access external resources.
 
@@ -37,28 +37,19 @@ class WalbertAgent:
     {db_schema}
 
     ## Decision Flow
-    For each user input, you MUST evaluate and emit ALL of the following decision blocks:
+    For each user input, you MUST evaluate and emit the following decision blocks:
     1. ~walbert_should_query_datastore_start~ (YES/NO) ~walbert_should_query_datastore_end~
-    2. ~walbert_should_execute_skill_start~ (YES/NO) ~walbert_should_execute_skill_end~
-    3. ~walbert_should_call_smarter_cousin_start~ (YES/NO) ~walbert_should_call_smarter_cousin_end~
-    4. ~walbert_conversation_complete_start~ (YES/NO) ~walbert_conversation_complete_end~
+    2. ~walbert_conversation_complete_start~ (YES/NO) ~walbert_conversation_complete_end~
 
     ## Available Blocks
     - Decision blocks (MUST use only YES or NO):
       ~walbert_should_query_datastore_start~
-      ~walbert_should_execute_skill_start~
-      ~walbert_should_call_smarter_cousin_start~
       ~walbert_conversation_complete_start~
 
     - Action blocks:
       ~walbert_sql_execute_start~
       SQL_STATEMENT
       ~walbert_sql_execute_end~
-
-      ~walbert_skill_execution_start~
-      SKILL_NAME
-      {"args": ["arg1", "arg2"]}
-      ~walbert_skill_execution_end~
 
       ~walbert_hardware_action_start~
       {"peripheral_type": "serial/bluetooth/usb", "action": "connect/read/write", "data": {}}
@@ -72,6 +63,12 @@ class WalbertAgent:
       ~walbert_response_channel_start~
       console/serial/bluetooth/usb
       ~walbert_response_channel_end~
+
+    ## Skill Management
+    Skills are stored as items with type='skill'. To work with skills:
+    - Retrieve skills: SELECT * FROM items WHERE type='skill'
+    - Execute skills: Use Python code execution with the skill content
+    - Store new skills: INSERT INTO items (content, type) VALUES ('skill_code', 'skill')
 
     ## Example
     ~walbert_should_query_datastore_start~
@@ -248,30 +245,35 @@ class WalbertAgent:
                 result = self.db.execute_sql(sql)
                 self.logger.debug(f"SQL execution result: {result}")
                 parsed["sql_result"] = result
+
+                # Check if this is a skill retrieval query
+                if "type='skill'" in sql.upper() and "SELECT" in sql.upper():
+                    skill_items = []
+                    try:
+                        # Parse the SQL result to extract skill code
+                        lines = result.split('\n')
+                        if len(lines) > 2:  # Header and separator lines
+                            for line in lines[2:]:
+                                if line.strip():
+                                    parts = line.split('\t')
+                                    if len(parts) >= 2:
+                                        skill_items.append(parts[1])  # content column
+                    except Exception as e:
+                        self.logger.error(f"Error parsing skill query result: {e}")
+
+                    if skill_items:
+                        try:
+                            # Execute the first skill found
+                            skill_code = skill_items[0]
+                            result = self.skill_manager.execute_skill(skill_code)
+                            self.logger.debug(f"Skill execution result: {result}")
+                            parsed["skill_result"] = result
+                        except Exception as e:
+                            self.logger.error(f"Skill execution error: {e}")
+                            parsed["skill_error"] = str(e)
             except Exception as e:
                 self.logger.error(f"SQL execution error: {e}")
                 parsed["sql_error"] = str(e)
-
-        # Execute skill if requested
-        if parsed.get("should_execute_skill") == "YES":
-            self.logger.debug("Executing skill as requested")
-            skill_exec = parsed.get("skill_execution", {})
-            skill_name = skill_exec["args"].get("skill_name")
-            args = skill_exec["args"].get("args", [])
-
-            if skill_name:
-                skill_code = self.skill_manager.retrieve_skill(skill_name)
-                if skill_code:
-                    try:
-                        result = self.skill_manager.execute_skill(skill_code, args)
-                        self.logger.debug(f"Skill execution result: {result}")
-                        parsed["skill_result"] = result
-                    except Exception as e:
-                        self.logger.error(f"Skill execution error: {e}")
-                        parsed["skill_error"] = str(e)
-                else:
-                    self.logger.warning(f"Skill '{skill_name}' not found")
-                    parsed["skill_error"] = f"Skill '{skill_name}' not found"
 
         if parsed.get("hardware_action") is not None:
             self.logger.debug(f"Executing hardware action: {parsed['hardware_action']}")

@@ -39,20 +39,12 @@ class TestResponseParser(unittest.TestCase):
         ~walbert_should_query_datastore_start~
         YES
         ~walbert_should_query_datastore_end~
-        ~walbert_should_execute_skill_start~
-        NO
-        ~walbert_should_execute_skill_end~
-        ~walbert_should_call_smarter_cousin_start~
-        YES
-        ~walbert_should_call_smarter_cousin_end~
         ~walbert_conversation_complete_start~
         NO
         ~walbert_conversation_complete_end~
         """
         parsed = self.parser.parse_response(response)
         self.assertEqual(parsed.get("should_query_datastore"), "YES")
-        self.assertEqual(parsed.get("should_execute_skill"), "NO")
-        self.assertEqual(parsed.get("should_call_smarter_cousin"), "YES")
         self.assertEqual(parsed.get("conversation_complete"), "NO")
 
     def test_parse_sql_execute_block(self):
@@ -65,15 +57,8 @@ class TestResponseParser(unittest.TestCase):
         self.assertEqual(parsed.get("sql_execute"), "SELECT * FROM items WHERE type = 'text'")
 
     def test_parse_skill_execution_block(self):
-        response = """
-        ~walbert_skill_execution_start~
-        test_skill
-        {"args": ["arg1", "arg2"]}
-        ~walbert_skill_execution_end~
-        """
-        parsed = self.parser.parse_response(response)
-        self.assertEqual(parsed.get("skill_execution", {}).get("command"), "test_skill")
-        self.assertEqual(parsed.get("skill_execution", {}).get("args", {}).get("args"), ["arg1", "arg2"])
+        # Skill execution is now handled through SQL queries
+        pass
 
     def test_parse_hardware_action_block(self):
         response = """
@@ -91,16 +76,10 @@ class TestResponseParser(unittest.TestCase):
         YES
         ~walbert_should_query_datastore_end~
         ~walbert_sql_execute_start~
-        SELECT * FROM items WHERE tags LIKE '%example%'
+        SELECT * FROM items WHERE type='skill'
         ~walbert_sql_execute_end~
-        ~walbert_should_execute_skill_start~
-        NO
-        ~walbert_should_execute_skill_end~
-        ~walbert_should_call_smarter_cousin_start~
-        NO
-        ~walbert_should_call_smarter_cousin_end~
         ~walbert_response_start~
-        I found 3 items related to your query.
+        I found 3 skills in the database.
         ~walbert_response_end~
         ~walbert_response_channel_start~
         console
@@ -111,10 +90,8 @@ class TestResponseParser(unittest.TestCase):
         """
         parsed = self.parser.parse_response(response)
         self.assertEqual(parsed.get("should_query_datastore"), "YES")
-        self.assertEqual(parsed.get("sql_execute"), "SELECT * FROM items WHERE tags LIKE '%example%'")
-        self.assertEqual(parsed.get("should_execute_skill"), "NO")
-        self.assertEqual(parsed.get("should_call_smarter_cousin"), "NO")
-        self.assertEqual(parsed.get("response"), "I found 3 items related to your query.")
+        self.assertEqual(parsed.get("sql_execute"), "SELECT * FROM items WHERE type='skill'")
+        self.assertEqual(parsed.get("response"), "I found 3 skills in the database.")
         self.assertEqual(parsed.get("channel"), "console")
         self.assertEqual(parsed.get("conversation_complete"), "NO")
 
