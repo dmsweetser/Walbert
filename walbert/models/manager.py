@@ -114,15 +114,11 @@ class ModelManager:
                 json=payload,
                 timeout=600
             )
-
-            if response.status_code != 200:
-                raise RuntimeError(f"Server error: {response.text}")
-
+            response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"]
-
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             logger.error(f"Error communicating with model server: {e}")
-            raise
+            raise RuntimeError(f"Model server error: {e}")
 
     def execute_ministral(self, prompt: str) -> str:
         """Execute Ministral model"""

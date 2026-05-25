@@ -29,8 +29,9 @@ class SkillManager:
                 timeout=30
             )
             if result.returncode != 0:
-                logger.error(f"Skill execution failed: {result.stderr}")
-                return f"Error: {result.stderr}"
+                error_msg = result.stderr if result.stderr else "Unknown error"
+                logger.error(f"Skill execution failed: {error_msg}")
+                return f"Error: {error_msg}"
             return result.stdout
         except subprocess.TimeoutExpired:
             logger.error("Skill execution timed out")
@@ -41,5 +42,5 @@ class SkillManager:
         finally:
             try:
                 os.unlink(temp_path)
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to clean up temp file: {e}")

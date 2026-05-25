@@ -80,64 +80,41 @@ class DatabaseManager:
     def get_schema(self) -> str:
         """Get current database schema"""
         self.logger.debug("Retrieving database schema")
-        schema = {}
 
         tables = self.cursor.execute("""
             SELECT name FROM sqlite_master
             WHERE type='table' AND name NOT LIKE 'sqlite_%'
         """).fetchall()
 
+        schema_str = "Current Database Schema:\n\n"
         for table in tables:
             table_name = table[0]
-            schema[table_name] = {}
+            schema_str += f"Table: {table_name}\n"
 
             columns = self.cursor.execute(f"PRAGMA table_info({table_name})").fetchall()
-            schema[table_name]['columns'] = [
-                {
-                    'name': col[1],
-                    'type': col[2],
-                    'not_null': bool(col[3]),
-                    'default_value': col[4],
-                    'primary_key': bool(col[5])
-                } for col in columns
-            ]
-
-            fks = self.cursor.execute(f"PRAGMA foreign_key_list({table_name})").fetchall()
-            schema[table_name]['foreign_keys'] = [
-                {
-                    'id': fk[0],
-                    'seq': fk[1],
-                    'table': fk[2],
-                    'from': fk[3],
-                    'to': fk[4],
-                    'on_update': fk[5],
-                    'on_delete': fk[6],
-                    'match': fk[7]
-                } for fk in fks
-            ]
-
-        schema_str = "Current Database Schema:\n\n"
-        for table_name, table_info in schema.items():
-            schema_str += f"Table: {table_name}\n"
             schema_str += "Columns:\n"
-            for col in table_info['columns']:
-                schema_str += f"  - {col['name']} ({col['type']})"
-                if col['primary_key']:
+            for col in columns:
+                col_name = col[1]
+                col_type = col[2]
+                schema_str += f"  - {col_name} ({col_type})"
+
+                if col[5]:  # primary key
                     schema_str += " PRIMARY KEY"
-                if col['not_null']:
+                if col[3]:  # not null
                     schema_str += " NOT NULL"
-                if col['default_value'] is not None:
-                    schema_str += f" DEFAULT {col['default_value']}"
+                if col[4] is not None:  # default value
+                    schema_str += f" DEFAULT {col[4]}"
                 schema_str += "\n"
 
-            if table_info['foreign_keys']:
+            fks = self.cursor.execute(f"PRAGMA foreign_key_list({table_name})").fetchall()
+            if fks:
                 schema_str += "Foreign Keys:\n"
-                for fk in table_info['foreign_keys']:
-                    schema_str += f"  - {fk['from']} REFERENCES {fk['table']}({fk['to']})"
-                    if fk['on_delete'] != 'NO ACTION':
-                        schema_str += f" ON DELETE {fk['on_delete']}"
-                    if fk['on_update'] != 'NO ACTION':
-                        schema_str += f" ON UPDATE {fk['on_update']}"
+                for fk in fks:
+                    schema_str += f"  - {fk[3]} REFERENCES {fk[2]}({fk[4]})"
+                    if fk[6] != 'NO ACTION':
+                        schema_str += f" ON DELETE {fk[6]}"
+                    if fk[5] != 'NO ACTION':
+                        schema_str += f" ON UPDATE {fk[5]}"
                     schema_str += "\n"
 
             schema_str += "\n"
@@ -155,15 +132,15 @@ class DatabaseManager:
                 if not rows:
                     return "Query executed successfully. No rows returned."
 
-                output = "Query results:\n"
+                output = []
                 columns = [desc[0] for desc in result.description]
-                output += "\t".join(columns) + "\n"
-                output += "-" * (sum(len(col) for col in columns) + len(columns) * 3) + "\n"
+                output.append("\t".join(columns))
+                output.append("-" * (sum(len(col) for col in columns) + len(columns) * 3))
 
                 for row in rows:
-                    output += "\t".join(str(val) for val in row) + "\n"
+                    output.append("\t".join(str(val) for val in row))
 
-                return output
+                return "\n".join(output)
             else:
                 self.conn.commit()
                 return f"SQL executed successfully. Rows affected: {self.cursor.rowcount}"

@@ -148,33 +148,27 @@ Walbert must emit **all responses and internal deliberations** using the followi
 ```
 ~walbert_response_start~
 <What it decided to say or do>
-~walbert_response_end~
 
 ~walbert_response_channel_start~
 <Where it will send the response (e.g., "console", "serial")>
-~walbert_response_channel_end~
 ```
 
 ## **6.2 Decision Blocks**
 ```
 ~walbert_should_query_datastore_start~
 YES/NO
-~walbert_should_query_datastore_end~
 
 ~walbert_conversation_complete_start~
 YES/NO
-~walbert_conversation_complete_end~
 ```
 
 ## **6.3 Action Blocks**
 ```
 ~walbert_sql_execute_start~
 SQL_STATEMENT
-~walbert_sql_execute_end~
 
 ~walbert_skill_execute_start~
 SKILL_NAME
-~walbert_skill_execute_end~
 ```
 
 ## **6.4 Rules**

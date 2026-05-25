@@ -37,37 +37,35 @@ class WalbertAgent:
 
     ## Decision Flow
     For each user input, you MUST evaluate and emit the following decision blocks:
-    1. ~walbert_should_query_datastore_start~ (YES/NO) ~walbert_should_query_datastore_end~
-    2. ~walbert_conversation_complete_start~ (YES/NO) ~walbert_conversation_complete_end~
+    1. ~walbert_should_query_datastore_start~ 
+    (YES/NO)
+    2. ~walbert_conversation_complete_start~ 
+    (YES/NO)
 
     ## Available Blocks
     - Decision blocks (MUST use only YES or NO):
 
       ~walbert_should_query_datastore_start~
-      ~walbert_should_query_datastore_end~
+      (YES/NO)
 
       ~walbert_conversation_complete_start~
-      ~walbert_conversation_complete_end~
+      (YES/NO)
 
     - Action blocks:
       ~walbert_sql_execute_start~
       SQL_STATEMENT
-      ~walbert_sql_execute_end~
-
+      
       ~walbert_skill_execute_start~
       SKILL_NAME
-      ~walbert_skill_execute_end~
-
+      
     - Core blocks (MUST include in every response):
-    
+
       ~walbert_response_start~
       Your response to the user
-      ~walbert_response_end~
-
+      
       ~walbert_response_channel_start~
       console/serial/bluetooth/usb
-      ~walbert_response_channel_end~
-
+      
     ## Skill Management
     Skills are stored as items with type='skill'. To work with skills:
     - Retrieve skills: SELECT * FROM items WHERE type='skill'
@@ -147,6 +145,7 @@ class WalbertAgent:
         if not self.db.conn:
             self.db.connect()
 
+        # Handle SQL execution
         if parsed.get("should_query_datastore") == "YES" and "sql_execute" in parsed:
             self.logger.debug("Executing SQL as requested")
             sql = parsed["sql_execute"]
@@ -155,14 +154,15 @@ class WalbertAgent:
                 self.logger.debug(f"SQL execution result: {result}")
                 parsed["sql_result"] = result
 
+                # Handle skill extraction from SQL results
                 if "type='skill'" in sql.upper() and "SELECT" in sql.upper():
                     skill_items = self._extract_skills_from_result(result)
                     if skill_items:
+                        skill_code = skill_items[0]
                         try:
-                            skill_code = skill_items[0]
-                            result = self.skill_manager.execute_skill(skill_code)
-                            self.logger.debug(f"Skill execution result: {result}")
-                            parsed["skill_result"] = result
+                            skill_result = self.skill_manager.execute_skill(skill_code)
+                            self.logger.debug(f"Skill execution result: {skill_result}")
+                            parsed["skill_result"] = skill_result
                         except Exception as e:
                             self.logger.error(f"Skill execution error: {e}")
                             parsed["skill_error"] = str(e)
@@ -170,6 +170,7 @@ class WalbertAgent:
                 self.logger.error(f"SQL execution error: {e}")
                 parsed["sql_error"] = str(e)
 
+        # Handle direct skill execution
         if parsed.get("skill_execute"):
             self.logger.debug(f"Executing skill: {parsed['skill_execute']}")
             try:
@@ -179,9 +180,9 @@ class WalbertAgent:
                 skill_items = self._extract_skills_from_result(result)
                 if skill_items:
                     skill_code = skill_items[0]
-                    result = self.skill_manager.execute_skill(skill_code)
-                    self.logger.debug(f"Skill execution result: {result}")
-                    parsed["skill_result"] = result
+                    skill_result = self.skill_manager.execute_skill(skill_code)
+                    self.logger.debug(f"Skill execution result: {skill_result}")
+                    parsed["skill_result"] = skill_result
             except Exception as e:
                 self.logger.error(f"Skill execution error: {e}")
                 parsed["skill_error"] = str(e)
@@ -207,7 +208,6 @@ class WalbertAgent:
         """Emit the input channel block for context"""
         return f"""~walbert_input_channel_start~
 {channel.value}
-~walbert_input_channel_end~
 """
 
     def start_conversation(self, channel: ChannelType):
@@ -238,13 +238,12 @@ class WalbertAgent:
             messages = self.db.cursor.execute("""
                 SELECT sender, content FROM messages
                 WHERE conversation_id = ?
+                AND sender != 'system'
                 ORDER BY timestamp ASC
             """, (self.current_conversation_id,)).fetchall()
 
             context = ""
             for sender, content in messages:
-                if sender == "system":
-                    continue
                 context += f"{sender.capitalize()}: {content}\n\n"
 
             return context
@@ -300,14 +299,19 @@ class WalbertAgent:
                 if user_input.lower() in ['exit', 'quit']:
                     break
 
+                # Add user message to conversation
                 if self.current_conversation_id:
                     self.db.add_message(self.current_conversation_id, user_input, "user")
                     self.db.conn.commit()
 
+                # Build conversation context
                 conversation_context = self.build_conversation_context()
-                full_prompt = self.SYSTEM_PROMPT + "\n\n" + conversation_context + self.emit_input_channel(ChannelType.CONSOLE) + "\nUser: " + user_input
-                self.logger.debug(f"Built prompt for model:\n{full_prompt}")
+                full_prompt = self.SYSTEM_PROMPT + "\n\n" + conversation_context
+                full_prompt += self.emit_input_channel(ChannelType.CONSOLE) + "\nUser: " + user_input
 
+                self.logger.debug("Built prompt for model")
+
+                # Process model response
                 user_response = None
                 internal_cycles = 0
                 max_internal_cycles = 5
@@ -321,20 +325,17 @@ class WalbertAgent:
                     if parsed_response.get("response"):
                         user_response = parsed_response["response"]
                         response_channel = parsed_response.get("channel", "console")
-                        self.logger.debug(f"User response generated: {user_response}")
                         break
 
                     internal_cycles += 1
                     full_prompt += f"\n\nAssistant (internal): {model_response}"
-                    self.logger.debug(f"Internal processing cycle {internal_cycles} completed")
 
+                # Handle user response
                 if user_response:
                     if response_channel == "console":
                         print(user_response)
-                        self.logger.debug(f"Sent response to console: {user_response}")
                     else:
                         try:
-                            self.logger.debug(f"Attempting to send response to {response_channel} channel")
                             io_layer = self.load_io_layer(ChannelType[response_channel.upper()])
                             if io_layer.requires_authorization():
                                 if self.authorization_manager.request_authorization(
@@ -342,28 +343,24 @@ class WalbertAgent:
                                     "Sending output"
                                 ):
                                     io_layer.write(user_response)
-                                    self.logger.debug(f"Sent authorized response to {response_channel}: {user_response}")
                             else:
                                 io_layer.write(user_response)
-                                self.logger.debug(f"Sent response to {response_channel}: {user_response}")
                         except Exception as e:
                             self.logger.error(f"Error writing to {response_channel} channel: {e}")
                             print(user_response)
-                            self.logger.debug(f"Fallback response to console: {user_response}")
 
+                # Handle conversation completion
                 if parsed_response.get("conversation_complete") == "YES":
                     self.logger.debug("Conversation marked as complete")
                     self.end_conversation()
                     self.save_conversation_files(self.current_conversation_id)
                     self.start_conversation(ChannelType.CONSOLE)
-                    self.logger.debug(f"Started new conversation with ID {self.current_conversation_id}")
                     print("Conversation complete. Starting new session.")
 
                 self.save_conversation_files(self.current_conversation_id)
 
             except KeyboardInterrupt:
                 print("\nGoodbye!")
-                self.logger.info("User initiated shutdown via KeyboardInterrupt")
                 if self.current_conversation_id:
                     self.end_conversation()
                     self.save_conversation_files(self.current_conversation_id)
