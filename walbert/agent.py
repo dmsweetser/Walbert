@@ -159,6 +159,22 @@ class WalbertAgent:
                 self.logger.error(f"SQL execution error: {e}")
                 parsed["sql_error"] = str(e)
 
+        # Handle smarter cousin consultation
+        if parsed.get("should_consult_smarter_cousin_start") == "YES":
+            self.logger.debug("Consulting smarter cousin as requested")
+            try:
+                conversation_context = self.build_conversation_context()
+                full_prompt = self.SYSTEM_PROMPT + "\n\n" + conversation_context
+                full_prompt += f"\n\nAssistant (internal): {response_text}"
+                full_prompt += "\n\n~walbert_input_channel_start~\nconsole"
+
+                devstral_response = self.model_manager.execute_devstral(full_prompt)
+                self.logger.debug(f"Devstral response:\n{devstral_response}")
+                parsed["devstral_response"] = devstral_response
+            except Exception as e:
+                self.logger.error(f"Error consulting smarter cousin: {e}")
+                parsed["devstral_error"] = str(e)
+
         return parsed
 
     
@@ -309,7 +325,7 @@ class WalbertAgent:
                             print(user_response)
 
                 # If we consulted Devstral, continue internal processing
-                if parsed.get("should_consult_smarter_cousin") == "YES" and "devstral_response" in parsed:
+                if parsed.get("should_consult_smarter_cousin_start") == "YES" and "devstral_response" in parsed:
                     full_prompt += f"\n\nDevstral Response: {parsed['devstral_response']}"
                     user_response = None
 

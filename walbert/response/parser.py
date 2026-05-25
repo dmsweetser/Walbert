@@ -15,6 +15,7 @@ class ResponseParser:
             "~walbert_should_consult_smarter_cousin_start~",
             "~walbert_conversation_complete_start~",
             "~walbert_sql_execute_start~",
+            "~walbert_skill_execute_start~",
             "~walbert_input_channel_start~"
         ]
         self.block_mapping = {

@@ -147,6 +147,7 @@ Walbert must emit **all responses and internal deliberations** using the followi
 ```
 ~walbert_sql_execute_start~SQL_STATEMENT
 ~walbert_skill_execute_start~SKILL_NAME
+~walbert_consult_smarter_cousin_start~
 ```
 
 ## **5.4 Rules**
