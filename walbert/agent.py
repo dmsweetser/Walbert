@@ -70,7 +70,7 @@ class WalbertAgent:
       ~walbert_response_end~
 
       ~walbert_response_channel_start~
-      console (or other channel)
+      console/serial/bluetooth/usb
       ~walbert_response_channel_end~
 
     ## Example
@@ -92,6 +92,9 @@ class WalbertAgent:
     ~walbert_response_channel_start~
     console
     ~walbert_response_channel_end~
+    ~walbert_conversation_complete_start~
+    NO
+    ~walbert_conversation_complete_end~
     """
 
     def __init__(self, config: Config, io_config: IOConfig):
@@ -457,6 +460,7 @@ class WalbertAgent:
                     self.save_conversation_files(self.current_conversation_id)
                     self.start_conversation(ChannelType.CONSOLE)
                     self.logger.debug(f"Started new conversation with ID {self.current_conversation_id}")
+                    print("Conversation complete. Starting new session.")
 
                 self.save_conversation_files(self.current_conversation_id)
 

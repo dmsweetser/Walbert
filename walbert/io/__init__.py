@@ -7,11 +7,9 @@ from .console import ConsoleIOLayer
 from .serial import SerialIOLayer
 from .bluetooth import BluetoothIOLayer
 from .usb import USBIOLayer
-from .python_code import PythonCodeIOLayer
-from .factory import IOLayerFactory
+from .factory import IOLayerFactory, ChannelType
 
 __all__ = [
     'IOLayer', 'ConsoleIOLayer', 'SerialIOLayer',
-    'BluetoothIOLayer', 'USBIOLayer', 'PythonCodeIOLayer',
-    'IOLayerFactory'
+    'BluetoothIOLayer', 'USBIOLayer', 'IOLayerFactory', 'ChannelType'
 ]

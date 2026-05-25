@@ -40,7 +40,7 @@
   Walbert must operate with an empty database and learn its identity and skills over time.
 
 - **GEN-010: Conversation Reset**
-  Walbert must autonomously determine when a conversation is complete and reset its state.
+  Walbert must autonomously determine when a conversation is complete and reset its state using the `~walbert_conversation_complete_start~` block.
 
 - **GEN-011: Dual Conversation Logging**
   All conversations must be logged to both the database (summary and full form) and a raw log file.
@@ -267,7 +267,7 @@ Walbert must emit **all responses and internal deliberations** using the followi
   Walbert must respond to external events (e.g., hardware signals, timers) autonomously, with user authorization for critical actions.
 
 - **AUTO-005: Unified Channel Routing**
-  Walbert must use `walbert_response_channel` blocks to determine the appropriate channel for each action or response, respecting user configuration.
+  Walbert must use `walbert_response_channel` blocks to determine the appropriate channel for each action or response (e.g., "console", "serial", "bluetooth", "usb"), respecting user configuration.
 
 - **AUTO-006: Cross-Channel Workflows**
   Walbert must support workflows that span multiple channels (e.g., receive input via console, interact with Bluetooth device, return response via console) with user authorization for each step.
