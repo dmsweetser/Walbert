@@ -1,6 +1,6 @@
 # **Walbert — Feature Specification**
 
-## **Version:** 2.0
+## **Version:** 2.1
 ## **Author:** Daniel
 ## **Purpose:** Define the complete feature set for the Walbert local agent system.
 
@@ -66,7 +66,7 @@
 - **AI-004: Autonomous Model Router**
   The primary model must autonomously decide when to:
   - Query its datastore via SQL
-  - Invoke a stored skill
+  - Execute stored skills
   - Perform multi-step reasoning
 
 - **AI-005: System Prompt Awareness**
@@ -144,21 +144,18 @@
 
 Walbert must emit **all responses and internal deliberations** using the following block-based format.
 
-## **6.1 walbert_response Block**
+## **6.1 Core Response Blocks**
 ```
 ~walbert_response_start~
 <What it decided to say or do>
 ~walbert_response_end~
-```
 
-## **6.2 walbert_response_channel Block**
-```
 ~walbert_response_channel_start~
 <Where it will send the response (e.g., "console", "serial")>
 ~walbert_response_channel_end~
 ```
 
-## **6.3 Decision Blocks**
+## **6.2 Decision Blocks**
 ```
 ~walbert_should_query_datastore_start~
 YES/NO
@@ -169,7 +166,7 @@ YES/NO
 ~walbert_conversation_complete_end~
 ```
 
-## **6.4 Action Blocks**
+## **6.3 Action Blocks**
 ```
 ~walbert_sql_execute_start~
 SQL_STATEMENT
@@ -180,7 +177,7 @@ SKILL_NAME
 ~walbert_skill_execute_end~
 ```
 
-## **6.5 Rules**
+## **6.4 Rules**
 - All text must appear within walbert_ blocks.
 - Walbert may execute multiple internal rounds before replying to the user.
 - Walbert must autonomously determine when a conversation is complete.

@@ -27,9 +27,6 @@ class PythonCodeIOLayer(IOLayer):
                 cwd=self.sandbox_dir
             )
 
-            # Clean up
-            os.unlink(f.name)
-
             return result.stdout
 
     def write(self, text: str) -> None:
