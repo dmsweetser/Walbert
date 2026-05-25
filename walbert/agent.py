@@ -42,8 +42,12 @@ class WalbertAgent:
 
     ## Available Blocks
     - Decision blocks (MUST use only YES or NO):
+
       ~walbert_should_query_datastore_start~
+      ~walbert_should_query_datastore_end~
+
       ~walbert_conversation_complete_start~
+      ~walbert_conversation_complete_end~
 
     - Action blocks:
       ~walbert_sql_execute_start~
@@ -55,6 +59,7 @@ class WalbertAgent:
       ~walbert_skill_execute_end~
 
     - Core blocks (MUST include in every response):
+    
       ~walbert_response_start~
       Your response to the user
       ~walbert_response_end~

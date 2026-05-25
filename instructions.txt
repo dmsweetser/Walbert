@@ -1,0 +1,5 @@
+Instead of walbert blocks having _start and _end, just have _start and parse until the next walbert block.
+
+Also, generate a single end-to-end test that validates the app, mocking any external dependencies.
+
+Please also clean up as much of the app as you can.
