@@ -7,3 +7,7 @@ Get rid of skill-specific code entirely.
 ***
 
 Clean up the feature-spec.md.
+
+***
+
+Get rid of any lingering unused code.

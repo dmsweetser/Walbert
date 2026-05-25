@@ -64,10 +64,7 @@
   Used only when the primary model decides it needs deeper reasoning.
 
 - **AI-004: Autonomous Model Router**
-  The primary model must autonomously decide when to:
-  - Query its datastore via SQL
-  - Execute stored skills
-  - Perform multi-step reasoning
+  The primary model must autonomously decide when to query its datastore via SQL.
 
 - **AI-005: System Prompt Awareness**
   Models must understand the DB schema, tag system, and response protocol.
@@ -88,16 +85,13 @@
 - **IOL-003: Console I/O Layer**
   The system must accept text input and display text output via the console.
 
-- **IOL-004: Python Code Execution Layer**
-  The system must support executing Python code with user authorization.
-
-- **IOL-005: Serial I/O Layer**
+- **IOL-004: Serial I/O Layer**
   The system must support bidirectional serial communication.
 
-- **IOL-006: Bluetooth I/O Layer**
+- **IOL-005: Bluetooth I/O Layer**
   The system must support Bluetooth device communication.
 
-- **IOL-007: USB I/O Layer**
+- **IOL-006: USB I/O Layer**
   The system must support USB device detection and communication.
 
 ---
@@ -105,7 +99,7 @@
 # **4. Data & Storage Features (DATA)**
 
 - **DATA-001: Items Table**
-  Must store text, skills, and arbitrary content with generalized tags.
+  Must store text and arbitrary content with generalized tags.
 
 - **DATA-002: Tags Table**
   Must store unique tag names.
@@ -124,61 +118,35 @@
 
 ---
 
-# **5. Skill System Features (SKILL)**
-
-- **SKILL-001: Skill Storage**
-  Skills must be stored as items in the database with `type='skill'`.
-
-- **SKILL-002: Skill Execution**
-  Skills must run in isolated subprocesses with access to provided arguments.
-
-- **SKILL-003: Skill Discovery**
-  Skills must be discoverable using SQL queries against the items table.
-
-- **SKILL-004: Self-Expansion**
-  Walbert must be able to generate and store new skills using SQL commands.
-
----
-
-# **6. Unified Walbert Response Format (MOD)**
+# **5. Unified Walbert Response Format (MOD)**
 
 Walbert must emit **all responses and internal deliberations** using the following block-based format.
 
-## **6.1 Core Response Blocks**
+## **5.1 Core Response Blocks**
 ```
-~walbert_response_start~
-<What it decided to say or do>
-
-~walbert_response_channel_start~
-<Where it will send the response (e.g., "console", "serial")>
+~walbert_response_start~<What it decided to say or do>
+~walbert_response_channel_start~<Where it will send the response (e.g., "console", "serial")>
 ```
 
-## **6.2 Decision Blocks**
+## **5.2 Decision Blocks**
 ```
-~walbert_should_query_datastore_start~
-YES/NO
-
-~walbert_conversation_complete_start~
-YES/NO
+~walbert_should_query_datastore_start~YES/NO
+~walbert_conversation_complete_start~YES/NO
 ```
 
-## **6.3 Action Blocks**
+## **5.3 Action Blocks**
 ```
-~walbert_sql_execute_start~
-SQL_STATEMENT
-
-~walbert_skill_execute_start~
-SKILL_NAME
+~walbert_sql_execute_start~SQL_STATEMENT
 ```
 
-## **6.4 Rules**
-- All text must appear within walbert_ blocks.
+## **5.4 Rules**
+- All text must appear immediately after walbert_ blocks (no newlines).
 - Walbert may execute multiple internal rounds before replying to the user.
 - Walbert must autonomously determine when a conversation is complete.
 
 ---
 
-# **7. Scripts & Environment Features (ENV)**
+# **6. Scripts & Environment Features (ENV)**
 
 - **ENV-001: install.sh**
   Must create venv, install minimal dependencies, and validate llama.cpp binary paths.
@@ -194,7 +162,7 @@ SKILL_NAME
 
 ---
 
-# **8. Testing Features (TEST)**
+# **7. Testing Features (TEST)**
 
 - **TEST-001: Unit Test Coverage**
   All major components must have comprehensive unit tests.
@@ -207,7 +175,7 @@ SKILL_NAME
 
 ---
 
-# **9. SOLID Principles Features (SOLID)**
+# **8. SOLID Principles Features (SOLID)**
 
 - **SOLID-001: Single Responsibility Principle**
   Each class must have only one reason to change.

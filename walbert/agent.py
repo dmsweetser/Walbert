@@ -78,7 +78,6 @@ class WalbertAgent:
         self.io_config = io_config
         self.model_manager = ModelManager(config)
         self.db = DatabaseManager()
-        self.skill_manager = SkillManager(self.db)
         self.response_parser = ResponseParser()
         self.authorization_manager = AuthorizationManager()
         self.io_factory = IOLayerFactory()
@@ -153,56 +152,13 @@ class WalbertAgent:
                 result = self.db.execute_sql(sql)
                 self.logger.debug(f"SQL execution result: {result}")
                 parsed["sql_result"] = result
-
-                # Handle skill extraction from SQL results
-                if "type='skill'" in sql.upper() and "SELECT" in sql.upper():
-                    skill_items = self._extract_skills_from_result(result)
-                    if skill_items:
-                        skill_code = skill_items[0]
-                        try:
-                            skill_result = self.skill_manager.execute_skill(skill_code)
-                            self.logger.debug(f"Skill execution result: {skill_result}")
-                            parsed["skill_result"] = skill_result
-                        except Exception as e:
-                            self.logger.error(f"Skill execution error: {e}")
-                            parsed["skill_error"] = str(e)
             except Exception as e:
                 self.logger.error(f"SQL execution error: {e}")
                 parsed["sql_error"] = str(e)
 
-        # Handle direct skill execution
-        if parsed.get("skill_execute"):
-            self.logger.debug(f"Executing skill: {parsed['skill_execute']}")
-            try:
-                skill_name = parsed["skill_execute"]
-                sql = f"SELECT content FROM items WHERE type='skill' AND content LIKE '%{skill_name}%'"
-                result = self.db.execute_sql(sql)
-                skill_items = self._extract_skills_from_result(result)
-                if skill_items:
-                    skill_code = skill_items[0]
-                    skill_result = self.skill_manager.execute_skill(skill_code)
-                    self.logger.debug(f"Skill execution result: {skill_result}")
-                    parsed["skill_result"] = skill_result
-            except Exception as e:
-                self.logger.error(f"Skill execution error: {e}")
-                parsed["skill_error"] = str(e)
-
         return parsed
 
-    def _extract_skills_from_result(self, result: str) -> list:
-        """Extract skill code from SQL query result"""
-        skill_items = []
-        try:
-            lines = result.split('\n')
-            if len(lines) > 2:
-                for line in lines[2:]:
-                    if line.strip():
-                        parts = line.split('\t')
-                        if len(parts) >= 2:
-                            skill_items.append(parts[1])
-        except Exception as e:
-            self.logger.error(f"Error parsing skill query result: {e}")
-        return skill_items
+    
 
     def emit_input_channel(self, channel: ChannelType) -> str:
         """Emit the input channel block for context"""

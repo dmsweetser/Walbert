@@ -33,18 +33,27 @@ class ResponseParser:
         current_block = None
         current_content = []
 
-        lines = response_text.split('\n')
-        for line in lines:
-            line = line.strip()
-            if line in self.block_starts:
+        i = 0
+        while i < len(response_text):
+            found_block = None
+            for block in self.block_starts:
+                if response_text.startswith(block, i):
+                    found_block = block
+                    break
+
+            if found_block:
                 if current_block:
-                    parsed[current_block] = '\n'.join(current_content).strip()
-                current_block = self.block_mapping[line]
+                    parsed[current_block] = ''.join(current_content).strip()
+                current_block = self.block_mapping[found_block]
                 current_content = []
+                i += len(found_block)
             elif current_block:
-                current_content.append(line)
+                current_content.append(response_text[i])
+                i += 1
+            else:
+                i += 1
 
         if current_block and current_content:
-            parsed[current_block] = '\n'.join(current_content).strip()
+            parsed[current_block] = ''.join(current_content).strip()
 
         return parsed
