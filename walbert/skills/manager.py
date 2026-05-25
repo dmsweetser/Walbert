@@ -14,9 +14,8 @@ class SkillManager:
     def __init__(self, db):
         self.db = db
 
-    def execute_skill(self, skill_code: str, args: list = None) -> str:
+    def execute_skill(self, skill_code: str) -> str:
         """Execute a skill in sandboxed environment"""
-        args = args or []
         with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
             f.write(skill_code)
             f.flush()
@@ -24,7 +23,7 @@ class SkillManager:
 
         try:
             result = subprocess.run(
-                ['python3', temp_path] + args,
+                ['python3', temp_path],
                 capture_output=True,
                 text=True,
                 timeout=30
@@ -40,7 +39,6 @@ class SkillManager:
             logger.error(f"Skill execution error: {e}")
             return f"Error: {str(e)}"
         finally:
-            # Clean up
             try:
                 os.unlink(temp_path)
             except:

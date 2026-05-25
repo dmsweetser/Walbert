@@ -3,7 +3,7 @@ Main Walbert agent implementation
 """
 
 import logging
-from enum import Enum, auto
+from enum import Enum
 import os
 from typing import Optional
 from .config import Config, IOConfig
@@ -51,9 +51,9 @@ class WalbertAgent:
       SQL_STATEMENT
       ~walbert_sql_execute_end~
 
-      ~walbert_hardware_action_start~
-      {"peripheral_type": "serial/bluetooth/usb", "action": "connect/read/write", "data": {}}
-      ~walbert_hardware_action_end~
+      ~walbert_skill_execute_start~
+      SKILL_NAME
+      ~walbert_skill_execute_end~
 
     - Core blocks (MUST include in every response):
       ~walbert_response_start~
@@ -67,31 +67,8 @@ class WalbertAgent:
     ## Skill Management
     Skills are stored as items with type='skill'. To work with skills:
     - Retrieve skills: SELECT * FROM items WHERE type='skill'
-    - Execute skills: Use Python code execution with the skill content
+    - Execute skills: Use ~walbert_skill_execute_start~ block with skill name
     - Store new skills: INSERT INTO items (content, type) VALUES ('skill_code', 'skill')
-
-    ## Example
-    ~walbert_should_query_datastore_start~
-    YES
-    ~walbert_should_query_datastore_end~
-    ~walbert_sql_execute_start~
-    SELECT * FROM items WHERE type = 'text' AND content LIKE '%greeting%'
-    ~walbert_sql_execute_end~
-    ~walbert_should_execute_skill_start~
-    NO
-    ~walbert_should_execute_skill_end~
-    ~walbert_should_call_smarter_cousin_start~
-    NO
-    ~walbert_should_call_smarter_cousin_end~
-    ~walbert_response_start~
-    I found 3 items related to greetings in the database.
-    ~walbert_response_end~
-    ~walbert_response_channel_start~
-    console
-    ~walbert_response_channel_end~
-    ~walbert_conversation_complete_start~
-    NO
-    ~walbert_conversation_complete_end~
     """
 
     def __init__(self, config: Config, io_config: IOConfig):
@@ -105,18 +82,15 @@ class WalbertAgent:
         self.io_factory = IOLayerFactory()
         self.current_conversation_id = None
 
-        # Ensure directories exist
         os.makedirs('instance/conversations/raw', exist_ok=True)
         os.makedirs('instance/conversations/chat', exist_ok=True)
 
-        # Ensure console layer exists in config
         if 'console' not in self.io_config.io_layers:
             self.io_config.io_layers['console'] = {
                 'enabled': True,
                 'require_authorization': False
             }
 
-        # Configure logging
         self.logger = logging.getLogger('walbert.agent')
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
 
@@ -155,70 +129,6 @@ class WalbertAgent:
             self.logger.error(f"Error reading from {channel_type.name}: {e}")
             return ""
 
-    def handle_hardware_interaction(self, hardware_action: dict) -> Optional[str]:
-        """Handle hardware interaction requests"""
-        peripheral_type = hardware_action.get("peripheral_type")
-        action = hardware_action.get("action")
-        data = hardware_action.get("data", {})
-
-        try:
-            if peripheral_type == "serial":
-                io_layer = self.load_io_layer(ChannelType.SERIAL)
-                if action == "connect":
-                    port = data.get("port")
-                    baudrate = data.get("baudrate", 9600)
-                    return io_layer.connect(port or io_layer.detect_ports()[0])
-                elif action == "read":
-                    return io_layer.read()
-                elif action == "write":
-                    text = data.get("data", "")
-                    io_layer.write(text)
-                    return f"Wrote to serial: {text}"
-
-            elif peripheral_type == "bluetooth":
-                io_layer = self.load_io_layer(ChannelType.BLUETOOTH)
-                if action == "discover":
-                    devices = io_layer.discover_devices()
-                    return f"Found devices: {devices}"
-                elif action == "pair":
-                    address = data.get("address")
-                    sock = io_layer.pair_device(address)
-                    return f"Paired with {address}"
-                elif action == "read":
-                    sock = data.get("sock")
-                    return io_layer.read(sock)
-                elif action == "write":
-                    sock = data.get("sock")
-                    text = data.get("data", "")
-                    io_layer.write(sock, text)
-                    return f"Wrote to Bluetooth: {text}"
-
-            elif peripheral_type == "usb":
-                io_layer = self.load_io_layer(ChannelType.USB)
-                if action == "detect":
-                    devices = io_layer.detect_devices()
-                    return f"Found USB devices: {devices}"
-                elif action == "connect":
-                    vendor_id = data.get("vendor_id")
-                    product_id = data.get("product_id")
-                    dev = io_layer.connect(vendor_id, product_id)
-                    return f"Connected to USB device {vendor_id}:{product_id}"
-                elif action == "read":
-                    dev = data.get("dev")
-                    endpoint = data.get("endpoint", 0x81)
-                    size = data.get("size", 64)
-                    return io_layer.read(dev, endpoint, size)
-                elif action == "write":
-                    dev = data.get("dev")
-                    data_bytes = data.get("data", b"")
-                    endpoint = data.get("endpoint", 0x01)
-                    io_layer.write(dev, data_bytes, endpoint)
-                    return f"Wrote to USB device"
-
-        except Exception as e:
-            logger.error(f"Hardware interaction failed: {e}")
-            return f"Error: {e}"
-
     def process_response(self, response_text: str, input_channel: ChannelType) -> dict:
         """Process model response and execute actions"""
         self.logger.debug(f"Processing response from {input_channel.name}:\n{response_text}")
@@ -226,18 +136,13 @@ class WalbertAgent:
         parsed = self.response_parser.parse_response(response_text)
         self.logger.debug(f"Parsed response: {parsed}")
 
-        # Store message in database
         if self.current_conversation_id:
-            msg_id = self.db.add_message(self.current_conversation_id, response_text, "assistant")
-            self.logger.debug(f"Stored assistant message with ID {msg_id}")
+            self.db.add_message(self.current_conversation_id, response_text, "assistant")
             self.db.conn.commit()
-            self.logger.debug("Database changes committed")
 
-        # Ensure database connection is active
         if not self.db.conn:
             self.db.connect()
 
-        # Execute SQL if requested
         if parsed.get("should_query_datastore") == "YES" and "sql_execute" in parsed:
             self.logger.debug("Executing SQL as requested")
             sql = parsed["sql_execute"]
@@ -246,24 +151,21 @@ class WalbertAgent:
                 self.logger.debug(f"SQL execution result: {result}")
                 parsed["sql_result"] = result
 
-                # Check if this is a skill retrieval query
                 if "type='skill'" in sql.upper() and "SELECT" in sql.upper():
                     skill_items = []
                     try:
-                        # Parse the SQL result to extract skill code
                         lines = result.split('\n')
-                        if len(lines) > 2:  # Header and separator lines
+                        if len(lines) > 2:
                             for line in lines[2:]:
                                 if line.strip():
                                     parts = line.split('\t')
                                     if len(parts) >= 2:
-                                        skill_items.append(parts[1])  # content column
+                                        skill_items.append(parts[1])
                     except Exception as e:
                         self.logger.error(f"Error parsing skill query result: {e}")
 
                     if skill_items:
                         try:
-                            # Execute the first skill found
                             skill_code = skill_items[0]
                             result = self.skill_manager.execute_skill(skill_code)
                             self.logger.debug(f"Skill execution result: {result}")
@@ -275,12 +177,22 @@ class WalbertAgent:
                 self.logger.error(f"SQL execution error: {e}")
                 parsed["sql_error"] = str(e)
 
-        if parsed.get("hardware_action") is not None:
-            self.logger.debug(f"Executing hardware action: {parsed['hardware_action']}")
-            result = self.handle_hardware_interaction(parsed["hardware_action"])
-            if result:
-                self.logger.debug(f"Hardware action result: {result}")
-                parsed["hardware_result"] = result
+        if parsed.get("skill_execute"):
+            self.logger.debug(f"Executing skill: {parsed['skill_execute']}")
+            try:
+                skill_name = parsed["skill_execute"]
+                sql = f"SELECT content FROM items WHERE type='skill' AND content LIKE '%{skill_name}%'"
+                result = self.db.execute_sql(sql)
+                lines = result.split('\n')
+                if len(lines) > 2:
+                    skill_code = lines[2].split('\t')[1] if len(lines[2].split('\t')) > 1 else ""
+                    if skill_code:
+                        result = self.skill_manager.execute_skill(skill_code)
+                        self.logger.debug(f"Skill execution result: {result}")
+                        parsed["skill_result"] = result
+            except Exception as e:
+                self.logger.error(f"Skill execution error: {e}")
+                parsed["skill_error"] = str(e)
 
         return parsed
 
@@ -328,11 +240,6 @@ class WalbertAgent:
                     continue
                 context += f"{sender.capitalize()}: {content}\n\n"
 
-            # Add user context from memory
-            user_items = self.db.retrieve_items_by_tag("user_name")
-            for item in user_items:
-                context += f"System Memory: User name is {item[1]}\n\n"
-
             return context
         except Exception as e:
             self.logger.error(f"Error building conversation context: {e}")
@@ -343,26 +250,22 @@ class WalbertAgent:
         if not conversation_id:
             return
 
-        # Get conversation data
         messages = self.db.cursor.execute("""
             SELECT sender, content, timestamp FROM messages
             WHERE conversation_id = ?
             ORDER BY timestamp ASC
         """, (conversation_id,)).fetchall()
 
-        # Generate filenames
         timestamp = self.db.cursor.execute("""
             SELECT start_time FROM conversations WHERE id = ?
         """, (conversation_id,)).fetchone()[0].replace(" ", "_").replace(":", "-")
-        raw_filename = f"instance/conversations/raw/conversation_{conversation_id}.txt"
-        chat_filename = f"instance/conversations/chat/conversation_{conversation_id}.txt"
+        raw_filename = f"instance/conversations/raw/conversation_{conversation_id}_{timestamp}.txt"
+        chat_filename = f"instance/conversations/chat/conversation_{conversation_id}_{timestamp}.txt"
 
-        # Save raw conversation
         with open(raw_filename, 'w') as f:
             for sender, content, ts in messages:
                 f.write(f"[{ts}] {sender.upper()}:\n{content}\n\n")
 
-        # Save chat conversation
         with open(chat_filename, 'w') as f:
             for sender, content, ts in messages:
                 if sender == "system":
@@ -379,56 +282,45 @@ class WalbertAgent:
         """Main agent execution loop"""
         print("Welcome to Walbert! Type 'exit' to quit.")
 
-        # Start initial conversation
         self.start_conversation(ChannelType.CONSOLE)
         self.logger.debug(f"Started new conversation with ID {self.current_conversation_id}")
 
         while True:
             try:
-                # Read input
                 user_input = self.handle_input_channel(ChannelType.CONSOLE)
                 if not user_input.strip():
                     continue
                 if user_input.lower() in ['exit', 'quit']:
                     break
 
-                # Store user message
                 if self.current_conversation_id:
-                    msg_id = self.db.add_message(self.current_conversation_id, user_input, "user")
-                    self.logger.debug(f"Stored user message with ID {msg_id}")
+                    self.db.add_message(self.current_conversation_id, user_input, "user")
                     self.db.conn.commit()
 
-                # Build full prompt
                 conversation_context = self.build_conversation_context()
                 full_prompt = self.SYSTEM_PROMPT + "\n\n" + conversation_context + self.emit_input_channel(ChannelType.CONSOLE) + "\nUser: " + user_input
                 self.logger.debug(f"Built prompt for model:\n{full_prompt}")
 
-                # Process until we get a response for the user
                 user_response = None
                 internal_cycles = 0
                 max_internal_cycles = 5
 
                 while not user_response and internal_cycles < max_internal_cycles:
-                    # Execute model
-                    self.logger.debug("Executing Ministral model")
                     model_response = self.model_manager.execute_ministral(full_prompt)
                     self.logger.debug(f"Model response:\n{model_response}")
 
                     parsed_response = self.process_response(model_response, ChannelType.CONSOLE)
 
-                    # Check if we have a response for the user
                     if parsed_response.get("response"):
                         user_response = parsed_response["response"]
                         response_channel = parsed_response.get("channel", "console")
                         self.logger.debug(f"User response generated: {user_response}")
                         break
 
-                    # If no user response, continue internal processing
                     internal_cycles += 1
                     full_prompt += f"\n\nAssistant (internal): {model_response}"
                     self.logger.debug(f"Internal processing cycle {internal_cycles} completed")
 
-                # Output response to user if we have one
                 if user_response:
                     if response_channel == "console":
                         print(user_response)
@@ -451,11 +343,7 @@ class WalbertAgent:
                             self.logger.error(f"Error writing to {response_channel} channel: {e}")
                             print(user_response)
                             self.logger.debug(f"Fallback response to console: {user_response}")
-                else:
-                    print("I've completed my internal processing but don't have a response for you yet.")
-                    self.logger.debug("No user response generated after internal processing")
 
-                # Check for conversation completion
                 if parsed_response.get("conversation_complete") == "YES":
                     self.logger.debug("Conversation marked as complete")
                     self.end_conversation()

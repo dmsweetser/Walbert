@@ -27,7 +27,6 @@ class DatabaseManager:
         """Initialize database schema"""
         self.logger.debug("Initializing database schema")
 
-        # Items table
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS items (
                 id INTEGER PRIMARY KEY,
@@ -37,7 +36,6 @@ class DatabaseManager:
             )
         """)
 
-        # Tags table
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS tags (
                 id INTEGER PRIMARY KEY,
@@ -45,7 +43,6 @@ class DatabaseManager:
             )
         """)
 
-        # Item-tags mapping
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS item_tags (
                 item_id INTEGER,
@@ -56,7 +53,6 @@ class DatabaseManager:
             )
         """)
 
-        # Conversations table
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS conversations (
                 id INTEGER PRIMARY KEY,
@@ -67,7 +63,6 @@ class DatabaseManager:
             )
         """)
 
-        # Messages table
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY,
@@ -87,7 +82,6 @@ class DatabaseManager:
         self.logger.debug("Retrieving database schema")
         schema = {}
 
-        # Get table information
         tables = self.cursor.execute("""
             SELECT name FROM sqlite_master
             WHERE type='table' AND name NOT LIKE 'sqlite_%'
@@ -97,7 +91,6 @@ class DatabaseManager:
             table_name = table[0]
             schema[table_name] = {}
 
-            # Get columns
             columns = self.cursor.execute(f"PRAGMA table_info({table_name})").fetchall()
             schema[table_name]['columns'] = [
                 {
@@ -109,7 +102,6 @@ class DatabaseManager:
                 } for col in columns
             ]
 
-            # Get foreign keys
             fks = self.cursor.execute(f"PRAGMA foreign_key_list({table_name})").fetchall()
             schema[table_name]['foreign_keys'] = [
                 {
@@ -124,7 +116,6 @@ class DatabaseManager:
                 } for fk in fks
             ]
 
-        # Format schema as string
         schema_str = "Current Database Schema:\n\n"
         for table_name, table_info in schema.items():
             schema_str += f"Table: {table_name}\n"
@@ -164,7 +155,6 @@ class DatabaseManager:
                 if not rows:
                     return "Query executed successfully. No rows returned."
 
-                # Format results
                 output = "Query results:\n"
                 columns = [desc[0] for desc in result.description]
                 output += "\t".join(columns) + "\n"

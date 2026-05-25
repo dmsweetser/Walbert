@@ -3,7 +3,6 @@ Response parser implementation
 """
 
 import re
-import json
 from typing import Dict
 
 class ResponseParser:
@@ -15,33 +14,16 @@ class ResponseParser:
             "should_query_datastore": r"~walbert_should_query_datastore_start~\s*(.*?)\s*~walbert_should_query_datastore_end~",
             "conversation_complete": r"~walbert_conversation_complete_start~\s*(.*?)\s*~walbert_conversation_complete_end~",
             "sql_execute": r"~walbert_sql_execute_start~\s*(.*?)\s*~walbert_sql_execute_end~",
-            "hardware_action": r"~walbert_hardware_action_start~\s*(.*?)\s*~walbert_hardware_action_end~"
+            "skill_execute": r"~walbert_skill_execute_start~\s*(.*?)\s*~walbert_skill_execute_end~"
         }
 
     def parse_response(self, response_text: str) -> Dict:
         """Parse response text into structured data"""
         parsed = {}
 
-        # Parse all blocks
         for key, pattern in self.block_patterns.items():
             match = re.search(pattern, response_text, re.DOTALL)
             if match:
-                if key == "skill_execution":
-                    try:
-                        args = json.loads(match.group(2).strip()) if match.group(2).strip() else {}
-                    except json.JSONDecodeError:
-                        args = {}
-                    parsed[key] = {
-                        "command": match.group(1).strip(),
-                        "args": args
-                    }
-                elif key == "hardware_action":
-                    try:
-                        args = json.loads(match.group(1).strip()) if match.group(1).strip() else {}
-                    except json.JSONDecodeError:
-                        args = {}
-                    parsed[key] = args
-                else:
-                    parsed[key] = match.group(1).strip()
+                parsed[key] = match.group(1).strip()
 
         return parsed

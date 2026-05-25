@@ -1,17 +1,15 @@
 # Walbert - Local-First AI Agent
 
-Walbert is a local-first AI agent system built on llama.cpp compiled binaries. It operates entirely on your local machine with no external dependencies beyond Python and llama.cpp.
+Walbert is a local-first AI agent system built on llama.cpp compiled binaries.
 
 ## Features
 
 - **Local-Only Execution**: Runs entirely on your Linux system using local llama.cpp binaries
 - **Multi-Model Support**: Load and manage multiple GGUF models simultaneously
-- **Minimal Dependencies**: Only requires Python and llama.cpp compiled binaries
-- **SQLite Datastore**: Stores all items, tags, skills, conversations, and memories in a single SQLite database
-- **Tag-Based Retrieval**: Organize and retrieve content using flexible tagging system
+- **SQLite Datastore**: Stores all items, tags, skills, conversations, and memories
 - **Skill System**: Create, store, and execute Python skills
 - **Hardware Integration**: Interact with USB, serial, and Bluetooth devices
-- **Unified Response Protocol**: Consistent block-based format for all responses and internal deliberation
+- **Unified Response Protocol**: Consistent block-based format for all responses
 - **Configurable I/O Layers**: Enable, disable, or require authorization for different I/O channels
 
 ## Installation
@@ -55,8 +53,7 @@ cd walbert
         }
     },
     "llama_binary_path": "/path/to/llama.cpp/bin/llama-server",
-    "mmproj_path": "/path/to/mmproj.gguf",
-    "log_level": "DEBUG"
+    "log_level": "INFO"
 }
 ```
 
@@ -75,9 +72,7 @@ cd walbert
     },
     "bluetooth": {
         "enabled": false,
-        "require_authorization": true,
-        "port": "/dev/rfcomm0",
-        "baudrate": 9600
+        "require_authorization": true
     },
     "usb": {
         "enabled": false,
@@ -97,30 +92,12 @@ Start the agent with:
 ./run.sh
 ```
 
-## Usage
-
-Once running, interact with Walbert through the console interface. Type your queries and Walbert will respond using its unified response protocol.
-
-## Development
-
-### Testing
+## Testing
 
 Run the test suite with:
 ```bash
 python -m unittest discover tests
 ```
-
-### Architecture
-
-Walbert follows SOLID principles with clear separation of concerns:
-
-- **Config**: System configuration
-- **Models**: Model management and execution
-- **Database**: SQLite storage and retrieval
-- **Skills**: Skill storage and execution
-- **I/O Layers**: Communication channels
-- **Response**: Response parsing and protocol handling
-- **Authorization**: User authorization for sensitive operations
 
 ## License
 
