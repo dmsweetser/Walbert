@@ -48,6 +48,9 @@ class WalbertAgent:
       ~walbert_should_query_datastore_start~
       (YES/NO)
 
+      ~walbert_should_consult_smarter_cousin_start~
+      (YES/NO)
+
       ~walbert_conversation_complete_start~
       (YES/NO)
 
@@ -304,6 +307,11 @@ class WalbertAgent:
                         except Exception as e:
                             self.logger.error(f"Error writing to {response_channel} channel: {e}")
                             print(user_response)
+
+                # If we consulted Devstral, continue internal processing
+                if parsed.get("should_consult_smarter_cousin") == "YES" and "devstral_response" in parsed:
+                    full_prompt += f"\n\nDevstral Response: {parsed['devstral_response']}"
+                    user_response = None
 
                 # Handle conversation completion
                 if parsed_response.get("conversation_complete") == "YES":

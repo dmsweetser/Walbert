@@ -1,1 +1,7 @@
-Remove any unused code and fully revise the feature-spec.md to reflect the new version.
+Add in the ability for Walbert to decide to talk internally to its smarter cousin.
+
+The idea is that it may do multiple internal steps before it responds to the user (like query the DB, talk to its smarter cousin, execute skills).
+
+****
+
+You started but the implementation is incomplete. Please finish it out.
