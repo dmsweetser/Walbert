@@ -2,6 +2,7 @@
 Test cases for SkillManager
 """
 
+import subprocess
 import unittest
 import os
 import tempfile

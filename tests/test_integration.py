@@ -80,6 +80,7 @@ class TestWalbertIntegration(unittest.TestCase):
         self.config = Config(
             model_configs=self.model_configs,
             llama_binary_path="/fake/path/llama-server",
+            mmproj_path="/fake/path/mmproj",
             log_level="DEBUG"
         )
 
@@ -90,8 +91,6 @@ class TestWalbertIntegration(unittest.TestCase):
             os.remove('instance/config.json')
         if os.path.exists('instance/io_config.json'):
             os.remove('instance/io_config.json')
-        if os.path.exists('instance'):
-            os.rmdir('instance')
         if os.path.exists(self.temp_dir):
             os.rmdir(self.temp_dir)
 
