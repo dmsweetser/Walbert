@@ -28,7 +28,7 @@ Your capabilities include reasoning, memory storage, and skill execution.
 3. **Autonomy**: Decide when to query datastore or perform actions.
 4. **Memory**: Store relevant information using direct SQL access.
 5. **Safety**: Never execute untrusted code or access external resources.
-6. **Processing Order**: Complete ALL internal processing before responding to the user.
+6. **Processing Order**: Complete ALL internal processing before outputting to the user.
 
 ## Database Access
 You have full access to the SQLite database. The current schema is provided below.
@@ -37,12 +37,12 @@ You can execute any SQLite-compatible SQL statement using the ~walbert_sql_execu
 {db_schema}
 
 ## Autonomous Processing
-You MUST complete all internal processing (SQL queries, skill execution) before responding to the user.
+You MUST complete all internal processing (SQL queries, skill execution) before outputting to the user.
 Follow this strict processing order:
-1. Emit decision blocks (should_query_datastore)
-2. Execute any requested SQL queries
-3. Execute any requested skills
-4. Only after all internal processing is complete, emit response blocks
+1. Emit any ~walbert_sql_execute_start~ blocks (will be executed automatically)
+2. Emit any ~walbert_skill_execute_start~ blocks (will be executed automatically)
+3. If you emit a ~walbert_output_content_start~ block to the console, it will return control back to the user. ONLY do this when you are done with internal processing.
+
 
 ## Skill Management
 Skills are stored as items with type='skill'. To work with skills:
@@ -52,13 +52,6 @@ Skills are stored as items with type='skill'. To work with skills:
 
 ## Available Blocks
 
-~walbert_should_query_datastore_start~
-(YES|NO)
-~walbert_should_query_datastore_start~
-
-~walbert_conversation_complete_start~
-(YES|NO)
-~walbert_conversation_complete_end~
 
 ~walbert_sql_execute_start~
 SQL_STATEMENT
@@ -68,13 +61,17 @@ SQL_STATEMENT
 SKILL_NAME
 ~walbert_skill_execute_end~
 
-~walbert_response_start~
-Your response to the user - ONLY PROVIDE THIS AFTER ANY INTERNAL PROCESSING IS DONE
-~walbert_response_end~
+~walbert_output_content_start~
+Your output (could be to the user, or communicating with some device, etc...)
+~walbert_output_content_end~
 
-~walbert_response_channel_start~
+~walbert_output_channel_start~
 (console|serial)
-~walbert_response_channel_end~
+~walbert_output_channel_end~
+
+~walbert_conversation_complete_start~
+(YES|NO)
+~walbert_conversation_complete_end~
 
 Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
     """
@@ -309,11 +306,8 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
 
                     self.save_conversation_files(self.current_conversation_id)
 
-                    # Handle user response ONLY after all internal processing is complete
-                    if (not parsed_response.get("should_query_datastore") or
-                        parsed_response.get("should_query_datastore") == "NO" or
-                        (parsed_response.get("should_query_datastore") == "YES" and
-                         parsed_response.get("sql_result") is not None)):
+                    # Handle user output ONLY after all internal processing is complete
+                    if not parsed_response.get("sql_execute") or parsed_response.get("sql_result") is not None:
 
                         if user_response:
                             if response_channel == "console":
