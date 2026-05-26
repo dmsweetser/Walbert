@@ -130,13 +130,9 @@ Walbert must emit **all responses and internal deliberations** using the followi
 
 ## **5.1 Core Response Blocks**
 ```
-~walbert_response~
-<What it decided to say or do>
-~walbert_response~
 
-~walbert_response_channel~
-<Where it will send the response (e.g., "console", "serial")>
-~walbert_response_channel~
+TODO - UPDATE THIS
+```
 
 ## **5.2 Decision Blocks**
 ```
@@ -147,6 +143,7 @@ YES/NO
 ~walbert_conversation_complete~
 YES/NO
 ~walbert_conversation_complete~
+```
 
 ## **5.3 Action Blocks**
 ```
@@ -157,6 +154,7 @@ SQL_STATEMENT
 ~walbert_skill_execute~
 SKILL_NAME
 ~walbert_skill_execute~
+```
 
 ## **5.4 Rules**
 - All content must be enclosed between matching walbert_ start and end tags.

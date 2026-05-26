@@ -5,3 +5,7 @@ Generate a full revision of any impacted files.
 ****
 
 You updated the SYSTEM_PROMPT and some of the parsing, but you never populate the system prompt variables. Finish the implementation wherever there are gaps, please. Also, make sure they have the walbert_ prefix.
+
+****
+
+Looking better - make any remaining fixes and update feature-spec.md.

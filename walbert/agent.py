@@ -95,6 +95,9 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
         self.logger = logging.getLogger('walbert.agent')
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
 
+        self.available_channels = self._get_available_channels()
+        self.channel_response_blocks = self._get_channel_response_blocks()
+
     def load_io_layer(self, channel_type: ChannelType) -> IOLayer:
         """Load I/O layer with proper configuration"""
         layer_name = channel_type.name.lower()
@@ -183,12 +186,34 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
         """Emit the input channel block for context"""
         return f"~walbert_input_channel_start~\n{channel.value}\n~walbert_input_channel_end~"
 
+    def _get_available_channels(self) -> str:
+        """Get list of available I/O channels"""
+        available = []
+        for channel_name, config in self.io_config.io_layers.items():
+            if config.get('enabled', False):
+                available.append(f"- {channel_name}")
+        return "\n".join(available) if available else "None"
+
+    def _get_channel_response_blocks(self) -> str:
+        """Get response block examples for each available channel"""
+        examples = []
+        for channel_name in self.io_config.io_layers:
+            if self.io_config.io_layers[channel_name].get('enabled', False):
+                examples.append(f"""
+~walbert_{channel_name}_response~
+<Your response for {channel_name} channel>
+~walbert_{channel_name}_response~
+""")
+        return "\n".join(examples)
+
     def start_conversation(self, channel: ChannelType):
         """Start a new conversation"""
         try:
             self.current_conversation_id = self.db.start_conversation(channel.value)
             db_schema = self.db.get_schema()
             system_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", db_schema)
+            system_prompt = system_prompt.replace("{available_channels}", self.available_channels)
+            system_prompt = system_prompt.replace("{channel_response_blocks}", self.channel_response_blocks)
             self.db.add_message(self.current_conversation_id, system_prompt, "system")
             self.db.conn.commit()
         except Exception as e:
@@ -296,7 +321,6 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
 
                     if parsed_response.get("response"):
                         user_response = parsed_response["response"]
-                        response_channel = parsed_response.get("channel", "console")
 
                     full_prompt += f"\n\nAssistant (internal): {model_response}"
 
@@ -304,7 +328,12 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
 
                     # Handle channel responses ONLY after all internal processing is complete
                     if not parsed_response.get("sql_execute") or parsed_response.get("sql_result") is not None:
-                        for channel_name in self.io_config.io_layers:
+                        target_channels = [
+                            name for name, config in self.io_config.io_layers.items()
+                            if config.get('enabled', False)
+                        ]
+
+                        for channel_name in target_channels:
                             if parsed_response.get(f"{channel_name}_response"):
                                 try:
                                     io_layer = self.load_io_layer(ChannelType[channel_name.upper()])

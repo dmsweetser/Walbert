@@ -7,6 +7,7 @@ from typing import Dict
 
 class ResponseParser:
     """Parses Walbert's response blocks"""
+
     def __init__(self):
         self.block_patterns = {
             "conversation_complete": r"~walbert_conversation_complete~\n(.*?)\n~walbert_conversation_complete~",
@@ -27,7 +28,7 @@ class ResponseParser:
                 parsed[key] = match.group(1).strip()
 
         # Parse channel-specific responses
-        channel_pattern = r"~(.*?)_response~\n(.*?)\n~.*?_response~"
+        channel_pattern = r"~walbert_(.*?)_response~\n(.*?)\n~walbert_.*?_response~"
         channel_matches = re.findall(channel_pattern, response_text, re.DOTALL)
         for channel, content in channel_matches:
             parsed[f"{channel}_response"] = content.strip()
