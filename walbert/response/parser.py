@@ -9,11 +9,9 @@ class ResponseParser:
     """Parses Walbert's response blocks"""
     def __init__(self):
         self.block_patterns = {
-            "output_content": r"~walbert_output_content_start~\n(.*?)\n~walbert_output_content_end~",
-            "output_channel": r"~walbert_output_channel_start~\n(.*?)\n~walbert_output_channel_end~",
-            "conversation_complete": r"~walbert_conversation_complete_start~\n(.*?)\n~walbert_conversation_complete_end~",
-            "sql_execute": r"~walbert_sql_execute_start~\n(.*?)\n~walbert_sql_execute_end~",
-            "skill_execute": r"~walbert_skill_execute_start~\n(.*?)\n~walbert_skill_execute_end~",
+            "conversation_complete": r"~walbert_conversation_complete~\n(.*?)\n~walbert_conversation_complete~",
+            "sql_execute": r"~walbert_sql_execute~\n(.*?)\n~walbert_sql_execute~",
+            "skill_execute": r"~walbert_skill_execute~\n(.*?)\n~walbert_skill_execute~",
             "input_channel": r"~walbert_input_channel_start~\n(.*?)\n~walbert_input_channel_end~"
         }
 
@@ -27,4 +25,11 @@ class ResponseParser:
             match = re.search(pattern, response_text, re.DOTALL)
             if match:
                 parsed[key] = match.group(1).strip()
+
+        # Parse channel-specific responses
+        channel_pattern = r"~(.*?)_response~\n(.*?)\n~.*?_response~"
+        channel_matches = re.findall(channel_pattern, response_text, re.DOTALL)
+        for channel, content in channel_matches:
+            parsed[f"{channel}_response"] = content.strip()
+
         return parsed

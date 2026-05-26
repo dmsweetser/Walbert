@@ -18,6 +18,7 @@ logger = logging.getLogger('walbert')
 
 class WalbertAgent:
     """Main Walbert agent class"""
+    
     SYSTEM_PROMPT = """
 You are Walbert, a local-first AI agent built on llama.cpp.
 Your capabilities include reasoning, memory storage, and skill execution.
@@ -32,46 +33,41 @@ Your capabilities include reasoning, memory storage, and skill execution.
 
 ## Database Access
 You have full access to the SQLite database. The current schema is provided below.
-You can execute any SQLite-compatible SQL statement using the ~walbert_sql_execute_start~ block.
+You can execute any SQLite-compatible SQL statement using the ~walbert_sql_execute~ block.
 
 {db_schema}
 
 ## Autonomous Processing
 You MUST complete all internal processing (SQL queries, skill execution) before outputting to the user.
 Follow this strict processing order:
-1. Emit any ~walbert_sql_execute_start~ blocks (will be executed automatically)
-2. Emit any ~walbert_skill_execute_start~ blocks (will be executed automatically)
-3. If you emit a ~walbert_output_content_start~ block to the console, it will return control back to the user. ONLY do this when you are done with internal processing.
-
+1. Emit any ~walbert_sql_execute~ blocks (will be executed automatically)
+2. Emit any ~walbert_skill_execute~ blocks (will be executed automatically)
+3. Emit response blocks for each enabled I/O channel
 
 ## Skill Management
 Skills are stored as items with type='skill'. To work with skills:
 - Retrieve skills: SELECT * FROM items WHERE type='skill'
-- Execute skills: Use ~walbert_skill_execute_start~ block with skill name
+- Execute skills: Use ~walbert_skill_execute~ block with skill name
 - Store new skills: INSERT INTO items (content, type) VALUES ('skill_code', 'skill')
+
+## Available I/O Channels
+{available_channels}
 
 ## Available Blocks
 
-
-~walbert_sql_execute_start~
+~walbert_sql_execute~
 SQL_STATEMENT
-~walbert_sql_execute_end~
+~walbert_sql_execute~
 
-~walbert_skill_execute_start~
+~walbert_skill_execute~
 SKILL_NAME
-~walbert_skill_execute_end~
+~walbert_skill_execute~
 
-~walbert_output_content_start~
-Your output (could be to the user, or communicating with some device, etc...)
-~walbert_output_content_end~
+~walbert_conversation_complete~
+YES/NO
+~walbert_conversation_complete~
 
-~walbert_output_channel_start~
-(console|serial)
-~walbert_output_channel_end~
-
-~walbert_conversation_complete_start~
-(YES|NO)
-~walbert_conversation_complete_end~
+{channel_response_blocks}
 
 Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
     """
@@ -306,26 +302,24 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
 
                     self.save_conversation_files(self.current_conversation_id)
 
-                    # Handle user output ONLY after all internal processing is complete
+                    # Handle channel responses ONLY after all internal processing is complete
                     if not parsed_response.get("sql_execute") or parsed_response.get("sql_result") is not None:
-
-                        if user_response:
-                            if response_channel == "console":
-                                print(user_response)
-                            else:
+                        for channel_name in self.io_config.io_layers:
+                            if parsed_response.get(f"{channel_name}_response"):
                                 try:
-                                    io_layer = self.load_io_layer(ChannelType[response_channel.upper()])
+                                    io_layer = self.load_io_layer(ChannelType[channel_name.upper()])
                                     if io_layer.requires_authorization():
                                         if self.authorization_manager.request_authorization(
-                                            response_channel,
+                                            channel_name,
                                             "Sending output"
                                         ):
-                                            io_layer.write(user_response)
+                                            io_layer.write(parsed_response[f"{channel_name}_response"])
                                     else:
-                                        io_layer.write(user_response)
+                                        io_layer.write(parsed_response[f"{channel_name}_response"])
                                 except Exception as e:
-                                    self.logger.error(f"Error writing to {response_channel} channel: {e}")
-                                    print(user_response)
+                                    self.logger.error(f"Error writing to {channel_name} channel: {e}")
+                                    if channel_name == "console":
+                                        print(parsed_response[f"{channel_name}_response"])
 
                     # Handle conversation completion
                     if parsed_response.get("conversation_complete") == "YES":
