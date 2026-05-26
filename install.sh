@@ -38,8 +38,8 @@ cat > instance/config.json << 'EOL'
     "model_configs": {
         "ministral": {
             "model_path": "instance/models/Ministral-3-14B-Instruct-2512-Q4_K_M.gguf",
-            "context_size": 125000,
-            "output_tokens": 125000,
+            "context_size": 32768,
+            "output_tokens": 16384,
             "temperature": 0.15,
             "top_p": 1.0,
             "top_k": 20,
@@ -47,8 +47,8 @@ cat > instance/config.json << 'EOL'
         },
         "devstral": {
             "model_path": "instance/models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf",
-            "context_size": 125000,
-            "output_tokens": 62500,
+            "context_size": 32768,
+            "output_tokens": 16384,
             "temperature": 0.9,
             "top_p": 0.95,
             "top_k": 20,
