@@ -1,4 +1,11 @@
 I need you to wait until Walbert's llama.cpp server is started before showing the prompt to the user.
 
+Also, I want you to feed the system prompt to the LLM before the user is prompted for input. That way, the response is much quicker.
+
 ***
 
+I want you to make it clear in the system prompt channel contents that the console will reply to the user. Also make it clear that you don't need to reply to any channel if you don't want.
+
+***
+
+Let's have it specify which IO is the user-interactive one in config, and then relay that to the LLM through the system prompt so they know that when they are ready to respond to the user, they should use that channel. They don't need to use it or any other IO channel until they are ready.
