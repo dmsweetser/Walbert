@@ -36,15 +36,6 @@ fi
 cat > instance/config.json << 'EOL'
 {
     "model_configs": {
-        "ministral": {
-            "model_path": "instance/models/Ministral-3-14B-Instruct-2512-Q4_K_M.gguf",
-            "context_size": 32768,
-            "output_tokens": 16384,
-            "temperature": 0.15,
-            "top_p": 1.0,
-            "top_k": 20,
-            "min_p": 0.01
-        },
         "devstral": {
             "model_path": "instance/models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf",
             "context_size": 32768,
@@ -56,8 +47,8 @@ cat > instance/config.json << 'EOL'
         }
     },
     "llama_binary_path": "instance/llama.cpp/bin/llama-server",
-    "mmproj_path": "instance/models/Ministral-3-14B-Instruct-2512-BF16-mmproj.gguf",
-    "log_level": "INFO"
+    "mmproj_path": "instance/models/Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf",
+    "log_level": "DEBUG"
 }
 EOL
 
@@ -75,20 +66,6 @@ if [ ! -f "instance/io_config.json" ]; then
             "require_authorization": true,
             "port": null,
             "baudrate": 9600
-        },
-        "bluetooth": {
-            "enabled": false,
-            "require_authorization": true,
-            "port": "/dev/rfcomm0",
-            "baudrate": 9600
-        },
-        "usb": {
-            "enabled": false,
-            "require_authorization": true
-        },
-        "python_code": {
-            "enabled": false,
-            "require_authorization": true
         }
     }
 }
@@ -112,31 +89,32 @@ download_model() {
     fi
 }
 
-# Ministral-14B model
-download_model "Ministral-3-14B-Instruct-2512-Q4_K_M.gguf" "https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512-GGUF/resolve/main/Ministral-3-14B-Instruct-2512-Q4_K_M.gguf?download=true"
-
-# Ministral-14B mmproj
-download_model "Ministral-3-14B-Instruct-2512-BF16-mmproj.gguf" "https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512-GGUF/resolve/main/Ministral-3-14B-Instruct-2512-BF16-mmproj.gguf?download=true"
-
 # Devstral-24B model
 download_model "Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf" "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true"
 
+# Devstral-24B mmproj
+download_model "Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf" "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true"
+
 # Download llama.cpp binary
 echo "Downloading llama.cpp binary..."
-wget -O llama.cpp.tar.gz \
+if [ ! -f "instance/llama.cpp/bin" ]; then
+    wget -O llama.cpp.tar.gz \
     "https://github.com/ggml-org/llama.cpp/releases/download/b9279/llama-b9279-bin-ubuntu-x64.tar.gz"
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to download llama.cpp binary"
-    exit 1
-fi
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to download llama.cpp binary"
+        exit 1
+    fi
 
-# Extract binary
-echo "Extracting llama.cpp binary..."
-tar -xzf llama.cpp.tar.gz -C instance/llama.cpp/bin --strip-components=1
-rm llama.cpp.tar.gz
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to extract llama.cpp binary"
-    exit 1
+    # Extract binary
+    echo "Extracting llama.cpp binary..."
+    tar -xzf llama.cpp.tar.gz -C instance/llama.cpp/bin --strip-components=1
+    rm llama.cpp.tar.gz
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to extract llama.cpp binary"
+        exit 1
+    fi
+else
+    echo "llama.cpp already exists, skipping download."
 fi
 
 echo "Installation complete."
