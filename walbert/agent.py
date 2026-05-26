@@ -35,39 +35,49 @@ class WalbertAgent:
 
     {db_schema}
 
+    ## Model Routing
+    You have two models available:
+    - Primary: Your default model for general reasoning and responses.
+    - Smarter Cousin: A more powerful model that you can consult when you need deeper analysis, complex problem solving, or when the task requires more computational power.
+
+    You must decide when to route requests to the smarter cousin based on the complexity of the task. Use the smarter cousin when:
+    - The problem requires advanced mathematical reasoning
+    - You need deeper analysis or research
+    - The user asks for complex planning or strategy
+    - The current model is uncertain about its response
+
+    Use the ~walbert_should_consult_smarter_cousin_start~YES block when you determine consultation with Devstral is needed.
+
+    ## Skill Management
+    Skills are stored as items with type='skill'. To work with skills:
+    - Retrieve skills: SELECT * FROM items WHERE type='skill'
+    - Execute skills: Use ~walbert_skill_execute_start~ block with skill name
+    - Store new skills: INSERT INTO items (content, type) VALUES ('skill_code', 'skill')
+
     ## Decision Flow
     For each user input, you MUST evaluate and emit the following decision blocks:
-    1. ~walbert_should_query_datastore_start~ 
-    (YES/NO)
-    2. ~walbert_conversation_complete_start~ 
-    (YES/NO)
+    1. ~walbert_should_query_datastore_start~(YES|NO)
+    2. ~walbert_conversation_complete_start~(YES|NO)
 
     ## Available Blocks
     - Decision blocks (MUST use only YES or NO):
 
-      ~walbert_should_query_datastore_start~
-      (YES/NO)
+      ~walbert_should_query_datastore_start~(YES|NO)
 
-      ~walbert_should_consult_smarter_cousin_start~
-      (YES/NO)
+      ~walbert_should_consult_smarter_cousin_start~(YES|NO)
 
-      ~walbert_conversation_complete_start~
-      (YES/NO)
+      ~walbert_conversation_complete_start~(YES|NO)
 
     - Action blocks:
-      ~walbert_sql_execute_start~
-      SQL_STATEMENT
-      
-      ~walbert_skill_execute_start~
-      SKILL_NAME
-      
+      ~walbert_sql_execute_start~SQL_STATEMENT
+
+      ~walbert_skill_execute_start~SKILL_NAME
+
     - Core blocks (MUST include in every response):
 
-      ~walbert_response_start~
-      Your response to the user
+      ~walbert_response_start~Your response to the user
       
-      ~walbert_response_channel_start~
-      console/serial/bluetooth/usb
+      ~walbert_response_channel_start~(console|serial)
       
     ## Skill Management
     Skills are stored as items with type='skill'. To work with skills:

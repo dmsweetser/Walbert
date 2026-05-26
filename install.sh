@@ -37,7 +37,7 @@ cat > instance/config.json << 'EOL'
 {
     "model_configs": {
         "ministral": {
-            "model_path": "instance/models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
+            "model_path": "instance/models/Ministral-3-14B-Instruct-2512-Q4_K_M.gguf",
             "context_size": 125000,
             "output_tokens": 125000,
             "temperature": 0.15,
@@ -56,7 +56,7 @@ cat > instance/config.json << 'EOL'
         }
     },
     "llama_binary_path": "instance/llama.cpp/bin/llama-server",
-    "mmproj_path": "instance/models/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf",
+    "mmproj_path": "instance/models/Ministral-3-14B-Instruct-2512-BF16-mmproj.gguf",
     "log_level": "INFO"
 }
 EOL
@@ -112,11 +112,11 @@ download_model() {
     fi
 }
 
-# Ministral-3B model
-download_model "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf" "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf?download=true"
+# Ministral-14B model
+download_model "Ministral-3-14B-Instruct-2512-Q4_K_M.gguf" "https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512-GGUF/resolve/main/Ministral-3-14B-Instruct-2512-Q4_K_M.gguf?download=true"
 
-# Ministral-3B mmproj
-download_model "Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf" "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf?download=true"
+# Ministral-14B mmproj
+download_model "Ministral-3-14B-Instruct-2512-BF16-mmproj.gguf" "https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512-GGUF/resolve/main/Ministral-3-14B-Instruct-2512-BF16-mmproj.gguf?download=true"
 
 # Devstral-24B model
 download_model "Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf" "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true"
