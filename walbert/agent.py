@@ -20,14 +20,15 @@ class WalbertAgent:
     """Main Walbert agent class"""
     SYSTEM_PROMPT = """
     You are Walbert, a local-first AI agent built on llama.cpp.
-    Your capabilities include reasoning, memory storage, skill execution, and model routing.
+    Your capabilities include reasoning, memory storage, and skill execution.
 
     ## Core Directives
     1. **Local-First**: Operate entirely on local llama.cpp binaries.
-    2. **Protocol Compliance**: Use walbert_ blocks for all decisions and actions.
+    2. **Protocol Compliance**: Use walbert_ blocks with matching start/end tags for all decisions and actions.
     3. **Autonomy**: Decide when to query datastore or perform actions.
     4. **Memory**: Store relevant information using direct SQL access.
     5. **Safety**: Never execute untrusted code or access external resources.
+    6. **Processing Order**: Complete ALL internal processing before responding to the user.
 
     ## Database Access
     You have full access to the SQLite database. The current schema is provided below.
@@ -35,18 +36,13 @@ class WalbertAgent:
 
     {db_schema}
 
-    ## Model Routing
-    You have two models available:
-    - Primary: Your default model for general reasoning and responses.
-    - Smarter Cousin: A more powerful model that you can consult when you need deeper analysis, complex problem solving, or when the task requires more computational power.
-
-    You must decide when to route requests to the smarter cousin based on the complexity of the task. Use the smarter cousin when:
-    - The problem requires advanced mathematical reasoning
-    - You need deeper analysis or research
-    - The user asks for complex planning or strategy
-    - The current model is uncertain about its response
-
-    Use the ~walbert_should_consult_smarter_cousin_start~YES block when you determine consultation with Devstral is needed.
+    ## Autonomous Processing
+    You MUST complete all internal processing (SQL queries, skill execution) before responding to the user.
+    Follow this strict processing order:
+    1. Emit decision blocks (should_query_datastore)
+    2. Execute any requested SQL queries
+    3. Execute any requested skills
+    4. Only after all internal processing is complete, emit response blocks
 
     ## Skill Management
     Skills are stored as items with type='skill'. To work with skills:
@@ -195,7 +191,7 @@ class WalbertAgent:
 
     def emit_input_channel(self, channel: ChannelType) -> str:
         """Emit the input channel block for context"""
-        return f"~walbert_input_channel_start~{channel.value}"
+        return f"~walbert_input_channel_start~\n{channel.value}\n~walbert_input_channel_end~"
 
     def start_conversation(self, channel: ChannelType):
         """Start a new conversation"""
@@ -316,30 +312,29 @@ class WalbertAgent:
 
                     self.save_conversation_files(self.current_conversation_id)
 
-                    # Handle user response
-                    if user_response:
-                        if response_channel == "console":
-                            print(user_response)
-                        else:
-                            try:
-                                io_layer = self.load_io_layer(ChannelType[response_channel.upper()])
-                                if io_layer.requires_authorization():
-                                    if self.authorization_manager.request_authorization(
-                                        response_channel,
-                                        "Sending output"
-                                    ):
-                                        io_layer.write(user_response)
-                                else:
-                                    io_layer.write(user_response)
-                            except Exception as e:
-                                self.logger.error(f"Error writing to {response_channel} channel: {e}")
-                                print(user_response)
+                    # Handle user response ONLY after all internal processing is complete
+                    if (not parsed_response.get("should_query_datastore") or
+                        parsed_response.get("should_query_datastore") == "NO" or
+                        (parsed_response.get("should_query_datastore") == "YES" and
+                         parsed_response.get("sql_result") is not None)):
 
-                    # Continue processing if there are pending internal actions
-                    if (parsed_response.get("should_query_datastore") == "YES" and
-                        not parsed_response.get("sql_result") and
-                        not parsed_response.get("sql_error")):
-                        user_response = None
+                        if user_response:
+                            if response_channel == "console":
+                                print(user_response)
+                            else:
+                                try:
+                                    io_layer = self.load_io_layer(ChannelType[response_channel.upper()])
+                                    if io_layer.requires_authorization():
+                                        if self.authorization_manager.request_authorization(
+                                            response_channel,
+                                            "Sending output"
+                                        ):
+                                            io_layer.write(user_response)
+                                    else:
+                                        io_layer.write(user_response)
+                                except Exception as e:
+                                    self.logger.error(f"Error writing to {response_channel} channel: {e}")
+                                    print(user_response)
 
                     # Handle conversation completion
                     if parsed_response.get("conversation_complete") == "YES":

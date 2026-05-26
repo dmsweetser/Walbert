@@ -63,10 +63,7 @@
 - **AI-002: llama.cpp Binary Execution**
   All model inference must be performed using llama.cpp compiled binaries.
 
-- **AI-003: Smarter Cousin — Devstral-24B (Local)**
-  Used only when the primary model decides it needs deeper reasoning.
-
-- **AI-004: Autonomous Model Router**
+- **AI-003: Autonomous Model Routing**
   The primary model must autonomously decide when to query its datastore via SQL.
 
 - **AI-005: System Prompt Awareness**
