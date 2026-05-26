@@ -1,11 +1,59 @@
-I need you to wait until Walbert's llama.cpp server is started before showing the prompt to the user.
+The LLM is very confused about the output format. Here is a similar prompt that is working properly:
 
-Also, I want you to feed the system prompt to the LLM before the user is prompted for input. That way, the response is much quicker.
+```
+Generate a line-delimited format file that describes file modifications to apply using the `create_file`, `remove_file`, `replace_file`, and `replace_section` action types.
+Ensure all content is provided using line-delimited format-compatible entities.
+Focus on small, specific sections of code rather than large blocks.
+Ensure you do not omit any existing code and only modify the sections specified.
+Available operations:
+1. `create_file`:
+    - `file_content`: List of strings (lines of the file content)
+2. `remove_file`:
+    - No additional parameters needed.
+3. `replace_file`:
+    - `file_content`: List of strings (lines of the new file content)
+    - The revision must be entirely complete
+4. `replace_section`:
+    - `original_content`: The original content in the file
+    - `file_content`: List of strings (lines of the new file content to replace the original content)
+Example output format:
+[cosmonaut_change file="new_file.py"]
+[cosmonaut_action type="create_file"]
+[cosmonaut_file_content]
+# Content line 1 with whitespace preserved
+\t# Content line 2 with whitespace preserved
+\t# Content line 3 with whitespace preserved
+[cosmonaut_end_file_content]
+[cosmonaut_end_action]
+[cosmonaut_change file="old_file.py"]
+[cosmonaut_action type="remove_file"]
+[cosmonaut_end_action]
+[cosmonaut_change file="file_to_replace.py"]
+[cosmonaut_action type="replace_file"]
+[cosmonaut_file_content]
+# New content line 1 with whitespace preserved
+\t# New content line 2 with whitespace preserved
+\t# New content line 3 with whitespace preserved
+[cosmonaut_end_file_content]
+[cosmonaut_end_action]
+[cosmonaut_change file="file_to_modify.py"]
+[cosmonaut_action type="replace_section"]
+[cosmonaut_original_content]
+# Original content line 1
+\t# Original content line 2
+[cosmonaut_end_original_content]
+[cosmonaut_file_content]
+# New content line 1 with whitespace preserved
+\t# New content line 2 with whitespace preserved
+\t# New content line 3 with whitespace preserved
+[cosmonaut_end_file_content]
+[cosmonaut_end_action]
+Generate modifications logically based on the desired changes.
+Current code:
+{current_code}
+Instructions:
+{instructions}
+Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
+```
 
-***
-
-I want you to make it clear in the system prompt channel contents that the console will reply to the user. Also make it clear that you don't need to reply to any channel if you don't want.
-
-***
-
-Let's have it specify which IO is the user-interactive one in config, and then relay that to the LLM through the system prompt so they know that when they are ready to respond to the user, they should use that channel. They don't need to use it or any other IO channel until they are ready.
+Take this as a reference and revise my system prompt, along with all related references (including the feature-spec.md) to be more clear to the LLM what output is expected and what it is used for.
