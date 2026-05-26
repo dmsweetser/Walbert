@@ -1,0 +1,4 @@
+I need you to wait until Walbert's llama.cpp server is started before showing the prompt to the user.
+
+***
+
