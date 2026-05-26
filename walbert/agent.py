@@ -30,6 +30,7 @@ Your capabilities include reasoning, memory storage, and skill execution.
 4. **Memory**: Store relevant information using direct SQL access.
 5. **Safety**: Never execute untrusted code or access external resources.
 6. **Processing Order**: Complete ALL internal processing before outputting to the user.
+7. **User Interaction**: Only respond to the user when you are ready. You don't need to respond to any channel until you have completed all internal processing.
 
 ## Database Access
 You have full access to the SQLite database. The current schema is provided below.
@@ -42,7 +43,7 @@ You MUST complete all internal processing (SQL queries, skill execution) before 
 Follow this strict processing order:
 1. Emit any ~walbert_sql_execute~ blocks (will be executed automatically)
 2. Emit any ~walbert_skill_execute~ blocks (will be executed automatically)
-3. Emit response blocks for each enabled I/O channel
+3. ONLY IF NECESSARY: Emit response blocks for enabled I/O channels
 
 ## Skill Management
 Skills are stored as items with type='skill'. To work with skills:
@@ -52,6 +53,10 @@ Skills are stored as items with type='skill'. To work with skills:
 
 ## Available I/O Channels
 {available_channels}
+
+## User Interactive Channel
+The primary user-interactive channel is: {user_interactive_channel}
+When you are ready to respond to the user, use this channel. You don't need to respond to any channel until you are ready.
 
 ## Available Blocks
 
@@ -69,6 +74,12 @@ YES/NO
 
 {channel_response_blocks}
 
+## Channel Response Rules
+- For the console channel: Your response will be shown directly to the user
+- For other channels: Only respond if you have specific output for that channel
+- You may choose to respond to none, some, or all channels
+- You MUST NOT respond to the user channel until all internal processing is complete
+
 Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
     """
 
@@ -82,6 +93,7 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
         self.authorization_manager = AuthorizationManager()
         self.io_factory = IOLayerFactory()
         self.current_conversation_id = None
+        self.user_interactive_channel = io_config.io_layers.get('user_interactive_channel', 'console')
 
         os.makedirs('instance/conversations/raw', exist_ok=True)
         os.makedirs('instance/conversations/chat', exist_ok=True)
@@ -214,8 +226,15 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
             system_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", db_schema)
             system_prompt = system_prompt.replace("{available_channels}", self.available_channels)
             system_prompt = system_prompt.replace("{channel_response_blocks}", self.channel_response_blocks)
+            system_prompt = system_prompt.replace("{user_interactive_channel}", self.user_interactive_channel)
             self.db.add_message(self.current_conversation_id, system_prompt, "system")
             self.db.conn.commit()
+
+            # Wait for model server to be ready before proceeding
+            self.logger.info("Waiting for model server to start...")
+            if not self.model_manager.wait_for_server():
+                raise RuntimeError("Model server failed to start")
+            self.logger.info("Model server ready")
         except Exception as e:
             self.logger.error(f"Error starting conversation: {e}")
             raise
@@ -284,10 +303,11 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
 
     def run(self):
         """Main agent execution loop"""
-        print("Welcome to Walbert! Type 'exit' to quit.")
-
+        print("Initializing Walbert...")
         self.start_conversation(ChannelType.CONSOLE)
         self.logger.debug(f"Started new conversation with ID {self.current_conversation_id}")
+
+        print("Welcome to Walbert! Type 'exit' to quit.")
 
         while True:
             try:
