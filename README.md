@@ -32,8 +32,8 @@ cd walbert
 ```json
 {
     "model_configs": {
-        "ministral": {
-            "model_path": "/path/to/ministral-3b.gguf",
+        "devstral": {
+            "model_path": "/path/to/devstral-24b.gguf",
             "context_size": 2048,
             "output_tokens": 512,
             "temperature": 0.7,

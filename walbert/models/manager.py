@@ -33,7 +33,7 @@ class ModelManager:
 
     def start_server(self, mmproj_path: Optional[str] = None) -> subprocess.Popen:
         """Start a llama.cpp server instance"""
-        model_config = self.config.model_configs['ministral']
+        model_config = self.config.model_configs['devstral']
         cmd = [
             self.config.llama_binary_path,
             "-m", model_config.model_path,
@@ -79,7 +79,7 @@ class ModelManager:
 
     def execute_model(self, prompt: str) -> str:
         """Execute model using existing server"""
-        model_config = self.config.model_configs['ministral']
+        model_config = self.config.model_configs['devstral']
         payload = {
             "model": "default",
             "messages": [
@@ -113,8 +113,8 @@ class ModelManager:
             logger.error(f"Error communicating with model server: {e}")
             raise RuntimeError(f"Model server error: {e}")
 
-    def execute_ministral(self, prompt: str) -> str:
-        """Execute Ministral model"""
+    def execute_devstral(self, prompt: str) -> str:
+        """Execute Devstral model"""
         return self.execute_model(prompt)
 
     def shutdown(self):

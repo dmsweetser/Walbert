@@ -57,7 +57,7 @@
 
 # **2. AI / Model Features (AI)**
 
-- **AI-001: Primary Model — Ministral-3B-Instruct-GGUF**
+- **AI-001: Primary Model — Devstral-24B-Instruct-GGUF**
   Used for all default reasoning and decision-making via llama.cpp.
 
 - **AI-002: llama.cpp Binary Execution**
