@@ -4,6 +4,7 @@ Main Walbert agent implementation
 
 import logging
 import os
+import time
 from typing import Optional
 from .config import Config, IOConfig
 from .io.factory import IOLayerFactory, ChannelType
@@ -57,6 +58,13 @@ Skills are stored as items with type='skill'. To work with skills:
 ## User Interactive Channel
 The primary user-interactive channel is: {user_interactive_channel}
 When you are ready to respond to the user, use this channel. You don't need to respond to any channel until you are ready.
+You MUST NOT respond to the user channel until all internal processing is complete.
+
+## {user_interactive_channel} Channel Specifics
+The {user_interactive_channel} channel is the primary user interface. When you respond to the {user_interactive_channel} channel:
+- Your response will be shown directly to the user
+- Use clear, concise language
+- Format your response for readability
 
 ## Available Blocks
 
@@ -75,9 +83,10 @@ YES/NO
 {channel_response_blocks}
 
 ## Channel Response Rules
-- For the console channel: Your response will be shown directly to the user
-- For other channels: Only respond if you have specific output for that channel
 - You may choose to respond to none, some, or all channels
+- You don't need to respond to any channel until you are ready
+- For the {user_interactive_channel} channel: This is where you communicate with the user
+- For other channels: Only respond if you have specific output for that channel
 - You MUST NOT respond to the user channel until all internal processing is complete
 
 Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
@@ -94,6 +103,7 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
         self.io_factory = IOLayerFactory()
         self.current_conversation_id = None
         self.user_interactive_channel = io_config.io_layers.get('user_interactive_channel', 'console')
+        self.model_ready = False
 
         os.makedirs('instance/conversations/raw', exist_ok=True)
         os.makedirs('instance/conversations/chat', exist_ok=True)
@@ -235,6 +245,12 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
             if not self.model_manager.wait_for_server():
                 raise RuntimeError("Model server failed to start")
             self.logger.info("Model server ready")
+
+            # Feed system prompt to model before user interaction
+            self.logger.info("Feeding system prompt to model...")
+            self.model_manager.execute_devstral(system_prompt)
+            self.model_ready = True
+            self.logger.info("System prompt processed")
         except Exception as e:
             self.logger.error(f"Error starting conversation: {e}")
             raise
@@ -306,6 +322,10 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
         print("Initializing Walbert...")
         self.start_conversation(ChannelType.CONSOLE)
         self.logger.debug(f"Started new conversation with ID {self.current_conversation_id}")
+
+        # Wait until model is ready before prompting user
+        while not self.model_ready:
+            time.sleep(0.1)
 
         print("Welcome to Walbert! Type 'exit' to quit.")
 
