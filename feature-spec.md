@@ -128,33 +128,7 @@
 
 Walbert must emit **all responses and internal deliberations** using the following block-based format.
 
-## **5.1 Core Response Blocks**
-```
-
-TODO - UPDATE THIS
-```
-
-## **5.2 Decision Blocks**
-```
-~walbert_should_query_datastore~
-YES/NO
-~walbert_should_query_datastore~
-
-~walbert_conversation_complete~
-YES/NO
-~walbert_conversation_complete~
-```
-
-## **5.3 Action Blocks**
-```
-~walbert_sql_execute~
-SQL_STATEMENT
-~walbert_sql_execute~
-
-~walbert_skill_execute~
-SKILL_NAME
-~walbert_skill_execute~
-```
+TODO - populate this
 
 ## **5.4 Rules**
 - All content must be enclosed between matching walbert_ start and end tags.

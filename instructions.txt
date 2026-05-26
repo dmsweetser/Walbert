@@ -9,3 +9,7 @@ You updated the SYSTEM_PROMPT and some of the parsing, but you never populate th
 ****
 
 Looking better - make any remaining fixes and update feature-spec.md.
+
+***
+
+You tried and consolidated into a single response block - NO - don't do that. I want individual blocks.
