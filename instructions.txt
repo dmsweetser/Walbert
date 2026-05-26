@@ -1,1 +1,9 @@
-Can you expand the system prompt to Walbert to explain in more detail what its capabilities are? It didn't realize it could talk to its smarter cousin, because it didn't know what that meant.
+I need you to get rid of the idea of a smarter cousin entirely.
+
+Also, have start and end tags for walbert blocks, with the contents inbetween.
+
+Order the model to only reply with content blocks and no other commentary.
+
+Revise the parser to just pull what is in those comment blocks.
+
+Also, right now, I find that the model has trouble doing autonomous / internal work. It keeps replying to the user and that interrupts things like internal DB queries. I really want those to be done first, and then ONLY AFTERWARDS, to have it reply to the user.
