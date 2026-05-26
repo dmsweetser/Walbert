@@ -1,5 +1,11 @@
-I want to only use Devstral, not Ministral. Remove the Ministral references everywhere and refactor as necessary.
+Right now, we have response and response channel.
 
-Also, clarify in the system prompt that skills should all be in Python.
+I don't really like these - the idea is that we get inputs (including user prompts) and outputs.
 
-Make it possible for the skill to install requirements before execution.
+Revise everywhere so that we have walbert_output_content_start / end and walbert_output_channel_start / end.
+
+Also, I don't like having a block for whether to execute SQL, and a block WITH the SQL. Consolidate those and just have the block with the SQL, and execute if present.
+
+The idea will be that the framework should expect multiple rounds without a response to the user.
+
+When a response is given to the user, that will return control to the user.
