@@ -170,21 +170,24 @@ class WalbertAgent:
                 self.logger.error(f"SQL execution error: {e}")
                 parsed["sql_error"] = str(e)
 
-        # Handle smarter cousin consultation
-        if parsed.get("should_consult_smarter_cousin") == "YES":
-            self.logger.debug("Consulting smarter cousin as requested")
+        # Handle skill execution
+        if parsed.get("skill_execute"):
+            self.logger.debug(f"Executing skill: {parsed['skill_execute']}")
             try:
-                conversation_context = self.build_conversation_context()
-                full_prompt = self.SYSTEM_PROMPT + "\n\n" + conversation_context
-                full_prompt += f"\n\nAssistant (internal): {response_text}"
-                full_prompt += "\n\n~walbert_input_channel_start~\nconsole"
+                skill_code = self.db.cursor.execute(
+                    "SELECT content FROM items WHERE type='skill' AND content LIKE ?",
+                    (f"%{parsed['skill_execute']}%",)
+                ).fetchone()
 
-                devstral_response = self.model_manager.execute_devstral(full_prompt)
-                self.logger.debug(f"Devstral response:\n{devstral_response}")
-                parsed["devstral_response"] = devstral_response
+                if skill_code:
+                    result = self.skill_manager.execute_skill(skill_code[0])
+                    self.logger.debug(f"Skill execution result: {result}")
+                    parsed["skill_result"] = result
+                else:
+                    parsed["skill_error"] = f"Skill not found: {parsed['skill_execute']}"
             except Exception as e:
-                self.logger.error(f"Error consulting smarter cousin: {e}")
-                parsed["devstral_error"] = str(e)
+                self.logger.error(f"Skill execution error: {e}")
+                parsed["skill_error"] = str(e)
 
         return parsed
 
@@ -332,9 +335,10 @@ class WalbertAgent:
                                 self.logger.error(f"Error writing to {response_channel} channel: {e}")
                                 print(user_response)
 
-                    # If we consulted Devstral, continue internal processing
-                    if parsed_response.get("should_consult_smarter_cousin_start") == "YES" and "devstral_response" in parsed_response:
-                        full_prompt += f"\n\nDevstral Response: {parsed_response['devstral_response']}"
+                    # Continue processing if there are pending internal actions
+                    if (parsed_response.get("should_query_datastore") == "YES" and
+                        not parsed_response.get("sql_result") and
+                        not parsed_response.get("sql_error")):
                         user_response = None
 
                     # Handle conversation completion

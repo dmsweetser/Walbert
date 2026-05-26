@@ -40,15 +40,6 @@ cd walbert
             "top_p": 0.9,
             "top_k": 40,
             "min_p": 0.05
-        },
-        "devstral": {
-            "model_path": "/path/to/devstral-24b.gguf",
-            "context_size": 4096,
-            "output_tokens": 1024,
-            "temperature": 0.8,
-            "top_p": 0.95,
-            "top_k": 50,
-            "min_p": 0.1
         }
     },
     "llama_binary_path": "/path/to/llama.cpp/bin/llama-server",

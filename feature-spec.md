@@ -133,28 +133,39 @@ Walbert must emit **all responses and internal deliberations** using the followi
 
 ## **5.1 Core Response Blocks**
 ```
-~walbert_response_start~<What it decided to say or do>
-~walbert_response_channel_start~<Where it will send the response (e.g., "console", "serial")>
-```
+~walbert_response~
+<What it decided to say or do>
+~walbert_response~
+
+~walbert_response_channel~
+<Where it will send the response (e.g., "console", "serial")>
+~walbert_response_channel~
 
 ## **5.2 Decision Blocks**
 ```
-~walbert_should_query_datastore_start~YES/NO
-~walbert_should_consult_smarter_cousin_start~YES/NO
-~walbert_conversation_complete_start~YES/NO
-```
+~walbert_should_query_datastore~
+YES/NO
+~walbert_should_query_datastore~
+
+~walbert_conversation_complete~
+YES/NO
+~walbert_conversation_complete~
 
 ## **5.3 Action Blocks**
 ```
-~walbert_sql_execute_start~SQL_STATEMENT
-~walbert_skill_execute_start~SKILL_NAME
-~walbert_consult_smarter_cousin_start~
-```
+~walbert_sql_execute~
+SQL_STATEMENT
+~walbert_sql_execute~
+
+~walbert_skill_execute~
+SKILL_NAME
+~walbert_skill_execute~
 
 ## **5.4 Rules**
-- All text must appear immediately after walbert_ blocks (no newlines).
-- Walbert may execute multiple internal rounds before replying to the user.
+- All content must be enclosed between matching walbert_ start and end tags.
+- Walbert must complete all internal processing (SQL queries, skill execution) before responding to the user.
 - Walbert must autonomously determine when a conversation is complete.
+- Walbert must emit all decision blocks before any response blocks.
 
 ---
 

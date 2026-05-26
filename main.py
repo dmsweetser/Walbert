@@ -37,15 +37,6 @@ def load_config() -> Config:
                     top_p=config_data['model_configs']['ministral']['top_p'],
                     top_k=config_data['model_configs']['ministral']['top_k'],
                     min_p=config_data['model_configs']['ministral']['min_p']
-                ),
-                'devstral': ModelConfig(
-                    model_path=config_data['model_configs']['devstral']['model_path'],
-                    context_size=config_data['model_configs']['devstral']['context_size'],
-                    output_tokens=config_data['model_configs']['devstral']['output_tokens'],
-                    temperature=config_data['model_configs']['devstral']['temperature'],
-                    top_p=config_data['model_configs']['devstral']['top_p'],
-                    top_k=config_data['model_configs']['devstral']['top_k'],
-                    min_p=config_data['model_configs']['devstral']['min_p']
                 )
             }
             return Config(
