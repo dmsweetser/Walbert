@@ -1,9 +1,5 @@
-I need you to get rid of the idea of a smarter cousin entirely.
+I want to only use Devstral, not Ministral. Remove the Ministral references everywhere and refactor as necessary.
 
-Also, have start and end tags for walbert blocks, with the contents inbetween.
+Also, clarify in the system prompt that skills should all be in Python.
 
-Order the model to only reply with content blocks and no other commentary.
-
-Revise the parser to just pull what is in those comment blocks.
-
-Also, right now, I find that the model has trouble doing autonomous / internal work. It keeps replying to the user and that interrupts things like internal DB queries. I really want those to be done first, and then ONLY AFTERWARDS, to have it reply to the user.
+Make it possible for the skill to install requirements before execution.
