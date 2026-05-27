@@ -348,52 +348,50 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                 self.logger.debug("Built prompt for model")
 
                 # Process model response
-                user_response = None
-                parsed_response = None
+                last_parsed_response = None
 
-                while not user_response:
-                    model_response = self.model_manager.execute_devstral(full_prompt)
-                    self.logger.debug(f"Model response:{chr(10)}{model_response}")
+                model_response = self.model_manager.execute_devstral(full_prompt)
+                self.logger.debug(f"Model response:{chr(10)}{model_response}")
 
-                    parsed_response = self.process_response(model_response, ChannelType.CONSOLE)
+                last_parsed_response = self.process_response(model_response, ChannelType.CONSOLE)
+                self.save_conversation_files(self.current_conversation_id)
 
-                    if parsed_response.get("response"):
-                        user_response = parsed_response["response"]
+                # Handle channel responses
+                target_channels = [
+                    name for name, config in self.io_config.io_layers.items()
+                    if config.get('enabled', False)
+                ]
+                for channel_name in target_channels:
+                    if last_parsed_response.get(f"{channel_name}_response"):
+                        try:
+                            io_layer = self.load_io_layer(ChannelType[channel_name.upper()])
+                            if io_layer.requires_authorization():
+                                if self.authorization_manager.request_authorization(channel_name, "Sending output"):
+                                    io_layer.write(last_parsed_response[f"{channel_name}_response"])
+                            else:
+                                io_layer.write(last_parsed_response[f"{channel_name}_response"])
+                        except Exception as e:
+                            self.logger.error(f"Error writing to {channel_name} channel: {e}")
+                            if channel_name == "console":
+                                print(last_parsed_response[f"{channel_name}_response"])
 
-                    full_prompt += f"{chr(10)}Assistant (internal):{chr(10)}{model_response}"
+                # Exit loop if user response exists or conversation is complete
+                has_console_response = last_parsed_response.get(f"{self.user_interactive_channel}_response") is not None
+                is_conversation_complete = last_parsed_response.get("conversation_complete") == "YES"
 
+                if has_console_response or is_conversation_complete:
+                    break
+
+                # Continue internal processing
+                full_prompt += f"{chr(10)}Assistant (internal):{chr(10)}{model_response}"
+
+                # Handle conversation completion after loop
+                if last_parsed_response and last_parsed_response.get("conversation_complete") == "YES":
+                    self.logger.debug("Conversation marked as complete")
+                    self.end_conversation()
                     self.save_conversation_files(self.current_conversation_id)
-
-                    # Handle channel responses immediately if available
-                    target_channels = [
-                        name for name, config in self.io_config.io_layers.items()
-                        if config.get('enabled', False)
-                    ]
-
-                    for channel_name in target_channels:
-                        if parsed_response.get(f"{channel_name}_response"):
-                            try:
-                                io_layer = self.load_io_layer(ChannelType[channel_name.upper()])
-                                if io_layer.requires_authorization():
-                                    if self.authorization_manager.request_authorization(
-                                        channel_name,
-                                        "Sending output"
-                                    ):
-                                        io_layer.write(parsed_response[f"{channel_name}_response"])
-                                else:
-                                    io_layer.write(parsed_response[f"{channel_name}_response"])
-                            except Exception as e:
-                                self.logger.error(f"Error writing to {channel_name} channel: {e}")
-                                if channel_name == "console":
-                                    print(parsed_response[f"{channel_name}_response"])
-
-                    # Handle conversation completion
-                    if parsed_response.get("conversation_complete") == "YES":
-                        self.logger.debug("Conversation marked as complete")
-                        self.end_conversation()
-                        self.save_conversation_files(self.current_conversation_id)
-                        self.start_conversation(ChannelType.CONSOLE)
-                        print("Conversation complete. Starting new session.")
+                    self.start_conversation(ChannelType.CONSOLE)
+                    print("Conversation complete. Starting new session.")
 
             except KeyboardInterrupt:
                 print("\nGoodbye!")
