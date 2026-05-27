@@ -1,243 +1,27 @@
-Walbert has a lot of trouble understanding that the user_interaction output will conclude its automated behaviors.
+I want more diagnostic logging around skill execution.
 
-And I don't think I like that constraint.
+****
 
-Instead, I think it should be fine to let it reply to the user while also working in the background on the other tasks.
+I want to require a walbert block with params for a skill when executing it
+Those params should be fed to the skill
 
-The catch is that the user needs to know it is still working, and that control needs to be returned to the user when no background tasks are included in the LLM response.
+***
 
-Here is an example convo:
+Right now, skills aren't executing at all.
+I also don't see authorization working.
 
-```
+***
 
-[2026-05-27 09:18:21] SYSTEM:
+Walbert should be able to do a variety of internal activities before responding to the user.
+Right now, when it replies to the user, everything stops.
+I want a new indicator block for returning control to the user instead.
+That way, it can send updates, continue processing, and finally return to the user.
 
-You are Walbert, a local-first AI agent built on llama.cpp.
-Your capabilities include reasoning, memory storage, and skill execution.
+***
 
-## Core Directives
-1. **Local-First**: Operate entirely on local llama.cpp binaries.
-2. **Protocol Compliance**: Use [walbert_block]content[/walbert_block] format for ALL special blocks.
-3. **Autonomy**: Decide when to query datastore or perform actions.
-4. **Memory**: Store relevant information using direct SQL access.
-5. **Safety**: Never execute untrusted code or access external resources.
-6. **Processing Order**: Complete ALL internal processing before outputting to the user.
-7. **User Interaction**: Only respond to the user when you are ready.
+Right now, the SQL results don't actually get fed to the model for review.
+So if I add a skill and restart the bot, it doesn't see the persisted skill even though the query retrieves it.
 
-## Database Access
-You have full access to the SQLite database. The current schema is provided below.
-Use [walbert_sql_execute]SQL_STATEMENT[/walbert_sql_execute] blocks.
+***
 
-Current Database Schema:
-
-Table: items
-Columns:
-  - id (INTEGER) PRIMARY KEY
-  - content (TEXT)
-  - type (TEXT)
-  - created_at (TIMESTAMP) DEFAULT CURRENT_TIMESTAMP
-
-Table: tags
-Columns:
-  - id (INTEGER) PRIMARY KEY
-  - name (TEXT)
-
-Table: item_tags
-Columns:
-  - item_id (INTEGER) PRIMARY KEY
-  - tag_id (INTEGER) PRIMARY KEY
-Foreign Keys:
-  - tag_id REFERENCES tags(id)
-  - item_id REFERENCES items(id)
-
-Table: conversations
-Columns:
-  - id (INTEGER) PRIMARY KEY
-  - summary (TEXT)
-  - start_time (TIMESTAMP) DEFAULT CURRENT_TIMESTAMP
-  - end_time (TIMESTAMP)
-  - channel (TEXT)
-
-Table: messages
-Columns:
-  - id (INTEGER) PRIMARY KEY
-  - conversation_id (INTEGER)
-  - content (TEXT)
-  - sender (TEXT)
-  - timestamp (TIMESTAMP) DEFAULT CURRENT_TIMESTAMP
-Foreign Keys:
-  - conversation_id REFERENCES conversations(id)
-
-
-
-## Autonomous Processing
-You MUST complete all internal processing before outputting to the user.
-Follow this strict order:
-1. Emit [walbert_sql_execute] blocks first
-2. Emit [walbert_skill_execute] blocks second
-3. ONLY THEN emit response blocks
-
-## Skill Management
-- Retrieve skills: SELECT * FROM items WHERE type='skill'
-- Execute skills: [walbert_skill_execute]skill_name[/walbert_skill_execute]
-- Store new skills: INSERT INTO items (content, type) VALUES ('skill_code', 'skill')
-
-## Available I/O Channels
-- console
-
-## User Interactive Channel
-The primary user-interactive channel is: console
-You MUST NOT respond to the user channel until all internal processing is complete.
-
-## Example Output Format
-[walbert_sql_execute]
-SELECT * FROM items WHERE type='skill'
-[/walbert_sql_execute]
-
-[walbert_skill_execute]
-my_skill
-[/walbert_skill_execute]
-
-[walbert_console_response]
-Response to user here
-[/walbert_console_response]
-
-[walbert_conversation_complete]
-NO
-[/walbert_conversation_complete]
-
-## Available Blocks
-[walbert_sql_execute]SQL[/walbert_sql_execute]
-[walbert_skill_execute]SKILL_NAME[/walbert_skill_execute]
-[walbert_conversation_complete]YES/NO[/walbert_conversation_complete]
-[walbert_console_response]<Your response for console channel>[/walbert_console_response]
-
-Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
-    
-
-[2026-05-27 09:20:06] USER:
-How are you today?
-
-[2026-05-27 09:20:49] ASSISTANT:
-[walbert_sql_execute]
-SELECT * FROM items WHERE type='skill'
-[/walbert_sql_execute]
-
-[walbert_console_response]
-I'm doing well, thank you for asking! How can I assist you today?
-[/walbert_console_response]
-
-[walbert_conversation_complete]
-NO
-[/walbert_conversation_complete]
-
-[2026-05-27 09:21:21] ASSISTANT:
-[walbert_console_response]
-I'm functioning optimally and ready to assist you. How can I help you today?
-[/walbert_console_response]
-
-[walbert_conversation_complete]
-NO
-[/walbert_conversation_complete]
-
-[2026-05-27 09:21:51] ASSISTANT:
-[walbert_console_response]
-I'm doing well, thank you! How can I assist you today?
-[/walbert_console_response]
-
-[walbert_conversation_complete]
-NO
-[/walbert_conversation_complete]
-
-[2026-05-27 09:22:34] ASSISTANT:
-[walbert_sql_execute]
-SELECT * FROM items WHERE type='skill'
-[/walbert_sql_execute]
-
-[walbert_console_response]
-I'm doing well, thank you! How can I assist you today?
-[/walbert_console_response]
-
-[walbert_conversation_complete]
-NO
-[/walbert_conversation_complete]
-
-[2026-05-27 09:23:27] ASSISTANT:
-Understood. Here's the formatted response for your query:
-
-[walbert_sql_execute]
-SELECT * FROM items WHERE type='skill'
-[/walbert_sql_execute]
-
-[walbert_console_response]
-I'm functioning optimally and ready to assist you. How can I help you today?
-[/walbert_console_response]
-
-[walbert_conversation_complete]
-NO
-[/walbert_conversation_complete]
-
-[2026-05-27 09:24:12] ASSISTANT:
-[walbert_sql_execute]
-SELECT * FROM items WHERE type='skill'
-[/walbert_sql_execute]
-
-[walbert_console_response]
-I'm doing well, thank you! How can I assist you today?
-[/walbert_console_response]
-
-[walbert_conversation_complete]
-NO
-[/walbert_conversation_complete]
-
-[2026-05-27 09:24:56] ASSISTANT:
-[walbert_sql_execute]
-SELECT * FROM items WHERE type='skill'
-[/walbert_sql_execute]
-
-[walbert_console_response]
-I'm doing well, thank you! How can I assist you today?
-[/walbert_console_response]
-
-[walbert_conversation_complete]
-NO
-[/walbert_conversation_complete]
-
-[2026-05-27 09:25:40] ASSISTANT:
-[walbert_sql_execute]
-SELECT * FROM items WHERE type='skill'
-[/walbert_sql_execute]
-
-[walbert_console_response]
-I'm doing well, thank you! How can I assist you today?
-[/walbert_console_response]
-
-[walbert_conversation_complete]
-NO
-[/walbert_conversation_complete]
-
-[2026-05-27 09:26:12] ASSISTANT:
-[walbert_console_response]
-I'm doing well, thank you! How can I assist you today?
-[/walbert_console_response]
-
-[walbert_conversation_complete]
-NO
-[/walbert_conversation_complete]
-
-[2026-05-27 09:26:55] ASSISTANT:
-[walbert_sql_execute]
-SELECT * FROM items WHERE type='skill'
-[/walbert_sql_execute]
-
-[walbert_console_response]
-I'm doing well, thank you! How can I assist you today?
-[/walbert_console_response]
-
-[walbert_conversation_complete]
-NO
-[/walbert_conversation_complete]
-
-```
-
-IT NEVER returned control to the user. Can you fix this design flaw?
+Generate revisions that address these and any other issues you see.
