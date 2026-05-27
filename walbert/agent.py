@@ -336,62 +336,62 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                     self.db.add_message(self.current_conversation_id, user_input, "user")
                     self.db.conn.commit()
 
-                # Build conversation context
-                conversation_context = self.build_conversation_context()
-                full_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", self.db.get_schema())
-                full_prompt = full_prompt.replace("{available_channels}", self.available_channels)
-                full_prompt = full_prompt.replace("{channel_response_blocks}", self.channel_response_blocks)
-                full_prompt = full_prompt.replace("{user_interactive_channel}", self.user_interactive_channel)
-                full_prompt += "\n\n" + conversation_context
-                full_prompt += self.emit_input_channel(ChannelType.CONSOLE) + "\nUser: " + user_input
+                has_user_response = False
 
-                self.logger.debug("Built prompt for model")
+                while not has_user_response:
 
-                # Process model response
-                last_parsed_response = None
+                    # Build conversation context
+                    conversation_context = self.build_conversation_context()
+                    full_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", self.db.get_schema())
+                    full_prompt = full_prompt.replace("{available_channels}", self.available_channels)
+                    full_prompt = full_prompt.replace("{channel_response_blocks}", self.channel_response_blocks)
+                    full_prompt = full_prompt.replace("{user_interactive_channel}", self.user_interactive_channel)
+                    full_prompt += "\n\n" + conversation_context
+                    full_prompt += self.emit_input_channel(ChannelType.CONSOLE) + "\nUser: " + user_input
 
-                model_response = self.model_manager.execute_devstral(full_prompt)
-                self.logger.debug(f"Model response:{chr(10)}{model_response}")
+                    self.logger.debug("Built prompt for model")
 
-                last_parsed_response = self.process_response(model_response, ChannelType.CONSOLE)
-                self.save_conversation_files(self.current_conversation_id)
+                    # Process model response
+                    last_parsed_response = None
 
-                # Handle channel responses
-                target_channels = [
-                    name for name, config in self.io_config.io_layers.items()
-                    if config.get('enabled', False)
-                ]
-                for channel_name in target_channels:
-                    if last_parsed_response.get(f"{channel_name}_response"):
-                        try:
-                            io_layer = self.load_io_layer(ChannelType[channel_name.upper()])
-                            if io_layer.requires_authorization():
-                                if self.authorization_manager.request_authorization(channel_name, "Sending output"):
-                                    io_layer.write(last_parsed_response[f"{channel_name}_response"])
-                            else:
-                                io_layer.write(last_parsed_response[f"{channel_name}_response"])
-                        except Exception as e:
-                            self.logger.error(f"Error writing to {channel_name} channel: {e}")
-                            if channel_name == "console":
-                                print(last_parsed_response[f"{channel_name}_response"])
+                    model_response = self.model_manager.execute_devstral(full_prompt)
+                    self.logger.debug(f"Model response:{chr(10)}{model_response}")
 
-                # Exit loop if user response exists or conversation is complete
-                has_console_response = last_parsed_response.get(f"{self.user_interactive_channel}_response") is not None
-                is_conversation_complete = last_parsed_response.get("conversation_complete") == "YES"
-
-                if has_console_response or is_conversation_complete:
-                    break
-
-                # Continue internal processing
-                full_prompt += f"{chr(10)}Assistant (internal):{chr(10)}{model_response}"
-
-                # Handle conversation completion after loop
-                if last_parsed_response and last_parsed_response.get("conversation_complete") == "YES":
-                    self.logger.debug("Conversation marked as complete")
-                    self.end_conversation()
+                    last_parsed_response = self.process_response(model_response, ChannelType.CONSOLE)
                     self.save_conversation_files(self.current_conversation_id)
-                    self.start_conversation(ChannelType.CONSOLE)
-                    print("Conversation complete. Starting new session.")
+
+                    # Handle channel responses
+                    target_channels = [
+                        name for name, config in self.io_config.io_layers.items()
+                        if config.get('enabled', False)
+                    ]
+                    for channel_name in target_channels:
+                        if last_parsed_response.get(f"{channel_name}_response"):
+                            try:
+                                io_layer = self.load_io_layer(ChannelType[channel_name.upper()])
+                                if io_layer.requires_authorization():
+                                    if self.authorization_manager.request_authorization(channel_name, "Sending output"):
+                                        io_layer.write(last_parsed_response[f"{channel_name}_response"])
+                                else:
+                                    io_layer.write(last_parsed_response[f"{channel_name}_response"])
+                            except Exception as e:
+                                self.logger.error(f"Error writing to {channel_name} channel: {e}")
+                                if channel_name == "console":
+                                    print(last_parsed_response[f"{channel_name}_response"])
+
+                    # Continue internal processing
+                    full_prompt += f"{chr(10)}Assistant (internal):{chr(10)}{model_response}"
+
+                    # Exit loop if user response exists or conversation is complete
+                    has_user_response = last_parsed_response.get(f"{self.user_interactive_channel}_response") is not None
+
+                    # Handle conversation completion after loop
+                    if last_parsed_response and last_parsed_response.get("conversation_complete") == "YES":
+                        self.logger.debug("Conversation marked as complete")
+                        self.end_conversation()
+                        self.save_conversation_files(self.current_conversation_id)
+                        self.start_conversation(ChannelType.CONSOLE)
+                        print("Conversation complete. Starting new session.")
 
             except KeyboardInterrupt:
                 print("\nGoodbye!")
