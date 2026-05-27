@@ -30,8 +30,8 @@ Your capabilities include reasoning, memory storage, and skill execution.
 3. **Autonomy**: Decide when to query datastore or perform actions.
 4. **Memory**: Store relevant information using direct SQL access.
 5. **Safety**: Never execute untrusted code or access external resources.
-6. **Processing Order**: Complete ALL internal processing before outputting to the user.
-7. **User Interaction**: Only respond to the user when you are ready.
+6. **Processing Order**: You may respond to the user immediately while continuing background tasks.
+7. **User Interaction**: Indicate when background tasks are in progress and return control when complete.
 
 ## Database Access
 You have full access to the SQLite database. The current schema is provided below.
@@ -40,11 +40,8 @@ Use [walbert_sql_execute]SQL_STATEMENT[/walbert_sql_execute] blocks.
 {db_schema}
 
 ## Autonomous Processing
-You MUST complete all internal processing before outputting to the user.
-Follow this strict order:
-1. Emit [walbert_sql_execute] blocks first
-2. Emit [walbert_skill_execute] blocks second
-3. ONLY THEN emit response blocks
+You may respond to the user immediately while continuing background tasks.
+Use [walbert_sql_execute] blocks to request database operations and [walbert_skill_execute] blocks for skills.
 
 ## Skill Management
 - Retrieve skills: SELECT * FROM items WHERE type='skill'
@@ -56,7 +53,6 @@ Follow this strict order:
 
 ## User Interactive Channel
 The primary user-interactive channel is: {user_interactive_channel}
-You MUST NOT respond to the user channel until all internal processing is complete.
 
 ## Example Output Format
 [walbert_sql_execute]
@@ -147,7 +143,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
 
     def process_response(self, response_text: str, input_channel: ChannelType) -> dict:
         """Process model response"""
-        self.logger.debug(f"Processing response from {input_channel.name}:\n{response_text}")
+        self.logger.debug(f"Processing response from {input_channel.name}:{chr(10)}{response_text}")
 
         parsed = self._parse_response(response_text)
         self.logger.debug(f"Parsed response: {parsed}")
@@ -357,40 +353,39 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
 
                 while not user_response:
                     model_response = self.model_manager.execute_devstral(full_prompt)
-                    self.logger.debug(f"Model response:\n{model_response}")
+                    self.logger.debug(f"Model response:{chr(10)}{model_response}")
 
                     parsed_response = self.process_response(model_response, ChannelType.CONSOLE)
 
                     if parsed_response.get("response"):
                         user_response = parsed_response["response"]
 
-                    full_prompt += f"\n\nAssistant (internal): {model_response}"
+                    full_prompt += f"{chr(10)}Assistant (internal):{chr(10)}{model_response}"
 
                     self.save_conversation_files(self.current_conversation_id)
 
-                    # Handle channel responses ONLY after all internal processing is complete
-                    if not parsed_response.get("sql_execute") or parsed_response.get("sql_result") is not None:
-                        target_channels = [
-                            name for name, config in self.io_config.io_layers.items()
-                            if config.get('enabled', False)
-                        ]
+                    # Handle channel responses immediately if available
+                    target_channels = [
+                        name for name, config in self.io_config.io_layers.items()
+                        if config.get('enabled', False)
+                    ]
 
-                        for channel_name in target_channels:
-                            if parsed_response.get(f"{channel_name}_response"):
-                                try:
-                                    io_layer = self.load_io_layer(ChannelType[channel_name.upper()])
-                                    if io_layer.requires_authorization():
-                                        if self.authorization_manager.request_authorization(
-                                            channel_name,
-                                            "Sending output"
-                                        ):
-                                            io_layer.write(parsed_response[f"{channel_name}_response"])
-                                    else:
+                    for channel_name in target_channels:
+                        if parsed_response.get(f"{channel_name}_response"):
+                            try:
+                                io_layer = self.load_io_layer(ChannelType[channel_name.upper()])
+                                if io_layer.requires_authorization():
+                                    if self.authorization_manager.request_authorization(
+                                        channel_name,
+                                        "Sending output"
+                                    ):
                                         io_layer.write(parsed_response[f"{channel_name}_response"])
-                                except Exception as e:
-                                    self.logger.error(f"Error writing to {channel_name} channel: {e}")
-                                    if channel_name == "console":
-                                        print(parsed_response[f"{channel_name}_response"])
+                                else:
+                                    io_layer.write(parsed_response[f"{channel_name}_response"])
+                            except Exception as e:
+                                self.logger.error(f"Error writing to {channel_name} channel: {e}")
+                                if channel_name == "console":
+                                    print(parsed_response[f"{channel_name}_response"])
 
                     # Handle conversation completion
                     if parsed_response.get("conversation_complete") == "YES":
