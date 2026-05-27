@@ -4,6 +4,7 @@ Main Walbert agent implementation
 
 import logging
 import os
+import re
 import time
 from typing import Optional
 from .config import Config, IOConfig
@@ -12,44 +13,42 @@ from .io.base import IOLayer
 from .models.manager import ModelManager
 from .database.manager import DatabaseManager
 from .skills.manager import SkillManager
-from .response.parser import ResponseParser
 from .authorization.manager import AuthorizationManager
 
 logger = logging.getLogger('walbert')
 
 class WalbertAgent:
     """Main Walbert agent class"""
-    
+
     SYSTEM_PROMPT = """
 You are Walbert, a local-first AI agent built on llama.cpp.
 Your capabilities include reasoning, memory storage, and skill execution.
 
 ## Core Directives
 1. **Local-First**: Operate entirely on local llama.cpp binaries.
-2. **Protocol Compliance**: Use walbert_ blocks with matching start/end tags for all decisions and actions.
+2. **Protocol Compliance**: Use [walbert_block]content[/walbert_block] format for ALL special blocks.
 3. **Autonomy**: Decide when to query datastore or perform actions.
 4. **Memory**: Store relevant information using direct SQL access.
 5. **Safety**: Never execute untrusted code or access external resources.
 6. **Processing Order**: Complete ALL internal processing before outputting to the user.
-7. **User Interaction**: Only respond to the user when you are ready. You don't need to respond to any channel until you have completed all internal processing.
+7. **User Interaction**: Only respond to the user when you are ready.
 
 ## Database Access
 You have full access to the SQLite database. The current schema is provided below.
-You can execute any SQLite-compatible SQL statement using the ~walbert_sql_execute~ block.
+Use [walbert_sql_execute]SQL_STATEMENT[/walbert_sql_execute] blocks.
 
 {db_schema}
 
 ## Autonomous Processing
-You MUST complete all internal processing (SQL queries, skill execution) before outputting to the user.
-Follow this strict processing order:
-1. Emit any ~walbert_sql_execute~ blocks (will be executed automatically)
-2. Emit any ~walbert_skill_execute~ blocks (will be executed automatically)
-3. ONLY IF NECESSARY: Emit response blocks for enabled I/O channels
+You MUST complete all internal processing before outputting to the user.
+Follow this strict order:
+1. Emit [walbert_sql_execute] blocks first
+2. Emit [walbert_skill_execute] blocks second
+3. ONLY THEN emit response blocks
 
 ## Skill Management
-Skills are stored as items with type='skill'. To work with skills:
 - Retrieve skills: SELECT * FROM items WHERE type='skill'
-- Execute skills: Use ~walbert_skill_execute~ block with skill name
+- Execute skills: [walbert_skill_execute]skill_name[/walbert_skill_execute]
 - Store new skills: INSERT INTO items (content, type) VALUES ('skill_code', 'skill')
 
 ## Available I/O Channels
@@ -57,39 +56,32 @@ Skills are stored as items with type='skill'. To work with skills:
 
 ## User Interactive Channel
 The primary user-interactive channel is: {user_interactive_channel}
-When you are ready to respond to the user, use this channel. You don't need to respond to any channel until you are ready.
 You MUST NOT respond to the user channel until all internal processing is complete.
 
-## {user_interactive_channel} Channel Specifics
-The {user_interactive_channel} channel is the primary user interface. When you respond to the {user_interactive_channel} channel:
-- Your response will be shown directly to the user
-- Use clear, concise language
-- Format your response for readability
+## Example Output Format
+[walbert_sql_execute]
+SELECT * FROM items WHERE type='skill'
+[/walbert_sql_execute]
+
+[walbert_skill_execute]
+my_skill
+[/walbert_skill_execute]
+
+[walbert_{user_interactive_channel}_response]
+Response to user here
+[/walbert_{user_interactive_channel}_response]
+
+[walbert_conversation_complete]
+NO
+[/walbert_conversation_complete]
 
 ## Available Blocks
-
-~walbert_sql_execute~
-SQL_STATEMENT
-~walbert_sql_execute~
-
-~walbert_skill_execute~
-SKILL_NAME
-~walbert_skill_execute~
-
-~walbert_conversation_complete~
-YES/NO
-~walbert_conversation_complete~
-
+[walbert_sql_execute]SQL[/walbert_sql_execute]
+[walbert_skill_execute]SKILL_NAME[/walbert_skill_execute]
+[walbert_conversation_complete]YES/NO[/walbert_conversation_complete]
 {channel_response_blocks}
 
-## Channel Response Rules
-- You may choose to respond to none, some, or all channels
-- You don't need to respond to any channel until you are ready
-- For the {user_interactive_channel} channel: This is where you communicate with the user
-- For other channels: Only respond if you have specific output for that channel
-- You MUST NOT respond to the user channel until all internal processing is complete
-
-Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
+Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
     """
 
     def __init__(self, config: Config, io_config: IOConfig):
@@ -98,7 +90,6 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
         self.model_manager = ModelManager(config)
         self.db = DatabaseManager()
         self.skill_manager = SkillManager(self.db)
-        self.response_parser = ResponseParser()
         self.authorization_manager = AuthorizationManager()
         self.io_factory = IOLayerFactory()
         self.current_conversation_id = None
@@ -156,10 +147,10 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
             return ""
 
     def process_response(self, response_text: str, input_channel: ChannelType) -> dict:
-        """Process model response and execute actions"""
+        """Process model response"""
         self.logger.debug(f"Processing response from {input_channel.name}:\n{response_text}")
 
-        parsed = self.response_parser.parse_response(response_text)
+        parsed = self._parse_response(response_text)
         self.logger.debug(f"Parsed response: {parsed}")
 
         if self.current_conversation_id:
@@ -202,11 +193,32 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
 
         return parsed
 
-    
+    def _parse_response(self, content: str) -> dict:
+        """Parse response"""
+        result = {}
+
+        # Try new [tag] format first
+        for block_type in ['sql_execute', 'skill_execute', 'conversation_complete']:
+            pattern = fr'\[walbert_{block_type}\](.*?)\[/walbert_{block_type}\]'
+            match = re.search(pattern, content, re.DOTALL)
+            if match:
+                result[block_type] = match.group(1).strip()
+
+        # Extract responses for all channels
+        for channel_name in self.io_config.io_layers:
+            if self.io_config.io_layers[channel_name].get('enabled', False):
+                # Try new format
+                pattern = fr'\[walbert_{channel_name}_response\](.*?)\[/walbert_{channel_name}_response\]'
+                match = re.search(pattern, content, re.DOTALL)
+                if match:
+                    result[f"{channel_name}_response"] = match.group(1).strip()
+                    continue
+
+        return result
 
     def emit_input_channel(self, channel: ChannelType) -> str:
         """Emit the input channel block for context"""
-        return f"~walbert_input_channel_start~\n{channel.value}\n~walbert_input_channel_end~"
+        return f"[walbert_input_channel]{channel.value}[/walbert_input_channel]"
 
     def _get_available_channels(self) -> str:
         """Get list of available I/O channels"""
@@ -221,11 +233,7 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
         examples = []
         for channel_name in self.io_config.io_layers:
             if self.io_config.io_layers[channel_name].get('enabled', False):
-                examples.append(f"""
-~walbert_{channel_name}_response~
-<Your response for {channel_name} channel>
-~walbert_{channel_name}_response~
-""")
+                examples.append(f"[walbert_{channel_name}_response]<Your response for {channel_name} channel>[/walbert_{channel_name}_response]")
         return "\n".join(examples)
 
     def start_conversation(self, channel: ChannelType):
@@ -299,23 +307,12 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
             SELECT start_time FROM conversations WHERE id = ?
         """, (conversation_id,)).fetchone()[0].replace(" ", "_").replace(":", "-")
         raw_filename = f"instance/conversations/raw/conversation_{conversation_id}_{timestamp}.txt"
-        chat_filename = f"instance/conversations/chat/conversation_{conversation_id}_{timestamp}.txt"
 
         with open(raw_filename, 'w') as f:
             for sender, content, ts in messages:
                 f.write(f"[{ts}] {sender.upper()}:\n{content}\n\n")
 
-        with open(chat_filename, 'w') as f:
-            for sender, content, ts in messages:
-                if sender == "system":
-                    continue
-                parsed = self.response_parser.parse_response(content)
-                if sender == "user":
-                    f.write(f"User: {content}\n\n")
-                elif parsed.get("response"):
-                    f.write(f"Assistant: {parsed['response']}\n\n")
-
-        self.logger.debug(f"Saved conversation {conversation_id} to {raw_filename} and {chat_filename}")
+        self.logger.debug(f"Saved conversation {conversation_id} to {raw_filename}")
 
     def run(self):
         """Main agent execution loop"""
@@ -344,7 +341,11 @@ Reply ONLY in the specified format with no commentary. THAT'S AN ORDER, SOLDIER!
 
                 # Build conversation context
                 conversation_context = self.build_conversation_context()
-                full_prompt = self.SYSTEM_PROMPT + "\n\n" + conversation_context
+                full_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", self.db.get_schema())
+                full_prompt = full_prompt.replace("{available_channels}", self.available_channels)
+                full_prompt = full_prompt.replace("{channel_response_blocks}", self.channel_response_blocks)
+                full_prompt = full_prompt.replace("{user_interactive_channel}", self.user_interactive_channel)
+                full_prompt += "\n\n" + conversation_context
                 full_prompt += self.emit_input_channel(ChannelType.CONSOLE) + "\nUser: " + user_input
 
                 self.logger.debug("Built prompt for model")

@@ -130,32 +130,32 @@ Walbert must emit **all responses and internal deliberations** using the followi
 
 ### **5.1 Core Blocks**
 ```
-~walbert_sql_execute~
+[walbert_sql_execute]
 SQL_STATEMENT
-~walbert_sql_execute~
+[/walbert_sql_execute]
 
-~walbert_skill_execute~
+[walbert_skill_execute]
 SKILL_NAME
-~walbert_skill_execute~
+[/walbert_skill_execute]
 
-~walbert_conversation_complete~
+[walbert_conversation_complete]
 YES/NO
-~walbert_conversation_complete~
+[/walbert_conversation_complete]
 ```
 
 ### **5.2 I/O Channel Blocks**
 For each enabled I/O channel (console, serial, etc.):
 ```
-~walbert_%channel%_response~
+[walbert_%channel%_response]
 RESPONSE_CONTENT
-~walbert_%channel%_response~
+[/walbert_%channel%_response]
 ```
 
 ### **5.3 Input Context Block**
 ```
-~walbert_input_channel~
+[walbert_input_channel]
 CHANNEL_NAME
-~walbert_input_channel~
+[/walbert_input_channel]
 ```
 
 ## **5.4 Rules**
