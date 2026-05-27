@@ -96,8 +96,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.user_interactive_channel = io_config.io_layers.get('user_interactive_channel', 'console')
         self.model_ready = False
 
-        os.makedirs('instance/conversations/raw', exist_ok=True)
-        os.makedirs('instance/conversations/chat', exist_ok=True)
+        os.makedirs('instance/conversations', exist_ok=True)
 
         if 'console' not in self.io_config.io_layers:
             self.io_config.io_layers['console'] = {
@@ -295,7 +294,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             return ""
 
     def save_conversation_files(self, conversation_id: int):
-        """Save conversation to raw and chat files"""
+        """Save conversation to raw files"""
         if not conversation_id:
             return
 
@@ -308,7 +307,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         timestamp = self.db.cursor.execute("""
             SELECT start_time FROM conversations WHERE id = ?
         """, (conversation_id,)).fetchone()[0].replace(" ", "_").replace(":", "-")
-        raw_filename = f"instance/conversations/raw/conversation_{conversation_id}_{timestamp}.txt"
+        raw_filename = f"instance/conversations/conversation_{conversation_id}_{timestamp}.txt"
 
         with open(raw_filename, 'w') as f:
             for sender, content, ts in messages:
