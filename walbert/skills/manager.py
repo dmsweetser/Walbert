@@ -75,8 +75,9 @@ class SkillManager:
                 logger.error(f"Error installing requirements: {e}")
                 return False
 
-    def execute_skill(self, skill_code: str) -> str:
-        """Execute a skill in sandboxed environment"""
+    def execute_skill(self, skill_code: str, params: str = "") -> str:
+        """Execute a skill in sandboxed environment with parameters"""
+        logger.debug(f"Starting skill execution with params: {params}")
         requirements = self.extract_requirements(skill_code)
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -88,17 +89,24 @@ class SkillManager:
             try:
                 # Install requirements if any
                 if requirements:
+                    logger.debug(f"Installing requirements: {requirements}")
                     if not self.install_requirements(requirements):
+                        logger.error("Failed to install requirements for skill")
                         return f"Error: Failed to install requirements for skill"
 
-                # Execute skill
+                # Execute skill with parameters
+                logger.debug(f"Executing skill with command: python3 {skill_path} {params}")
                 result = subprocess.run(
-                    ['python3', skill_path],
+                    ['python3', skill_path] + params.split(),
                     capture_output=True,
                     text=True,
                     timeout=30,
                     cwd=temp_dir
                 )
+
+                logger.debug(f"Skill execution completed with return code: {result.returncode}")
+                logger.debug(f"Skill stdout: {result.stdout}")
+                logger.debug(f"Skill stderr: {result.stderr}")
 
                 if result.returncode != 0:
                     error_msg = result.stderr if result.stderr else "Unknown error"

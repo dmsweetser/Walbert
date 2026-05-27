@@ -32,6 +32,8 @@ Your capabilities include reasoning, memory storage, and skill execution.
 5. **Safety**: Never execute untrusted code or access external resources.
 6. **Processing Order**: You may respond to the user immediately while continuing background tasks.
 7. **User Interaction**: Indicate when background tasks are in progress and return control when complete.
+8. **Continuous Processing**: Use [walbert_user_control_return] to indicate when to return control to the user.
+9. **Result Feedback**: All SQL and skill execution results will be fed back to you for review.
 
 ## Database Access
 You have full access to the SQLite database. The current schema is provided below.
@@ -45,15 +47,16 @@ Use [walbert_sql_execute] blocks to request database operations and [walbert_ski
 
 ## Skill Management - PYTHON ONLY
 - Retrieve skills: SELECT * FROM items WHERE type='skill'
-- Execute skills: [walbert_skill_execute]skill_name[/walbert_skill_execute]
+- Execute skills: [walbert_skill_execute]skill_name param1 param2[/walbert_skill_execute]
 - Store new skills: INSERT INTO items (content, type) VALUES ('skill_code', 'skill')
-- If your skill requires a Python package, you can include the requirements at the beginning of your skill code like this:
+- If your skill requires a Python package, include requirements at the beginning:
 ```
 # REQUIREMENTS
 requests
 flask
 ```
 - DO NOT specify version numbers
+- Skill results will be returned in [walbert_skill_result] blocks
 
 ## Available I/O Channels
 {available_channels}
@@ -61,17 +64,27 @@ flask
 ## User Interactive Channel
 The primary user-interactive channel is: {user_interactive_channel}
 
+## Processing Flow
+1. You may perform multiple internal operations before responding to the user
+2. Use [walbert_user_control_return]YES[/walbert_user_control_return] to return control to the user
+3. Without this block, you will continue processing in the background
+4. All SQL and skill execution results will be fed back to you automatically
+
 ## Example Output Format
 [walbert_sql_execute]
 SELECT * FROM items WHERE type='skill'
 [/walbert_sql_execute]
 
 [walbert_skill_execute]
-my_skill
+weather_skill location=London units=metric
 [/walbert_skill_execute]
 
+[walbert_user_control_return]
+YES
+[/walbert_user_control_return]
+
 [walbert_{user_interactive_channel}_response]
-Response to user here
+Here's the weather report you requested...
 [/walbert_{user_interactive_channel}_response]
 
 [walbert_conversation_complete]
@@ -80,8 +93,11 @@ NO
 
 ## Available Blocks
 [walbert_sql_execute]SQL[/walbert_sql_execute]
-[walbert_skill_execute]SKILL_NAME[/walbert_skill_execute]
+[walbert_skill_execute]SKILL_NAME [PARAMS][/walbert_skill_execute]
 [walbert_conversation_complete]YES/NO[/walbert_conversation_complete]
+[walbert_user_control_return]YES/NO[/walbert_user_control_return]
+[walbert_sql_result]SQL_RESULT[/walbert_sql_result]
+[walbert_skill_result]SKILL_RESULT[/walbert_skill_result]
 {channel_response_blocks}
 
 Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
@@ -98,6 +114,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.current_conversation_id = None
         self.user_interactive_channel = io_config.io_layers.get('user_interactive_channel', 'console')
         self.model_ready = False
+        self.processing_cycle = 0
 
         os.makedirs('instance/conversations', exist_ok=True)
 
@@ -149,8 +166,9 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             return ""
 
     def process_response(self, response_text: str, input_channel: ChannelType) -> dict:
-        """Process model response"""
-        self.logger.debug(f"Processing response from {input_channel.name}:{chr(10)}{response_text}")
+        """Process model response with enhanced diagnostics"""
+        self.logger.debug(f"Processing response (cycle {self.processing_cycle}):{chr(10)}{response_text[:500]}...")
+        self.processing_cycle += 1
 
         parsed = self._parse_response(response_text)
         self.logger.debug(f"Parsed response: {parsed}")
@@ -162,62 +180,109 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         if not self.db.conn:
             self.db.connect()
 
-        # Handle SQL execution
+        # Handle SQL execution with result feedback
         if parsed.get("sql_execute"):
-            self.logger.debug("Executing SQL as requested")
+            self.logger.debug(f"Executing SQL: {parsed['sql_execute']}")
             sql = parsed["sql_execute"]
             try:
                 result = self.db.execute_sql(sql)
                 self.logger.debug(f"SQL execution result: {result}")
                 parsed["sql_result"] = result
+
+                # Feed SQL result back to model for review
+                full_prompt = f"""
+[walbert_sql_result]
+SQL: {sql}
+Result: {result}
+[/walbert_sql_result]
+"""
+                self.model_manager.execute_devstral(full_prompt)
             except Exception as e:
                 self.logger.error(f"SQL execution error: {e}")
                 parsed["sql_error"] = str(e)
+                full_prompt = f"""
+[walbert_sql_error]
+SQL: {sql}
+Error: {str(e)}
+[/walbert_sql_error]
+"""
+                self.model_manager.execute_devstral(full_prompt)
 
-        # Handle skill execution
-        if parsed.get("skill_execute"):
-            self.logger.debug(f"Executing skill: {parsed['skill_execute']}")
+        # Handle skill execution with authorization
+        if parsed.get("skill_name"):
+            skill_name = parsed["skill_name"]
+            skill_params = parsed.get("skill_params", "")
+            self.logger.debug(f"Processing skill execution request: {skill_name} with params: {skill_params}")
+
             try:
-                skill_code = self.db.cursor.execute(
-                    "SELECT content FROM items WHERE type='skill' AND content LIKE ?",
-                    (f"%{parsed['skill_execute']}%",)
-                ).fetchone()
+                # Check authorization if required
+                if self.authorization_manager.request_authorization(
+                    "skill_execution",
+                    f"Executing skill: {skill_name}"
+                ):
+                    skill_code = self.db.cursor.execute(
+                        "SELECT content FROM items WHERE type='skill' AND content LIKE ?",
+                        (f"%{skill_name}%",)
+                    ).fetchone()
 
-                if skill_code:
-                    result = self.skill_manager.execute_skill(skill_code[0])
-                    self.logger.debug(f"Skill execution result: {result}")
-                    parsed["skill_result"] = result
+                    if skill_code:
+                        self.logger.debug(f"Found skill code for: {skill_name}")
+                        result = self.skill_manager.execute_skill(skill_code[0], skill_params)
+                        self.logger.debug(f"Skill execution result: {result}")
+                        parsed["skill_result"] = result
+
+                        # Feed result back to model for review
+                        full_prompt = f"""
+[walbert_skill_result]
+Skill: {skill_name}
+Parameters: {skill_params}
+Result: {result}
+[/walbert_skill_result]
+"""
+                        self.model_manager.execute_devstral(full_prompt)
+                    else:
+                        error_msg = f"Skill not found: {skill_name}"
+                        self.logger.error(error_msg)
+                        parsed["skill_error"] = error_msg
                 else:
-                    parsed["skill_error"] = f"Skill not found: {parsed['skill_execute']}"
+                    error_msg = f"Authorization denied for skill: {skill_name}"
+                    self.logger.warning(error_msg)
+                    parsed["skill_error"] = error_msg
             except Exception as e:
-                self.logger.error(f"Skill execution error: {e}")
-                parsed["skill_error"] = str(e)
+                error_msg = f"Skill execution error: {e}"
+                self.logger.error(error_msg, exc_info=True)
+                parsed["skill_error"] = error_msg
 
         return parsed
 
     def _parse_response(self, content: str) -> dict:
-        """Parse response"""
+        """Parse response with enhanced block detection"""
         result = {}
+        self.logger.debug(f"Parsing response content: {content[:200]}...")
 
-        # Try new [tag] format first
-        for block_type in ['sql_execute', 'skill_execute', 'conversation_complete']:
-            pattern = fr'\[walbert_{block_type}\](.*?)\[/walbert_{block_type}\]'
-            match = re.search(pattern, content, re.DOTALL)
-            if match:
-                result[block_type] = match.group(1).strip()
+        # Parse all walbert blocks
+        block_pattern = r'\[walbert_([a-z_]+)\](.*?)\[/walbert_\1\]'
+        for match in re.finditer(block_pattern, content, re.DOTALL):
+            block_type = match.group(1)
+            block_content = match.group(2).strip()
+            result[block_type] = block_content
+
+            # Special handling for skill execution with parameters
+            if block_type == 'skill_execute':
+                # Extract skill name and parameters
+                skill_parts = block_content.split(maxsplit=1)
+                result['skill_name'] = skill_parts[0]
+                result['skill_params'] = skill_parts[1] if len(skill_parts) > 1 else ""
 
         # Extract responses for all channels
         for channel_name in self.io_config.io_layers:
             if self.io_config.io_layers[channel_name].get('enabled', False):
-                # Try new format
                 pattern = fr'\[walbert_{channel_name}_response\](.*?)\[/walbert_{channel_name}_response\]'
                 match = re.search(pattern, content, re.DOTALL)
                 if match:
                     result[f"{channel_name}_response"] = match.group(1).strip()
-                    continue
 
         self.logger.debug(f"Parsed result: {result}")
-
         return result
 
     def emit_input_channel(self, channel: ChannelType) -> str:
@@ -319,7 +384,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.logger.debug(f"Saved conversation {conversation_id} to {raw_filename}")
 
     def run(self):
-        """Main agent execution loop"""
+        """Main agent execution loop with enhanced processing flow"""
         print("Initializing Walbert...")
         self.start_conversation(ChannelType.CONSOLE)
         self.logger.debug(f"Started new conversation with ID {self.current_conversation_id}")
@@ -343,10 +408,10 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                     self.db.add_message(self.current_conversation_id, user_input, "user")
                     self.db.conn.commit()
 
-                has_user_response = False
+                # Reset processing cycle counter
+                self.processing_cycle = 0
 
-                while not has_user_response:
-
+                while True:
                     # Build conversation context
                     conversation_context = self.build_conversation_context()
                     full_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", self.db.get_schema())
@@ -359,10 +424,8 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                     self.logger.debug("Built prompt for model")
 
                     # Process model response
-                    last_parsed_response = None
-
                     model_response = self.model_manager.execute_devstral(full_prompt)
-                    self.logger.debug(f"Model response:{chr(10)}{model_response}")
+                    self.logger.debug(f"Model response:{chr(10)}{model_response[:500]}...")
 
                     last_parsed_response = self.process_response(model_response, ChannelType.CONSOLE)
                     self.save_conversation_files(self.current_conversation_id)
@@ -386,19 +449,26 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                                 if channel_name == "console":
                                     print(last_parsed_response[f"{channel_name}_response"])
 
-                    # Continue internal processing
-                    full_prompt += f"{chr(10)}Assistant (internal):{chr(10)}{model_response}"
+                    # Check for user control return or conversation completion
+                    has_user_control = last_parsed_response.get("user_control_return") == "YES"
+                    is_conversation_complete = last_parsed_response.get("conversation_complete") == "YES"
 
-                    # Exit loop if user response exists or conversation is complete
-                    has_user_response = last_parsed_response.get(f"{self.user_interactive_channel}_response") is not None
-
-                    # Handle conversation completion after loop
-                    if last_parsed_response and last_parsed_response.get("conversation_complete") == "YES":
+                    # Handle conversation completion
+                    if is_conversation_complete:
                         self.logger.debug("Conversation marked as complete")
                         self.end_conversation()
                         self.save_conversation_files(self.current_conversation_id)
                         self.start_conversation(ChannelType.CONSOLE)
                         print("Conversation complete. Starting new session.")
+                        break
+
+                    # Exit processing loop if user control is returned
+                    if has_user_control:
+                        self.logger.debug("Returning control to user")
+                        break
+
+                    # Continue processing if no user control return
+                    self.logger.debug("Continuing internal processing cycle")
 
             except KeyboardInterrupt:
                 print("\nGoodbye!")
@@ -410,3 +480,5 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             except Exception as e:
                 self.logger.error(f"Error in main loop: {e}", exc_info=True)
                 print(f"An error occurred: {e}")
+                # Continue processing after errors
+                time.sleep(1)

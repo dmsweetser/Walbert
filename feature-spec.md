@@ -135,12 +135,26 @@ SQL_STATEMENT
 [/walbert_sql_execute]
 
 [walbert_skill_execute]
-SKILL_NAME
+SKILL_NAME [PARAM1 PARAM2 ...]
 [/walbert_skill_execute]
 
 [walbert_conversation_complete]
 YES/NO
 [/walbert_conversation_complete]
+
+[walbert_user_control_return]
+YES/NO
+[/walbert_user_control_return]
+
+[walbert_sql_result]
+SQL_RESULT_CONTENT
+[/walbert_sql_result]
+
+[walbert_skill_result]
+SKILL_NAME
+PARAMETERS
+RESULT_CONTENT
+[/walbert_skill_result]
 ```
 
 ### **5.2 I/O Channel Blocks**
