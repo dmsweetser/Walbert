@@ -214,6 +214,8 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                     result[f"{channel_name}_response"] = match.group(1).strip()
                     continue
 
+        self.logger.debug(f"Parsed result: {result}")
+
         return result
 
     def emit_input_channel(self, channel: ChannelType) -> str:
