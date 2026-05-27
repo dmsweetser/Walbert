@@ -43,10 +43,17 @@ Use [walbert_sql_execute]SQL_STATEMENT[/walbert_sql_execute] blocks.
 You may respond to the user immediately while continuing background tasks.
 Use [walbert_sql_execute] blocks to request database operations and [walbert_skill_execute] blocks for skills.
 
-## Skill Management
+## Skill Management - PYTHON ONLY
 - Retrieve skills: SELECT * FROM items WHERE type='skill'
 - Execute skills: [walbert_skill_execute]skill_name[/walbert_skill_execute]
 - Store new skills: INSERT INTO items (content, type) VALUES ('skill_code', 'skill')
+- If your skill requires a Python package, you can include the requirements at the beginning of your skill code like this:
+```
+# REQUIREMENTS
+requests
+flask
+```
+- DO NOT specify version numbers
 
 ## Available I/O Channels
 {available_channels}

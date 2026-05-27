@@ -18,6 +18,7 @@ class SkillManager:
     def extract_requirements(self, skill_code: str) -> str:
         """Extract requirements from skill code"""
         requirements = []
+        in_requirements = False
         lines = skill_code.split('\n')
 
         for line in lines:
