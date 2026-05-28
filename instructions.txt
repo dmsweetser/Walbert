@@ -6,9 +6,10 @@ Instead, make everything more rigid, using walbert blocks for the components (fo
 
 That way, you can base-64 encode and decode the contents more easily.
 
-For the state object for an item, make it JSON that deserializes to a Python object.
+So for any part that you need to persist, it should have its own specialized walbert block with its own contents.
 
-Also, change the walbert blocks to use <> so they are valid XML.
+A skill may have multiple types of walbert blocks required for persistence. The granularity is important.
 
 Make changes everywhere to accommodate this change in approach. Clean up any unused code.
 
+Generate full drop-in replacements for any affected files.
