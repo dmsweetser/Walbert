@@ -27,7 +27,7 @@
   All model outputs must use a simplified block-based format for responses.
 
 - **GEN-007: Configurable I/O Layers**
-  All I/O layers must be enabled, disabled, or set to require user authorization.
+  All I/O layers must be enabled or disabled
 
 - **GEN-008: Console I/O Layer**
   The system must accept text input and display text output via the console.
@@ -82,19 +82,16 @@
 - **IOL-001: I/O Layer Configuration**
   The system must allow users to configure I/O layers via `io_config.json`.
 
-- **IOL-002: User Authorization for Execution**
-  Each I/O layer must support a user authorization step if configured.
-
-- **IOL-003: Console I/O Layer**
+- **IOL-002: Console I/O Layer**
   The system must accept text input and display text output via the console.
 
-- **IOL-004: Serial I/O Layer**
+- **IOL-003: Serial I/O Layer**
   The system must support bidirectional serial communication.
 
-- **IOL-005: Bluetooth I/O Layer**
+- **IOL-004: Bluetooth I/O Layer**
   The system must support Bluetooth device communication.
 
-- **IOL-006: USB I/O Layer**
+- **IOL-005: USB I/O Layer**
   The system must support USB device detection and communication.
 
 ---

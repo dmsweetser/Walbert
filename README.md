@@ -9,7 +9,7 @@ Walbert is a local-first AI agent system built on llama.cpp compiled binaries.
 - **SQLite Datastore**: Stores all items, tags, conversations, and memories
 - **Hardware Integration**: Interact with serial devices
 - **Unified Response Protocol**: Consistent block-based format for all responses
-- **Configurable I/O Layers**: Enable, disable, or require authorization for different I/O channels
+- **Configurable I/O Layers**: Enable or disable different I/O channels
 
 ## Installation
 
@@ -52,11 +52,9 @@ cd walbert
 {
     "console": {
         "enabled": true,
-        "require_authorization": false
     },
     "serial": {
         "enabled": false,
-        "require_authorization": true,
         "port": "/dev/ttyUSB0",
         "baudrate": 9600
     }

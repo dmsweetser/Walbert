@@ -13,7 +13,6 @@ from .io.base import IOLayer
 from .models.manager import ModelManager
 from .database.manager import DatabaseManager
 from .skills.manager import SkillManager
-from .authorization.manager import AuthorizationManager
 
 logger = logging.getLogger('walbert')
 
@@ -109,7 +108,6 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.model_manager = ModelManager(config)
         self.db = DatabaseManager()
         self.skill_manager = SkillManager(self.db)
-        self.authorization_manager = AuthorizationManager()
         self.io_factory = IOLayerFactory()
         self.current_conversation_id = None
         self.user_interactive_channel = io_config.io_layers.get('user_interactive_channel', 'console')
@@ -121,7 +119,6 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         if 'console' not in self.io_config.io_layers:
             self.io_config.io_layers['console'] = {
                 'enabled': True,
-                'require_authorization': False
             }
 
         self.logger = logging.getLogger('walbert.agent')
@@ -147,15 +144,6 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         try:
             self.logger.debug(f"Handling input from {channel_type.name}")
             io_layer = self.load_io_layer(channel_type)
-
-            if io_layer.requires_authorization():
-                self.logger.debug(f"Requesting authorization for {channel_type.name} input")
-                if not self.authorization_manager.request_authorization(
-                    channel_type.name.lower(),
-                    "Reading input"
-                ):
-                    self.logger.warning(f"Authorization denied for {channel_type.name} input")
-                    return ""
 
             input_text = io_layer.read()
             self.logger.debug(f"Received input from {channel_type.name}: {input_text}")
@@ -208,54 +196,37 @@ Error: {str(e)}
 """
                 self.model_manager.execute_devstral(full_prompt)
 
-        # Handle skill execution with authorization
+        # Handle skill execution
         if parsed.get("skill_name"):
             skill_name = parsed["skill_name"]
             skill_params = parsed.get("skill_params", "")
             self.logger.debug(f"Processing skill execution request: {skill_name} with params: {skill_params}")
 
             try:
-                # Check authorization if required
-                if self.authorization_manager.request_authorization(
-                    "skill_execution",
-                    f"Executing skill: {skill_name}"
-                ):
-                    # More robust skill lookup
-                    skill_code = self.db.cursor.execute(
-                        "SELECT content FROM items WHERE type='skill' AND (content LIKE ? OR content LIKE ? OR name LIKE ?)",
-                        (f"%def {skill_name}%", f"%{skill_name}%", f"%{skill_name}%")
-                    ).fetchone()
+                # More robust skill lookup
+                skill_code = self.db.cursor.execute(
+                    "SELECT content FROM items WHERE type='skill' AND (content LIKE ? OR content LIKE ? OR name LIKE ?)",
+                    (f"%def {skill_name}%", f"%{skill_name}%", f"%{skill_name}%")
+                ).fetchone()
 
-                    if skill_code:
-                        self.logger.debug(f"Found skill code for: {skill_name}")
-                        result = self.skill_manager.execute_skill(skill_code[0], skill_params)
-                        self.logger.debug(f"Skill execution result: {result}")
-                        parsed["skill_result"] = result
+                if skill_code:
+                    self.logger.debug(f"Found skill code for: {skill_name}")
+                    result = self.skill_manager.execute_skill(skill_code[0], skill_params)
+                    self.logger.debug(f"Skill execution result: {result}")
+                    parsed["skill_result"] = result
 
-                        # Feed result back to model for review
-                        full_prompt = f"""
+                    # Feed result back to model for review
+                    full_prompt = f"""
 [walbert_skill_result]
 Skill: {skill_name}
 Parameters: {skill_params}
 Result: {result}
 [/walbert_skill_result]
 """
-                        self.model_manager.execute_devstral(full_prompt)
-                    else:
-                        error_msg = f"Skill not found: {skill_name}"
-                        self.logger.error(error_msg)
-                        parsed["skill_error"] = error_msg
-                        # Feed error back to model
-                        full_prompt = f"""
-[walbert_skill_error]
-Skill: {skill_name}
-Error: {error_msg}
-[/walbert_skill_error]
-"""
-                        self.model_manager.execute_devstral(full_prompt)
+                    self.model_manager.execute_devstral(full_prompt)
                 else:
-                    error_msg = f"Authorization denied for skill: {skill_name}"
-                    self.logger.warning(error_msg)
+                    error_msg = f"Skill not found: {skill_name}"
+                    self.logger.error(error_msg)
                     parsed["skill_error"] = error_msg
                     # Feed error back to model
                     full_prompt = f"""
@@ -264,7 +235,7 @@ Skill: {skill_name}
 Error: {error_msg}
 [/walbert_skill_error]
 """
-                    self.model_manager.execute_devstral(full_prompt)
+                    self.model_manager.execute_devstral(full_prompt)                
             except Exception as e:
                 error_msg = f"Skill execution error: {e}"
                 self.logger.error(error_msg, exc_info=True)
@@ -483,11 +454,7 @@ Error: {error_msg}
                         if last_parsed_response.get(f"{channel_name}_response"):
                             try:
                                 io_layer = self.load_io_layer(ChannelType[channel_name.upper()])
-                                if io_layer.requires_authorization():
-                                    if self.authorization_manager.request_authorization(channel_name, "Sending output"):
-                                        io_layer.write(last_parsed_response[f"{channel_name}_response"])
-                                else:
-                                    io_layer.write(last_parsed_response[f"{channel_name}_response"])
+                                io_layer.write(last_parsed_response[f"{channel_name}_response"])
                             except Exception as e:
                                 self.logger.error(f"Error writing to {channel_name} channel: {e}")
                                 if channel_name == "console":

@@ -20,7 +20,3 @@ class IOLayer:
     def is_enabled(self) -> bool:
         """Check if the layer is enabled"""
         return self.config.get('enabled', False)
-
-    def requires_authorization(self) -> bool:
-        """Check if the layer requires user authorization"""
-        return self.config.get('require_authorization', False)
