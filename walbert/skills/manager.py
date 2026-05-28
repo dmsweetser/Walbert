@@ -26,14 +26,15 @@ class SkillManager:
                 # Start collecting requirements
                 in_requirements = True
                 continue
-            if in_requirements and line.strip().startswith('#'):
-                # Remove comment marker and whitespace
-                req = line.strip()[1:].strip()
-                if req:
-                    requirements.append(req)
-            elif in_requirements and not line.strip().startswith('#'):
-                # End of requirements section
-                break
+            if in_requirements:
+                if line.strip().startswith('#'):
+                    # Remove comment marker and whitespace
+                    req = line.strip()[1:].strip()
+                    if req:
+                        requirements.append(req)
+                elif line.strip():
+                    # End of requirements section
+                    break
 
         return '\n'.join(requirements)
 

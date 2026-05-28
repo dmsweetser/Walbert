@@ -222,8 +222,8 @@ Error: {str(e)}
                 ):
                     # More robust skill lookup
                     skill_code = self.db.cursor.execute(
-                        "SELECT content FROM items WHERE type='skill' AND (content LIKE ? OR content LIKE ?)",
-                        (f"%def {skill_name}%", f"%{skill_name}%")
+                        "SELECT content FROM items WHERE type='skill' AND (content LIKE ? OR content LIKE ? OR name LIKE ?)",
+                        (f"%def {skill_name}%", f"%{skill_name}%", f"%{skill_name}%")
                     ).fetchone()
 
                     if skill_code:
@@ -298,6 +298,14 @@ Error: {error_msg}
                 skill_parts = block_content.split(maxsplit=1)
                 result['skill_name'] = skill_parts[0]
                 result['skill_params'] = skill_parts[1] if len(skill_parts) > 1 else ""
+
+            # Special handling for SQL execution
+            if block_type == 'sql_execute':
+                # Clean up SQL statements
+                sql = block_content.strip()
+                if sql.endswith(';'):
+                    sql = sql[:-1]
+                result[block_type] = sql
 
         # Extract responses for all channels
         for channel_name in self.io_config.io_layers:

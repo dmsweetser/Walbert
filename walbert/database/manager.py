@@ -193,6 +193,19 @@ class DatabaseManager:
         self.conn.commit()
         self.logger.debug(f"Conversation {conversation_id} ended")
 
+    def sanitize_sql_content(self, content: str) -> str:
+            """Sanitize content for SQL insertion to handle special characters"""
+            if not content:
+                return ""
+
+            # Escape single quotes by doubling them
+            content = content.replace("'", "''")
+
+            # Handle special characters that might cause issues
+            content = content.replace("\\", "\\\\")
+
+            return content
+
     def close(self):
         """Close database connection"""
         self.logger.debug("Closing database connection")
