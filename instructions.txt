@@ -16,4 +16,4 @@ But for that to work, you need to have the proper granularity for data persisten
 
 Make changes everywhere to accommodate this change in approach. Clean up any unused code.
 
-Generate full drop-in replacements for any affected files.
+Make sure to generate full drop-in replacements for any affected files.
