@@ -74,6 +74,12 @@ class DatabaseManager:
             )
         """)
 
+        # Create indexes for better performance
+        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_items_type ON items(type)")
+        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_conversations_channel ON conversations(channel)")
+        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)")
+        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender)")
+
         self.conn.commit()
         self.logger.debug("Database schema initialized")
 
@@ -125,6 +131,12 @@ class DatabaseManager:
         """Execute arbitrary SQL statement"""
         self.logger.debug(f"Executing SQL: {sql}")
         try:
+            # Handle string values with single quotes
+            if sql.strip().upper().startswith(("INSERT", "UPDATE", "DELETE")):
+                # Escape single quotes in content
+                if "'" in sql:
+                    sql = sql.replace("'", "''")
+
             result = self.cursor.execute(sql)
 
             if sql.strip().upper().startswith("SELECT"):
@@ -138,7 +150,7 @@ class DatabaseManager:
                 output.append("-" * (sum(len(col) for col in columns) + len(columns) * 3))
 
                 for row in rows:
-                    output.append("\t".join(str(val) for val in row))
+                    output.append("\t".join(str(val) if val is not None else "NULL" for val in row))
 
                 return "\n".join(output)
             else:

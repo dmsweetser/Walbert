@@ -220,9 +220,10 @@ Error: {str(e)}
                     "skill_execution",
                     f"Executing skill: {skill_name}"
                 ):
+                    # More robust skill lookup
                     skill_code = self.db.cursor.execute(
-                        "SELECT content FROM items WHERE type='skill' AND content LIKE ?",
-                        (f"%{skill_name}%",)
+                        "SELECT content FROM items WHERE type='skill' AND (content LIKE ? OR content LIKE ?)",
+                        (f"%def {skill_name}%", f"%{skill_name}%")
                     ).fetchone()
 
                     if skill_code:
@@ -244,14 +245,38 @@ Result: {result}
                         error_msg = f"Skill not found: {skill_name}"
                         self.logger.error(error_msg)
                         parsed["skill_error"] = error_msg
+                        # Feed error back to model
+                        full_prompt = f"""
+[walbert_skill_error]
+Skill: {skill_name}
+Error: {error_msg}
+[/walbert_skill_error]
+"""
+                        self.model_manager.execute_devstral(full_prompt)
                 else:
                     error_msg = f"Authorization denied for skill: {skill_name}"
                     self.logger.warning(error_msg)
                     parsed["skill_error"] = error_msg
+                    # Feed error back to model
+                    full_prompt = f"""
+[walbert_skill_error]
+Skill: {skill_name}
+Error: {error_msg}
+[/walbert_skill_error]
+"""
+                    self.model_manager.execute_devstral(full_prompt)
             except Exception as e:
                 error_msg = f"Skill execution error: {e}"
                 self.logger.error(error_msg, exc_info=True)
                 parsed["skill_error"] = error_msg
+                # Feed error back to model
+                full_prompt = f"""
+[walbert_skill_error]
+Skill: {skill_name}
+Error: {error_msg}
+[/walbert_skill_error]
+"""
+                self.model_manager.execute_devstral(full_prompt)
 
         return parsed
 
@@ -281,6 +306,17 @@ Result: {result}
                 match = re.search(pattern, content, re.DOTALL)
                 if match:
                     result[f"{channel_name}_response"] = match.group(1).strip()
+
+        # Handle conversation complete and user control return blocks
+        if 'conversation_complete' not in result:
+            match = re.search(r'\[walbert_conversation_complete\](.*?)\[/walbert_conversation_complete\]', content, re.DOTALL)
+            if match:
+                result['conversation_complete'] = match.group(1).strip()
+
+        if 'user_control_return' not in result:
+            match = re.search(r'\[walbert_user_control_return\](.*?)\[/walbert_user_control_return\]', content, re.DOTALL)
+            if match:
+                result['user_control_return'] = match.group(1).strip()
 
         self.logger.debug(f"Parsed result: {result}")
         return result

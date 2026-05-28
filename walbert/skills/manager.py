@@ -22,7 +22,7 @@ class SkillManager:
         lines = skill_code.split('\n')
 
         for line in lines:
-            if line.strip().startswith('# REQUIREMENTS:'):
+            if line.strip().startswith('# REQUIREMENTS'):
                 # Start collecting requirements
                 in_requirements = True
                 continue
@@ -112,7 +112,7 @@ class SkillManager:
                     error_msg = result.stderr if result.stderr else "Unknown error"
                     logger.error(f"Skill execution failed: {error_msg}")
                     return f"Error: {error_msg}"
-                return result.stdout
+                return result.stdout if result.stdout else "Skill executed successfully with no output"
             except subprocess.TimeoutExpired:
                 logger.error("Skill execution timed out")
                 return "Error: Skill execution timed out"
