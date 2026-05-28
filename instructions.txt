@@ -10,6 +10,10 @@ So for any part that you need to persist, it should have its own specialized wal
 
 A skill may have multiple types of walbert blocks required for persistence. The granularity is important.
 
+Design things so that every walbert block has only one thing in it. The LLM should be entirely ignorant of the base-64 encoding. Just use that in the background so there are no SQL persistence errors.
+
+But for that to work, you need to have the proper granularity for data persistence, so each thing is in its own block.
+
 Make changes everywhere to accommodate this change in approach. Clean up any unused code.
 
 Generate full drop-in replacements for any affected files.
