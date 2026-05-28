@@ -7,6 +7,9 @@ import subprocess
 import os
 import logging
 import re
+import json
+import base64
+from typing import Dict, Any
 
 logger = logging.getLogger('walbert.skills')
 
@@ -79,6 +82,19 @@ class SkillManager:
     def execute_skill(self, skill_code: str, params: str = "") -> str:
         """Execute a skill in sandboxed environment with parameters"""
         logger.debug(f"Starting skill execution with params: {params}")
+
+        # Parse parameters into state object
+        state = {}
+        if params:
+            try:
+                state = json.loads(params)
+            except json.JSONDecodeError:
+                # Handle simple key=value parameters
+                for param in params.split():
+                    if '=' in param:
+                        key, value = param.split('=', 1)
+                        state[key] = value
+
         requirements = self.extract_requirements(skill_code)
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -93,12 +109,17 @@ class SkillManager:
                     logger.debug(f"Installing requirements: {requirements}")
                     if not self.install_requirements(requirements):
                         logger.error("Failed to install requirements for skill")
-                        return f"Error: Failed to install requirements for skill"
+                        return json.dumps({"error": "Failed to install requirements for skill"})
 
-                # Execute skill with parameters
-                logger.debug(f"Executing skill with command: python3 {skill_path} {params}")
+                # Create input file with state
+                input_path = os.path.join(temp_dir, 'input.json')
+                with open(input_path, 'w') as f:
+                    json.dump(state, f)
+
+                # Execute skill with input file
+                logger.debug(f"Executing skill with command: python3 {skill_path} {input_path}")
                 result = subprocess.run(
-                    ['python3', skill_path] + params.split(),
+                    ['python3', skill_path, input_path],
                     capture_output=True,
                     text=True,
                     timeout=30,
@@ -112,11 +133,19 @@ class SkillManager:
                 if result.returncode != 0:
                     error_msg = result.stderr if result.stderr else "Unknown error"
                     logger.error(f"Skill execution failed: {error_msg}")
-                    return f"Error: {error_msg}"
-                return result.stdout if result.stdout else "Skill executed successfully with no output"
+                    return json.dumps({"error": error_msg})
+
+                # Try to parse the output as JSON
+                try:
+                    output_state = json.loads(result.stdout)
+                    return json.dumps(output_state)
+                except json.JSONDecodeError:
+                    # If not JSON, return as string
+                    return json.dumps({"result": result.stdout if result.stdout else "Skill executed successfully with no output"})
+
             except subprocess.TimeoutExpired:
                 logger.error("Skill execution timed out")
-                return "Error: Skill execution timed out"
+                return json.dumps({"error": "Skill execution timed out"})
             except Exception as e:
                 logger.error(f"Skill execution error: {e}")
-                return f"Error: {str(e)}"
+                return json.dumps({"error": str(e)})

@@ -2,6 +2,7 @@
 Main Walbert agent implementation
 """
 
+import json
 import logging
 import os
 import re
@@ -209,26 +210,43 @@ Error: {str(e)}
 
             try:
                 # More robust skill lookup
-                skill_code = self.db.cursor.execute(
-                    "SELECT content FROM items WHERE type='skill' AND (content LIKE ? OR content LIKE ? OR name LIKE ?)",
-                    (f"%def {skill_name}%", f"%{skill_name}%", f"%{skill_name}%")
+                skill_item = self.db.cursor.execute(
+                    "SELECT id, content_b64 FROM items WHERE type='skill' AND (content_b64 LIKE ? OR content_b64 LIKE ?)",
+                    (f"%{skill_name}%", f"%def {skill_name}%")
                 ).fetchone()
 
-                if skill_code:
+                if skill_item:
+                    skill_id, skill_code_b64 = skill_item
+                    skill_code = self.db._decode_content(skill_code_b64)
                     self.logger.debug(f"Found skill code for: {skill_name}")
-                    result = self.skill_manager.execute_skill(skill_code[0], skill_params)
+                    result = self.skill_manager.execute_skill(skill_code, skill_params)
                     self.logger.debug(f"Skill execution result: {result}")
-                    parsed["skill_result"] = result
 
-                    # Feed result back to model for review
-                    full_prompt = f"""
+                    # Parse the result to extract state
+                    try:
+                        result_obj = json.loads(result)
+                        parsed["skill_result"] = result_obj
+
+                        # Feed result back to model for review
+                        full_prompt = f"""
+[walbert_skill_result]
+Skill: {skill_name}
+Parameters: {skill_params}
+Result: {json.dumps(result_obj, indent=2)}
+[/walbert_skill_result]
+"""
+                        self.model_manager.execute_devstral(full_prompt)
+                    except json.JSONDecodeError:
+                        parsed["skill_result"] = result
+                        # Feed result back to model for review
+                        full_prompt = f"""
 [walbert_skill_result]
 Skill: {skill_name}
 Parameters: {skill_params}
 Result: {result}
 [/walbert_skill_result]
 """
-                    self.model_manager.execute_devstral(full_prompt)
+                        self.model_manager.execute_devstral(full_prompt)
                 else:
                     error_msg = f"Skill not found: {skill_name}"
                     self.logger.error(error_msg)
@@ -365,7 +383,7 @@ Error: {error_msg}
 
         try:
             messages = self.db.cursor.execute("""
-                SELECT sender, content FROM messages
+                SELECT sender, content_b64 FROM messages
                 WHERE conversation_id = ?
                 AND sender != 'system'
                 ORDER BY timestamp DESC
@@ -376,10 +394,16 @@ Error: {error_msg}
             messages = messages[::-1]
 
             context = ""
-            for sender, content in messages:
+            for sender, content_b64 in messages:
+                content = self.db._decode_content(content_b64)
                 # Truncate long messages to prevent context bloat
-                if len(content) > 500:
+                if isinstance(content, str) and len(content) > 500:
                     content = content[:497] + "..."
+                elif isinstance(content, (dict, list)):
+                    content_str = json.dumps(content)
+                    if len(content_str) > 500:
+                        content_str = content_str[:497] + "..."
+                    content = content_str
                 context += f"{sender.capitalize()}: {content}\n\n"
 
             return context
@@ -393,7 +417,7 @@ Error: {error_msg}
             return
 
         messages = self.db.cursor.execute("""
-            SELECT sender, content, timestamp FROM messages
+            SELECT sender, content_b64, timestamp FROM messages
             WHERE conversation_id = ?
             ORDER BY timestamp ASC
         """, (conversation_id,)).fetchall()
@@ -404,8 +428,13 @@ Error: {error_msg}
         raw_filename = f"instance/conversations/conversation_{conversation_id}_{timestamp}.txt"
 
         with open(raw_filename, 'w') as f:
-            for sender, content, ts in messages:
-                f.write(f"[{ts}] {sender.upper()}:\n{content}\n\n")
+            for sender, content_b64, ts in messages:
+                content = self.db._decode_content(content_b64)
+                if isinstance(content, (dict, list)):
+                    content_str = json.dumps(content, indent=2)
+                else:
+                    content_str = str(content)
+                f.write(f"[{ts}] {sender.upper()}:\n{content_str}\n\n")
 
         self.logger.debug(f"Saved conversation {conversation_id} to {raw_filename}")
 
