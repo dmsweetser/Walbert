@@ -1,0 +1,6 @@
+I'm concerned about context bloat. Some factors:
+
+-The SYSTEM_PROMPT should only be fed at the beginning of a conversation, not in the middle anywhere
+-Returning SQL results to the model can cause problems if the result is huge
+
+Help me mitigate this.

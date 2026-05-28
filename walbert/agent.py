@@ -174,7 +174,12 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             sql = parsed["sql_execute"]
             try:
                 result = self.db.execute_sql(sql)
-                self.logger.debug(f"SQL execution result: {result}")
+                self.logger.debug(f"SQL execution result: {result[:200]}...")
+
+                # Truncate large results to prevent context bloat
+                if len(result) > 1000:
+                    result = result[:997] + "... (truncated)"
+
                 parsed["sql_result"] = result
 
                 # Feed SQL result back to model for review
@@ -324,6 +329,14 @@ Error: {error_msg}
         """Start a new conversation"""
         try:
             self.current_conversation_id = self.db.start_conversation(channel.value)
+
+            # Wait for model server to be ready before proceeding
+            self.logger.info("Waiting for model server to start...")
+            if not self.model_manager.wait_for_server():
+                raise RuntimeError("Model server failed to start")
+            self.logger.info("Model server ready")
+
+            # Store system prompt in database but don't feed it to model yet
             db_schema = self.db.get_schema()
             system_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", db_schema)
             system_prompt = system_prompt.replace("{available_channels}", self.available_channels)
@@ -332,17 +345,8 @@ Error: {error_msg}
             self.db.add_message(self.current_conversation_id, system_prompt, "system")
             self.db.conn.commit()
 
-            # Wait for model server to be ready before proceeding
-            self.logger.info("Waiting for model server to start...")
-            if not self.model_manager.wait_for_server():
-                raise RuntimeError("Model server failed to start")
-            self.logger.info("Model server ready")
-
-            # Feed system prompt to model before user interaction
-            self.logger.info("Feeding system prompt to model...")
-            self.model_manager.execute_devstral(system_prompt)
             self.model_ready = True
-            self.logger.info("System prompt processed")
+            self.logger.info("Conversation started, system prompt stored but not fed to model")
         except Exception as e:
             self.logger.error(f"Error starting conversation: {e}")
             raise
@@ -354,8 +358,8 @@ Error: {error_msg}
             self.db.end_conversation(self.current_conversation_id, summary)
             self.current_conversation_id = None
 
-    def build_conversation_context(self) -> str:
-        """Build conversation context from database"""
+    def build_conversation_context(self, max_messages: int = 10) -> str:
+        """Build conversation context from database with message limit"""
         if not self.current_conversation_id:
             return ""
 
@@ -364,11 +368,18 @@ Error: {error_msg}
                 SELECT sender, content FROM messages
                 WHERE conversation_id = ?
                 AND sender != 'system'
-                ORDER BY timestamp ASC
-            """, (self.current_conversation_id,)).fetchall()
+                ORDER BY timestamp DESC
+                LIMIT ?
+            """, (self.current_conversation_id, max_messages)).fetchall()
+
+            # Reverse to maintain chronological order
+            messages = messages[::-1]
 
             context = ""
             for sender, content in messages:
+                # Truncate long messages to prevent context bloat
+                if len(content) > 500:
+                    content = content[:497] + "..."
                 context += f"{sender.capitalize()}: {content}\n\n"
 
             return context
@@ -429,11 +440,18 @@ Error: {error_msg}
                 while True:
                     # Build conversation context
                     conversation_context = self.build_conversation_context()
-                    full_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", self.db.get_schema())
-                    full_prompt = full_prompt.replace("{available_channels}", self.available_channels)
-                    full_prompt = full_prompt.replace("{channel_response_blocks}", self.channel_response_blocks)
-                    full_prompt = full_prompt.replace("{user_interactive_channel}", self.user_interactive_channel)
-                    full_prompt += "\n\n" + conversation_context
+
+                    # Only include SYSTEM_PROMPT for the first cycle of each user input
+                    if self.processing_cycle == 0:
+                        full_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", self.db.get_schema())
+                        full_prompt = full_prompt.replace("{available_channels}", self.available_channels)
+                        full_prompt = full_prompt.replace("{channel_response_blocks}", self.channel_response_blocks)
+                        full_prompt = full_prompt.replace("{user_interactive_channel}", self.user_interactive_channel)
+                        full_prompt += "\n\n" + conversation_context
+                    else:
+                        # For subsequent cycles, only include conversation context
+                        full_prompt = conversation_context
+
                     full_prompt += self.emit_input_channel(ChannelType.CONSOLE) + "\nUser: " + user_input
 
                     self.logger.debug("Built prompt for model")
