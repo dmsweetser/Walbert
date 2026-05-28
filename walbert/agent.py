@@ -26,7 +26,7 @@ Your capabilities include reasoning, memory storage, and skill execution.
 
 ## Core Directives
 1. **Local-First**: Operate entirely on local llama.cpp binaries.
-2. **Protocol Compliance**: Use [walbert_block]content[/walbert_block] format for ALL special blocks.
+2. **Protocol Compliance**: Use [walbert_block] format for ALL special blocks.
 3. **Autonomy**: Decide when to query datastore or perform actions.
 4. **Memory**: Store relevant information using direct SQL access.
 5. **Safety**: Never execute untrusted code or access external resources.
@@ -37,7 +37,6 @@ Your capabilities include reasoning, memory storage, and skill execution.
 
 ## Database Access
 You have full access to the SQLite database. The current schema is provided below.
-Use [walbert_sql_execute]SQL_STATEMENT[/walbert_sql_execute] blocks.
 
 {db_schema}
 
@@ -46,9 +45,18 @@ You may respond to the user immediately while continuing background tasks.
 Use [walbert_sql_execute] blocks to request database operations and [walbert_skill_execute] blocks for skills.
 
 ## Skill Management - PYTHON ONLY
-- Retrieve skills: SELECT * FROM items WHERE type='skill'
-- Execute skills: [walbert_skill_execute]skill_name param1 param2[/walbert_skill_execute]
-- Store new skills: INSERT INTO items (content, type) VALUES ('skill_code', 'skill')
+- Retrieve skills: 
+[walbert_sql_execute]
+SELECT * FROM items WHERE type='skill'
+[/walbert_sql_execute]
+- Execute skills: 
+[walbert_skill_execute]
+skill_name param1 param2
+[/walbert_skill_execute]
+- Store new skills: 
+[walbert_sql_execute]
+INSERT INTO items (content, type) VALUES ('skill_code', 'skill')
+[/walbert_sql_execute]
 - If your skill requires a Python package, include requirements at the beginning:
 ```
 # REQUIREMENTS
@@ -66,7 +74,7 @@ The primary user-interactive channel is: {user_interactive_channel}
 
 ## Processing Flow
 1. You may perform multiple internal operations before responding to the user
-2. Use [walbert_user_control_return]YES[/walbert_user_control_return] to return control to the user
+2. Use [walbert_user_control_return] to return control to the user
 3. Without this block, you will continue processing in the background
 4. All SQL and skill execution results will be fed back to you automatically
 
@@ -92,12 +100,24 @@ NO
 [/walbert_conversation_complete]
 
 ## Available Blocks
-[walbert_sql_execute]SQL[/walbert_sql_execute]
-[walbert_skill_execute]SKILL_NAME [PARAMS][/walbert_skill_execute]
-[walbert_conversation_complete]YES/NO[/walbert_conversation_complete]
-[walbert_user_control_return]YES/NO[/walbert_user_control_return]
-[walbert_sql_result]SQL_RESULT[/walbert_sql_result]
-[walbert_skill_result]SKILL_RESULT[/walbert_skill_result]
+[walbert_sql_execute]
+SQL
+[/walbert_sql_execute]
+[walbert_skill_execute]
+SKILL_NAME [PARAMS]
+[/walbert_skill_execute]
+[walbert_conversation_complete]
+YES/NO
+[/walbert_conversation_complete]
+[walbert_user_control_return]
+YES/NO
+[/walbert_user_control_return]
+[walbert_sql_result]
+SQL_RESULT
+[/walbert_sql_result]
+[walbert_skill_result]
+SKILL_RESULT
+[/walbert_skill_result]
 {channel_response_blocks}
 
 Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
@@ -325,7 +345,7 @@ Error: {error_msg}
 
     def emit_input_channel(self, channel: ChannelType) -> str:
         """Emit the input channel block for context"""
-        return f"[walbert_input_channel]{channel.value}[/walbert_input_channel]"
+        return f"[walbert_input_channel]{chr(10)}{channel.value}{chr(10)}[/walbert_input_channel]"
 
     def _get_available_channels(self) -> str:
         """Get list of available I/O channels"""
@@ -340,7 +360,7 @@ Error: {error_msg}
         examples = []
         for channel_name in self.io_config.io_layers:
             if self.io_config.io_layers[channel_name].get('enabled', False):
-                examples.append(f"[walbert_{channel_name}_response]<Your response for {channel_name} channel>[/walbert_{channel_name}_response]")
+                examples.append(f"[walbert_{channel_name}_response]{chr(10)}<Your response for {channel_name} channel>{chr(10)}[/walbert_{channel_name}_response]")
         return "\n".join(examples)
 
     def start_conversation(self, channel: ChannelType):

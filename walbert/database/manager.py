@@ -213,30 +213,6 @@ class DatabaseManager:
         self.conn.commit()
         self.logger.debug(f"Conversation {conversation_id} ended")
 
-    def add_item(self, content: Any, item_type: str) -> int:
-        """Add an item to the database"""
-        self.logger.debug(f"Adding item of type {item_type}")
-        content_b64 = self._encode_content(content)
-        self.cursor.execute(
-            "INSERT INTO items (content_b64, type) VALUES (?, ?)",
-            (content_b64, item_type)
-        )
-        item_id = self.cursor.lastrowid
-        self.conn.commit()
-        self.logger.debug(f"Added item with ID {item_id}")
-        return item_id
-
-    def get_item(self, item_id: int) -> Any:
-        """Get an item from the database"""
-        self.logger.debug(f"Retrieving item with ID {item_id}")
-        result = self.cursor.execute(
-            "SELECT content_b64 FROM items WHERE id = ?",
-            (item_id,)
-        ).fetchone()
-        if result:
-            return self._decode_content(result[0])
-        return None
-
     def close(self):
         """Close database connection"""
         self.logger.debug("Closing database connection")
