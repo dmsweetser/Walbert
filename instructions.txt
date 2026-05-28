@@ -1,9 +1,14 @@
-The SQL needs some work. I want you to base64 encode anything you persist to the DB, and base64 decode it on the way out. Get rid of all the syntax / scrubbing behaviors - you won't need to worry about that anymore.
+I had an epiphany.
 
-For skills, I want to add some more structure. A skill should have an input object that is the state, it can do whatever internally, and then it should return the same state object back out. The contents of the state object will differ between skills, but it should be a Python object with key value pairs.
+Get rid of all the code that gives the DB schema to Walbert.
 
-Add [walbert] blocks for adding and retrieving skills, so this is clear structurally.
+Instead, make everything more rigid, using walbert blocks for the components (for example, persisting an item).
 
-Right now, the SQL base64 is incomplete. Given that the bot can provide arbitrary SQL, I don't see a great way to accomplish this. Help me out.
+That way, you can base-64 encode and decode the contents more easily.
 
-Revise the app throughout to align with these requirements.
+For the state object for an item, make it JSON that deserializes to a Python object.
+
+Also, change the walbert blocks to use <> so they are valid XML.
+
+Make changes everywhere to accommodate this change in approach. Clean up any unused code.
+
