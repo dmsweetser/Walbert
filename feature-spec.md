@@ -139,6 +139,10 @@ SQL_RESULT_CONTENT
 [walbert_python_result]
 PYTHON_RESULT_CONTENT
 [/walbert_python_result]
+
+[walbert_console_response]
+CONSOLE_RESPONSE_CONTENT
+[/walbert_console_response]
 ```
 
 ### **5.2 Input Context Block**
@@ -155,7 +159,11 @@ CHANNEL_NAME
 - **ALL** data storage and retrieval must be managed through SQL commands in `[walbert_sql_execute]` blocks.
 - **ALL** Python code execution must be managed through `[walbert_python_execute]` blocks.
 - **ALL** Python requirements must be specified in `[walbert_python_requirements]` blocks without version numbers.
+- **ALL** console responses to the user must be wrapped in `[walbert_console_response]` blocks.
 - No hard-coded database operations are allowed - **ALL** persistence must be handled through the protocol.
+- For prompt caching efficiency, the system prompt should only be included once at the beginning of a conversation.
+- Subsequent interactions should append only the new conversation context and user input.
+- The conversation context should reset only when Walbert determines the conversation is complete.
 - Walbert must manage **ALL** aspects of its database, including:
   - Schema design and evolution
   - Data storage and retrieval

@@ -7,7 +7,14 @@ Walbert is a local-first AI agent system built on llama.cpp compiled binaries.
 - **Local-First Execution**: Runs on your Linux system using local llama.cpp binaries
 - **Single Model Focus**: Optimized for Devstral-24B-Instruct-GGUF for high-quality reasoning
 - **SQLite Datastore**: Walbert has **FULL AUTONOMY** over its database schema and persistence
-- **Unified Response Protocol**: Consistent block-based format for all responses
+- **Unified Response Protocol**: Walbert must emit **all responses and internal deliberations** using the following block-based format with `walbert_` prefix:
+    - `[walbert_console_response]` - Direct console output to the user
+    - `[walbert_sql_execute]` - SQL commands for database operations
+    - `[walbert_python_requirements]` - Python package requirements
+    - `[walbert_python_execute]` - Python code execution blocks
+    - `[walbert_sql_result]` - SQL query results
+    - `[walbert_python_result]` - Python execution results
+    - `[walbert_error]` - Error reporting
 - **Full Database Autonomy**: Walbert manages **ALL** aspects of its database:
   - Schema design and evolution
   - Data storage and retrieval

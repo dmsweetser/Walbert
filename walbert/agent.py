@@ -117,6 +117,11 @@ PYTHON_RESULT_CONTENT
 ERROR_CONTENT
 [/walbert_error]
 
+[walbert_console_response]
+Your response to the user
+[/walbert_console_response]
+
+
 Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
     """
 
@@ -149,7 +154,15 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
 
     def write_output(self, text: str) -> None:
         """Write output to console"""
-        print(text)
+        if text.startswith("[walbert_console_response]"):
+            # Extract content from console response block
+            match = re.search(r'\[walbert_console_response\](.*?)\[/walbert_console_response\]', text, re.DOTALL)
+            if match:
+                print(match.group(1).strip())
+            else:
+                print(text)
+        else:
+            print(text)
 
     def process_response(self, response_text: str) -> dict:
         """Process model response with enhanced diagnostics"""
@@ -350,6 +363,10 @@ Error: {error_msg}
             if block_type == 'python_requirements':
                 result[block_type] = [line.strip() for line in block_content.split('{chr(10)}') if line.strip()]
 
+            # Special handling for console response
+            if block_type == 'console_response':
+                result[block_type] = block_content
+
         # Determine if control should return to user automatically
         has_pending_sql = 'sql_execute' in result
         has_pending_python = 'python_execute' in result
@@ -391,7 +408,7 @@ Error: {error_msg}
             self.python_temp_dir = None
             self.python_venv_path = None
 
-    def build_conversation_context(self, max_lines: int = 50) -> str:
+    def build_conversation_context(self, max_lines: int = 9999999) -> str:
         """Build conversation context from raw log file"""
         if not self.current_conversation_file or not os.path.exists(self.current_conversation_file):
             return ""
@@ -465,19 +482,26 @@ Error: {error_msg}
                 # Log user input to conversation file
                 self._log_to_conversation_file(user_input, "user")
 
-                # Reset processing cycle counter
+                # Reset processing cycle counter and conversation context
                 self.processing_cycle = 0
+                conversation_context = ""
 
                 while True:
-                    # Build conversation context
-                    conversation_context = self.build_conversation_context()
-
-                    # Only include SYSTEM_PROMPT for the first cycle of each user input
+                    # Append to conversation context instead of rebuilding
                     if self.processing_cycle == 0:
+                        conversation_context = self.build_conversation_context()
+                    else:
+                        # For subsequent cycles, just append the latest response
+                        if self.processing_cycle > 0 and model_response:
+                            self._log_to_conversation_file(model_response, "assistant")
+                        conversation_context = self.build_conversation_context()
+
+                    # Only include SYSTEM_PROMPT at the beginning of a new conversation
+                    if self.processing_cycle == 0 and not conversation_context.strip():
                         full_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", self.db.get_schema())
                         full_prompt += "{chr(10)}" + conversation_context
                     else:
-                        # For subsequent cycles, only include conversation context
+                        # For all other cases, only append new context
                         full_prompt = conversation_context
 
                     full_prompt += "User: " + user_input
@@ -489,6 +513,10 @@ Error: {error_msg}
                     self.logger.debug(f"Model response:{chr(10)}{model_response}")
 
                     last_parsed_response = self.process_response(model_response)
+
+                    # Handle console response if present
+                    if "console_response" in last_parsed_response:
+                        self.write_output(f"[walbert_console_response]{last_parsed_response['console_response']}[/walbert_console_response]")
 
                     # Exit processing loop if no pending tasks
                     if not last_parsed_response.get("has_pending_tasks", False):
