@@ -123,10 +123,6 @@ import os
 print("Hello from Python!")
 [/walbert_python_execute]
 
-[walbert_conversation_complete]
-YES/NO
-[/walbert_conversation_complete]
-
 [walbert_sql_result]
 SQL_RESULT_CONTENT
 [/walbert_sql_result]
@@ -145,7 +141,6 @@ CHANNEL_NAME
 
 ### **5.3 Rules**
 - All content must be enclosed between matching `walbert_` start and end tags.
-- Walbert must autonomously determine when a conversation is complete.
 - Walbert may emit response blocks at any time during processing.
 - Walbert has **FULL AUTONOMY** over database schema and data persistence.
 - **ALL** data storage and retrieval must be managed through SQL commands in `[walbert_sql_execute]` blocks.
@@ -194,6 +189,9 @@ CHANNEL_NAME
 
 - **TEST-003: Mocking Infrastructure**
   All external dependencies must be mockable for testing.
+
+- **TEST-004: Python Execution Testing**
+  All Python code execution must be properly sandboxed and tested.
 
 ---
 
