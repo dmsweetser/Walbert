@@ -1,5 +1,1 @@
-Instead of building the conversation context repeatedly, I want you to retain it in memory and carefully append to it so that we can rely on caching as often as possible.
-
-***
-
-You started doing this but didn't finish. Finish the implementation, and fix any other issues you see so the app is fully functional.
+Move any magic strings or numbers into configuration.

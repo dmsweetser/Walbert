@@ -390,13 +390,14 @@ Error: {error_msg}
                 raise RuntimeError("Model server failed to start")
             self.logger.info("Model server ready")
 
-            # Log system prompt to conversation file and initialize context
+            # Initialize conversation context with system prompt
             db_schema = self.db.get_schema()
             system_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", db_schema)
 
             self._log_to_conversation_file(system_prompt, "system")
             self.conversation_context = system_prompt + chr(10)
             self.model_ready = True
+            self.processing_cycle = 0
             self.logger.info("Conversation started")
         except Exception as e:
             self.logger.error(f"Error starting conversation: {e}")
@@ -405,6 +406,7 @@ Error: {error_msg}
     def end_conversation(self):
         """End current conversation"""
         self.current_conversation_file = None
+        self.conversation_context = ""
         # Clean up Python execution environment
         if self.python_temp_dir and os.path.exists(self.python_temp_dir):
             shutil.rmtree(self.python_temp_dir)
@@ -413,7 +415,7 @@ Error: {error_msg}
 
 
     def _log_to_conversation_file(self, content: str, sender: str = "user"):
-        """Log content to current conversation file and append to in-memory context"""
+        """Log content to current conversation file"""
         if not self.current_conversation_file:
             return
 
@@ -425,12 +427,6 @@ Error: {error_msg}
                 else:
                     content_str = str(content)
                 f.write(f"[{timestamp}] {sender}:{chr(10)}{content_str}{chr(10)}{chr(10)}")
-
-            # Append to in-memory context
-            if sender == "system":
-                self.conversation_context = content_str + chr(10)
-            else:
-                self.conversation_context += f"[{timestamp}] {sender}:{chr(10)}{content_str}{chr(10)}{chr(10)}"
         except Exception as e:
             self.logger.error(f"Error logging to conversation file: {e}")
 
@@ -450,13 +446,14 @@ Error: {error_msg}
                 # Check for timeout and continue autonomously if needed
                 if time.time() - self.last_input_time > self.input_timeout:
                     self.logger.info("No user input received within timeout period, continuing autonomously")
-                    full_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", self.db.get_schema())
-                    full_prompt += "{chr(10)}" + self.build_conversation_context()
+                    full_prompt = self.conversation_context
                     full_prompt += "{chr(10)}[walbert_input_channel]autonomous[/walbert_input_channel]"
                     full_prompt += "{chr(10)}Continuing autonomous operation..."
 
                     model_response = self.model_manager.execute_model(full_prompt)
                     last_parsed_response = self.process_response(model_response)
+                    self._log_to_conversation_file(model_response, "assistant")
+                    self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
 
                     # Reset timeout if there are pending tasks
                     if last_parsed_response.get("has_pending_tasks", False):
@@ -471,40 +468,26 @@ Error: {error_msg}
                 if user_input.lower() in ['exit', 'quit']:
                     break
 
-                # Log user input to conversation file
+                # Log user input to conversation file and append to context
                 self._log_to_conversation_file(user_input, "user")
-
-                # Reset processing cycle counter and conversation context
+                self.conversation_context += f"User:{chr(10)}{user_input}{chr(10)}{chr(10)}"
                 self.processing_cycle = 0
-                conversation_context = ""
 
                 while True:
-                    # Append to conversation context instead of rebuilding
-                    if self.processing_cycle == 0:
-                        conversation_context = self.build_conversation_context()
-                    else:
-                        # For subsequent cycles, just append the latest response
-                        if self.processing_cycle > 0 and model_response:
-                            self._log_to_conversation_file(model_response, "assistant")
-                        conversation_context = self.build_conversation_context()
+                    # Build prompt using the in-memory conversation context
+                    full_prompt = self.conversation_context
 
-                    # Only include SYSTEM_PROMPT at the beginning of a new conversation
-                    if self.processing_cycle == 0 and not conversation_context.strip():
-                        full_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", self.db.get_schema())
-                        full_prompt += "{chr(10)}" + conversation_context
-                    else:
-                        # For all other cases, only append new context
-                        full_prompt = conversation_context
-
-                    full_prompt += "User: " + user_input
-
-                    self.logger.debug("Built prompt for model")
+                    self.logger.debug("Built prompt for model using in-memory context")
 
                     # Process model response
                     model_response = self.model_manager.execute_model(full_prompt)
                     self.logger.debug(f"Model response:{chr(10)}{model_response}")
 
                     last_parsed_response = self.process_response(model_response)
+
+                    # Log assistant response to conversation file and append to context
+                    self._log_to_conversation_file(model_response, "assistant")
+                    self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
 
                     # Handle console response if present
                     if "console_response" in last_parsed_response:
@@ -517,6 +500,7 @@ Error: {error_msg}
 
                     # Continue processing if there are pending tasks
                     self.logger.debug("Continuing internal processing cycle due to pending tasks")
+                    self.processing_cycle += 1
 
             except KeyboardInterrupt:
                 print(f"{chr(10)}Goodbye!")
