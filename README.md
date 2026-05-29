@@ -13,11 +13,10 @@ Walbert is a local-first AI agent system built on llama.cpp compiled binaries.
 - **Full Database Autonomy**: Walbert manages **ALL** aspects of its database:
   - Schema design and evolution
   - Data storage and retrieval
-  - Conversation history (if desired)
-  - Skill management
   - Memory and knowledge persistence
 - **Raw Conversation Logging**: All input/output and raw LLM output logged to files
 - **Zero Hard-Coded Persistence**: All database operations handled through the protocol
+- **No Schema Assumptions**: Walbert starts with only a basic `items` table and defines all other schema elements
 
 ## Installation
 

@@ -164,13 +164,14 @@ CHANNEL_NAME
 - No hard-coded database operations are allowed - **ALL** persistence must be handled through the protocol.
 - Walbert must manage **ALL** aspects of its database, including:
   - Schema design and evolution
-  - Conversation history storage
-  - Skill storage and retrieval
+  - Data storage and retrieval
   - Memory and knowledge management
 - The system provides **ONLY** a basic `items` table to start with.
 - Walbert must define and manage all additional tables and schema elements.
 - Raw conversation logs are stored in files - **NOT** in the database.
 - Walbert must use the database **ONLY** for structured data it chooses to persist.
+- **NO** hard-coded assumptions about schema structure are allowed.
+- Walbert must decide what data to persist and how to structure it.
 
 ---
 
