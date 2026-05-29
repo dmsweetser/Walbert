@@ -1,19 +1,7 @@
-I had an epiphany.
+I recently decided to have you encode content with base-64. My reasoning was that Walbert can generate arbitrary SQL, and I wanted to avoid syntax errors when persisting.
 
-Get rid of all the code that gives the DB schema to Walbert.
+However, there was a problem. Because Walbert generates arbitrary SQL, you can't base-64 encode just the contents being committed. It's a whole SQL statement.
 
-Instead, make everything more rigid, using walbert blocks for the components (for example, persisting an item).
+I then had you try using detailed, granular walbert_ blocks, but then we lose the flexibility for Walbert to redefine its schema. I don't want it to be locked down if we can help it.
 
-That way, you can base-64 encode and decode the contents more easily.
-
-So for any part that you need to persist, it should have its own specialized walbert block with its own contents.
-
-A skill may have multiple types of walbert blocks required for persistence. The granularity is important.
-
-Design things so that every walbert block has only one thing in it. The LLM should be entirely ignorant of the base-64 encoding. Just use that in the background so there are no SQL persistence errors.
-
-But for that to work, you need to have the proper granularity for data persistence, so each thing is in its own block.
-
-Make changes everywhere to accommodate this change in approach. Clean up any unused code.
-
-Make sure to generate full drop-in replacements for any affected files.
+Get rid of all the base-64 stuff. Then we can rethink things.
