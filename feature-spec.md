@@ -26,31 +26,28 @@
 - **GEN-006: Unified Walbert Response Protocol**
   All model outputs must use a simplified block-based format for responses.
 
-- **GEN-007: Configurable I/O Layers**
-  All I/O layers must be enabled or disabled
-
-- **GEN-008: Console I/O Layer**
+- **GEN-007: Console I/O Layer**
   The system must accept text input and display text output via the console.
 
-- **GEN-009: Zero-State Boot**
+- **GEN-008: Zero-State Boot**
   Walbert must operate with an empty database and learn its identity over time.
 
-- **GEN-010: Conversation Reset**
+- **GEN-009: Conversation Reset**
   Walbert must autonomously determine when a conversation is complete.
 
-- **GEN-011: Raw Conversation Logging**
+- **GEN-010: Raw Conversation Logging**
   All input/output and raw LLM output must be logged to raw log files.
 
-- **GEN-012: Comprehensive Testing Framework**
+- **GEN-011: Comprehensive Testing Framework**
   The system must include unit tests and integration tests for all components.
 
-- **GEN-013: Factory Pattern Implementation**
+- **GEN-012: Factory Pattern Implementation**
   All major components must be instantiatable through factory methods.
 
-- **GEN-014: llama.cpp Binary Path Configuration**
+- **GEN-013: llama.cpp Binary Path Configuration**
   The system must define and validate paths to llama.cpp compiled binaries.
 
-- **GEN-015: Skill Management System**
+- **GEN-014: Skill Management System**
   Walbert must support dynamic skill execution and storage.
 
 ---
@@ -79,20 +76,8 @@
 
 # **3. Unified I/O Layer Features (IOL)**
 
-- **IOL-001: I/O Layer Configuration**
-  The system must allow users to configure I/O layers via `io_config.json`.
-
-- **IOL-002: Console I/O Layer**
+- **IOL-001: Console I/O Layer**
   The system must accept text input and display text output via the console.
-
-- **IOL-003: Serial I/O Layer**
-  The system must support bidirectional serial communication.
-
-- **IOL-004: Bluetooth I/O Layer**
-  The system must support Bluetooth device communication.
-
-- **IOL-005: USB I/O Layer**
-  The system must support USB device detection and communication.
 
 ---
 
@@ -151,25 +136,15 @@ PYTHON_RESULT_CONTENT
 [/walbert_python_result]
 ```
 
-### **5.2 I/O Channel Blocks**
-For each enabled I/O channel (console, serial, etc.):
-```
-[walbert_%channel%_response]
-RESPONSE_CONTENT
-[/walbert_%channel%_response]
-```
-
-### **5.3 Input Context Block**
+### **5.2 Input Context Block**
 ```
 [walbert_input_channel]
 CHANNEL_NAME
 [/walbert_input_channel]
 ```
 
-### **5.4 Rules**
+### **5.3 Rules**
 - All content must be enclosed between matching `walbert_` start and end tags.
-- Walbert may respond to the user immediately while continuing background tasks.
-- Walbert must provide clear indication when background tasks are in progress.
 - Walbert must autonomously determine when a conversation is complete.
 - Walbert may emit response blocks at any time during processing.
 - Walbert has **FULL AUTONOMY** over database schema and data persistence.

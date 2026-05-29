@@ -50,7 +50,7 @@ def load_config() -> Config:
         sys.exit(1)
     except Exception as e:
         logger.error(f"Error loading config: {e}")
-        sys.exit(1)                                                                         
+        sys.exit(1)
 
 def load_io_config() -> IOConfig:
     """Load I/O configuration"""

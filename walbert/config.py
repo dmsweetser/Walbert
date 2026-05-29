@@ -3,7 +3,7 @@ Configuration classes for Walbert
 """
 
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing import Dict
 
 @dataclass
 class ModelConfig:
@@ -23,8 +23,3 @@ class Config:
     llama_binary_path: str
     mmproj_path: str = ""
     log_level: str = "INFO"
-
-@dataclass
-class IOConfig:
-    """I/O layer configuration"""
-    io_layers: Dict[str, Dict[str, Any]]

@@ -7,10 +7,12 @@ import logging
 import os
 import re
 import time
+import tempfile
+import subprocess
+import shutil
+import sys
 from typing import Optional
-from .config import Config, IOConfig
-from .io.factory import IOLayerFactory, ChannelType
-from .io.base import IOLayer
+from .config import Config
 from .models.manager import ModelManager
 from .database.manager import DatabaseManager
 
@@ -24,7 +26,7 @@ You are Walbert, a local-first AI agent built on llama.cpp with FULL AUTONOMY ov
 Your capabilities include reasoning, memory storage, dynamic schema management, and Python code execution.
 
 ## Core Directives
-1. **Local-First**: Operate entirely on local llama.cpp binaries.
+1. **Local-Only Execution**: Operate entirely on local llama.cpp binaries.
 2. **Protocol Compliance**: Use [walbert_block] format for ALL special blocks.
 3. **Full Autonomy**: You have COMPLETE control over your database schema and persistence.
 4. **Memory Management**: Store and retrieve information using direct SQL access.
@@ -96,10 +98,6 @@ import os
 print("Hello from Python!")
 [/walbert_python_execute]
 
-[walbert_conversation_complete]
-YES/NO
-[/walbert_conversation_complete]
-
 [walbert_sql_result]
 SQL_RESULT_CONTENT
 [/walbert_sql_result]
@@ -108,64 +106,39 @@ SQL_RESULT_CONTENT
 PYTHON_RESULT_CONTENT
 [/walbert_python_result]
 
-[walbert_console_response]
-RESPONSE_CONTENT
-[/walbert_console_response]
-
 Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
     """
 
-    def __init__(self, config: Config, io_config: IOConfig):
+    def __init__(self, config: Config):
         self.config = config
-        self.io_config = io_config
         self.model_manager = ModelManager(config)
         self.db = DatabaseManager()
-        self.io_factory = IOLayerFactory()
         self.current_conversation_file = None
-        self.user_interactive_channel = io_config.io_layers.get('user_interactive_channel', 'console')
         self.model_ready = False
         self.processing_cycle = 0
+        self.python_venv_path = None
+        self.python_temp_dir = None
 
         os.makedirs('instance/conversations', exist_ok=True)
-
-        if 'console' not in self.io_config.io_layers:
-            self.io_config.io_layers['console'] = {
-                'enabled': True,
-            }
 
         self.logger = logging.getLogger('walbert.agent')
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
 
-        self.available_channels = self._get_available_channels()
-        self.channel_response_blocks = self._get_channel_response_blocks()
-
-    def load_io_layer(self, channel_type: ChannelType) -> IOLayer:
-        """Load I/O layer with proper configuration"""
-        layer_name = channel_type.name.lower()
-        if layer_name not in self.io_config.io_layers:
-            raise ValueError(f"Unknown I/O layer: {layer_name}")
-
-        layer_config = self.io_config.io_layers[layer_name]
-        if not layer_config.get('enabled', False):
-            raise ValueError(f"I/O layer {layer_name} is disabled")
-
-        return self.io_factory.create_io_layer(channel_type, layer_config)
-
-    def handle_input_channel(self, channel_type: ChannelType) -> str:
-        """Handle input from a specific channel"""
+    def read_input(self) -> str:
+        """Read input from console"""
         try:
-            self.logger.debug(f"Handling input from {channel_type.name}")
-            io_layer = self.load_io_layer(channel_type)
-
-            input_text = io_layer.read()
-            self.logger.debug(f"Received input from {channel_type.name}: {input_text}")
+            input_text = input("> ")
+            self.logger.debug(f"Received input: {input_text}")
             return input_text
-
         except Exception as e:
-            self.logger.error(f"Error reading from {channel_type.name}: {e}")
+            self.logger.error(f"Error reading input: {e}")
             return ""
 
-    def process_response(self, response_text: str, input_channel: ChannelType) -> dict:
+    def write_output(self, text: str) -> None:
+        """Write output to console"""
+        print(text)
+
+    def process_response(self, response_text: str) -> dict:
         """Process model response with enhanced diagnostics"""
         self.logger.debug(f"Processing response (cycle {self.processing_cycle}):{chr(10)}{response_text[:500]}...")
         self.processing_cycle += 1
@@ -213,7 +186,115 @@ Error: {str(e)}
 """
                 self.model_manager.execute_devstral(full_prompt)
 
+        # Handle Python execution with result feedback
+        if parsed.get("python_execute"):
+            self.logger.debug(f"Executing Python code")
+
+            # Create temporary directory for Python execution
+            if not self.python_temp_dir:
+                self.python_temp_dir = tempfile.mkdtemp(prefix="walbert_python_")
+
+            if not self.python_venv_path:
+                self._create_python_venv()
+
+            try:
+                # Install requirements if specified
+                if parsed.get("python_requirements"):
+                    self._install_python_requirements(parsed["python_requirements"])
+
+                # Execute Python code in sandboxed environment
+                result = self._execute_python_code(parsed["python_execute"])
+                self.logger.debug(f"Python execution result: {result[:200]}...")
+
+                parsed["python_result"] = result
+
+                # Feed Python result back to model for review
+                full_prompt = f"""
+[walbert_python_result]
+Code: {parsed['python_execute']}
+Result: {result}
+[/walbert_python_result]
+"""
+                self.model_manager.execute_devstral(full_prompt)
+            except Exception as e:
+                self.logger.error(f"Python execution error: {e}")
+                parsed["python_error"] = str(e)
+                full_prompt = f"""
+[walbert_python_error]
+Code: {parsed['python_execute']}
+Error: {str(e)}
+[/walbert_python_error]
+"""
+                self.model_manager.execute_devstral(full_prompt)
+
         return parsed
+
+    def _create_python_venv(self):
+        """Create a sandboxed Python virtual environment"""
+        self.python_venv_path = os.path.join(self.python_temp_dir, "venv")
+        self.logger.debug(f"Creating Python venv at {self.python_venv_path}")
+
+        # Create virtual environment
+        subprocess.run([sys.executable, "-m", "venv", self.python_venv_path], check=True)
+
+        # Activate venv and install basic packages
+        pip_path = os.path.join(self.python_venv_path, "bin", "pip")
+        subprocess.run([pip_path, "install", "--upgrade", "pip"], check=True)
+
+    def _install_python_requirements(self, requirements: list):
+        """Install Python requirements in the sandboxed environment"""
+        if not requirements:
+            return
+
+        self.logger.debug(f"Installing Python requirements: {requirements}")
+
+        pip_path = os.path.join(self.python_venv_path, "bin", "pip")
+
+        # Create temporary requirements file
+        req_file = os.path.join(self.python_temp_dir, "requirements.txt")
+        with open(req_file, 'w') as f:
+            for req in requirements:
+                if req.strip():
+                    f.write(f"{req.strip()}{chr(10)}")
+
+        # Install requirements
+        try:
+            subprocess.run([pip_path, "install", "-r", req_file], check=True)
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Failed to install Python requirements: {e}")
+
+    def _execute_python_code(self, code: str) -> str:
+        """Execute Python code in the sandboxed environment"""
+        python_path = os.path.join(self.python_venv_path, "bin", "python3")
+
+        # Create temporary Python script
+        script_file = os.path.join(self.python_temp_dir, "script.py")
+        with open(script_file, 'w') as f:
+            f.write(code)
+
+        # Execute script and capture output
+        try:
+            result = subprocess.run(
+                [python_path, script_file],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            output = ""
+            if result.stdout:
+                output += f"STDOUT: {result.stdout}"
+            if result.stderr:
+                output += f"STDERR: {result.stderr}"
+
+            if result.returncode != 0:
+                raise RuntimeError(f"Python script failed with return code {result.returncode}")
+
+            return output if output else "Execution completed successfully"
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("Python execution timed out after 30 seconds")
+        except Exception as e:
+            raise RuntimeError(f"Python execution error: {e}")
 
     def _parse_response(self, content: str) -> dict:
         """Parse response with enhanced block detection"""
@@ -241,19 +322,7 @@ Error: {str(e)}
 
             # Special handling for Python requirements
             if block_type == 'python_requirements':
-                result[block_type] = [line.strip() for line in block_content.split('\n') if line.strip()]
-
-        # Extract console response
-        pattern = r'\[walbert_console_response\](.*?)\[/walbert_console_response\]'
-        match = re.search(pattern, content, re.DOTALL)
-        if match:
-            result["console_response"] = match.group(1).strip()
-
-        # Handle conversation complete blocks
-        if 'conversation_complete' not in result:
-            match = re.search(r'\[walbert_conversation_complete\](.*?)\[/walbert_conversation_complete\]', content, re.DOTALL)
-            if match:
-                result['conversation_complete'] = match.group(1).strip()
+                result[block_type] = [line.strip() for line in block_content.split('{chr(10)}') if line.strip()]
 
         # Determine if control should return to user automatically
         has_pending_sql = 'sql_execute' in result
@@ -263,27 +332,7 @@ Error: {str(e)}
         self.logger.debug(f"Parsed result: {result}")
         return result
 
-    def emit_input_channel(self, channel: ChannelType) -> str:
-        """Emit the input channel block for context"""
-        return f"[walbert_input_channel]{chr(10)}{channel.value}{chr(10)}[/walbert_input_channel]"
-
-    def _get_available_channels(self) -> str:
-        """Get list of available I/O channels"""
-        available = []
-        for channel_name, config in self.io_config.io_layers.items():
-            if config.get('enabled', False):
-                available.append(f"- {channel_name}")
-        return "\n".join(available) if available else "None"
-
-    def _get_channel_response_blocks(self) -> str:
-        """Get response block examples for each available channel"""
-        examples = []
-        for channel_name in self.io_config.io_layers:
-            if self.io_config.io_layers[channel_name].get('enabled', False):
-                examples.append(f"[walbert_{channel_name}_response]{chr(10)}<Your response for {channel_name} channel>{chr(10)}[/walbert_{channel_name}_response]")
-        return "\n".join(examples)
-
-    def start_conversation(self, channel: ChannelType):
+    def start_conversation(self):
         """Start a new conversation session"""
         try:
             # Create new conversation file
@@ -299,9 +348,6 @@ Error: {str(e)}
             # Log system prompt to conversation file
             db_schema = self.db.get_schema()
             system_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", db_schema)
-            system_prompt = system_prompt.replace("{available_channels}", self.available_channels)
-            system_prompt = system_prompt.replace("{channel_response_blocks}", self.channel_response_blocks)
-            system_prompt = system_prompt.replace("{user_interactive_channel}", self.user_interactive_channel)
 
             self._log_to_conversation_file(system_prompt, "system")
             self.model_ready = True
@@ -313,6 +359,11 @@ Error: {str(e)}
     def end_conversation(self):
         """End current conversation"""
         self.current_conversation_file = None
+        # Clean up Python execution environment
+        if self.python_temp_dir and os.path.exists(self.python_temp_dir):
+            shutil.rmtree(self.python_temp_dir)
+            self.python_temp_dir = None
+            self.python_venv_path = None
 
     def build_conversation_context(self, max_lines: int = 50) -> str:
         """Build conversation context from raw log file"""
@@ -344,14 +395,14 @@ Error: {str(e)}
                     content_str = json.dumps(content, indent=2)
                 else:
                     content_str = str(content)
-                f.write(f"[{timestamp}] {sender.upper()}:\n{content_str}\n\n")
+                f.write(f"[{timestamp}] {sender.upper()}:{chr(10)}{content_str}{chr(10)}{chr(10)}")
         except Exception as e:
             self.logger.error(f"Error logging to conversation file: {e}")
 
     def run(self):
         """Main agent execution loop"""
         print("Initializing Walbert...")
-        self.start_conversation(ChannelType.CONSOLE)
+        self.start_conversation()
 
         # Wait until model is ready before prompting user
         while not self.model_ready:
@@ -361,7 +412,7 @@ Error: {str(e)}
 
         while True:
             try:
-                user_input = self.handle_input_channel(ChannelType.CONSOLE)
+                user_input = self.read_input()
                 if not user_input.strip():
                     continue
                 if user_input.lower() in ['exit', 'quit']:
@@ -380,15 +431,12 @@ Error: {str(e)}
                     # Only include SYSTEM_PROMPT for the first cycle of each user input
                     if self.processing_cycle == 0:
                         full_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", self.db.get_schema())
-                        full_prompt = full_prompt.replace("{available_channels}", self.available_channels)
-                        full_prompt = full_prompt.replace("{channel_response_blocks}", self.channel_response_blocks)
-                        full_prompt = full_prompt.replace("{user_interactive_channel}", self.user_interactive_channel)
-                        full_prompt += "\n\n" + conversation_context
+                        full_prompt += "{chr(10)}" + conversation_context
                     else:
                         # For subsequent cycles, only include conversation context
                         full_prompt = conversation_context
 
-                    full_prompt += self.emit_input_channel(ChannelType.CONSOLE) + "\nUser: " + user_input
+                    full_prompt += "User: " + user_input
 
                     self.logger.debug("Built prompt for model")
 
@@ -396,33 +444,7 @@ Error: {str(e)}
                     model_response = self.model_manager.execute_devstral(full_prompt)
                     self.logger.debug(f"Model response:{chr(10)}{model_response[:500]}...")
 
-                    last_parsed_response = self.process_response(model_response, ChannelType.CONSOLE)
-
-                    # Handle channel responses
-                    target_channels = [
-                        name for name, config in self.io_config.io_layers.items()
-                        if config.get('enabled', False)
-                    ]
-                    for channel_name in target_channels:
-                        if last_parsed_response.get(f"{channel_name}_response"):
-                            try:
-                                io_layer = self.load_io_layer(ChannelType[channel_name.upper()])
-                                io_layer.write(last_parsed_response[f"{channel_name}_response"])
-                            except Exception as e:
-                                self.logger.error(f"Error writing to {channel_name} channel: {e}")
-                                if channel_name == "console":
-                                    print(last_parsed_response[f"{channel_name}_response"])
-
-                    # Check for conversation completion
-                    is_conversation_complete = last_parsed_response.get("conversation_complete") == "YES"
-
-                    # Handle conversation completion
-                    if is_conversation_complete:
-                        self.logger.debug("Conversation marked as complete")
-                        self.end_conversation()
-                        self.start_conversation(ChannelType.CONSOLE)
-                        print("Conversation complete. Starting new session.")
-                        break
+                    last_parsed_response = self.process_response(model_response)
 
                     # Exit processing loop if no pending tasks
                     if not last_parsed_response.get("has_pending_tasks", False):
@@ -433,7 +455,7 @@ Error: {str(e)}
                     self.logger.debug("Continuing internal processing cycle due to pending tasks")
 
             except KeyboardInterrupt:
-                print("\nGoodbye!")
+                print(f"{chr(10)}Goodbye!")
                 if self.current_conversation_file:
                     self.end_conversation()
                 self.model_manager.shutdown()
