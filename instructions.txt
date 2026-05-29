@@ -4,4 +4,8 @@ Instead of having Walbert decide when to return control to the user, I want to h
 
 ***
 
-You started implementing this but didn't complete it. Please finish the implementation.
+You started implementing this but didn't complete it. Please finish the implementation. Also, please get rid of all the IO nuance and just have Walbert read from and reply to the console.
+
+***
+
+We don't have anything to execute the python blocks. I want the code to execute in a sandboxed venv after requirements are installed, in a temp dir. Please continue the implementation.
