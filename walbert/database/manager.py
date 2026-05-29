@@ -4,7 +4,6 @@ Database manager implementation
 
 import sqlite3
 import logging
-import base64
 import json
 from typing import List, Tuple, Any, Dict
 
@@ -32,7 +31,7 @@ class DatabaseManager:
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS items (
                 id INTEGER PRIMARY KEY,
-                content_b64 TEXT,
+                content TEXT,
                 type TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -69,7 +68,7 @@ class DatabaseManager:
             CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY,
                 conversation_id INTEGER,
-                content_b64 TEXT,
+                content TEXT,
                 sender TEXT,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id)
@@ -129,22 +128,6 @@ class DatabaseManager:
 
         return schema_str
 
-    def _encode_content(self, content: Any) -> str:
-        """Encode content to base64"""
-        if isinstance(content, (dict, list)):
-            content_str = json.dumps(content)
-        else:
-            content_str = str(content)
-        return base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
-
-    def _decode_content(self, content_b64: str) -> Any:
-        """Decode content from base64"""
-        content_str = base64.b64decode(content_b64.encode('utf-8')).decode('utf-8')
-        try:
-            return json.loads(content_str)
-        except json.JSONDecodeError:
-            return content_str
-
     def execute_sql(self, sql: str) -> str:
         """Execute arbitrary SQL statement"""
         self.logger.debug(f"Executing SQL: {sql}")
@@ -162,14 +145,10 @@ class DatabaseManager:
                 output.append("-" * (sum(len(col) for col in columns) + len(columns) * 3))
 
                 for row in rows:
-                    decoded_row = []
+                    output_row = []
                     for val in row:
-                        if isinstance(val, str) and ('content_b64' in columns or columns[row.index(val)] == 'content_b64'):
-                            decoded_val = self._decode_content(val)
-                            decoded_row.append(str(decoded_val))
-                        else:
-                            decoded_row.append(str(val) if val is not None else "NULL")
-                    output.append("\t".join(decoded_row))
+                        output_row.append(str(val) if val is not None else "NULL")
+                    output.append("\t".join(output_row))
 
                 return "\n".join(output)
             else:
@@ -194,10 +173,9 @@ class DatabaseManager:
     def add_message(self, conversation_id: int, content: Any, sender: str = "user") -> int:
         """Add a message to a conversation"""
         self.logger.debug(f"Adding message to conversation {conversation_id} from {sender}")
-        content_b64 = self._encode_content(content)
         self.cursor.execute(
-            "INSERT INTO messages (conversation_id, content_b64, sender) VALUES (?, ?, ?)",
-            (conversation_id, content_b64, sender)
+            "INSERT INTO messages (conversation_id, content, sender) VALUES (?, ?, ?)",
+            (conversation_id, content, sender)
         )
         msg_id = self.cursor.lastrowid
         self.logger.debug(f"Added message with ID {msg_id}")

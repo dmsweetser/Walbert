@@ -231,13 +231,12 @@ Error: {str(e)}
             try:
                 # More robust skill lookup
                 skill_item = self.db.cursor.execute(
-                    "SELECT id, content_b64 FROM items WHERE type='skill' AND (content_b64 LIKE ? OR content_b64 LIKE ?)",
+                    "SELECT id, content FROM items WHERE type='skill' AND (content LIKE ? OR content LIKE ?)",
                     (f"%{skill_name}%", f"%def {skill_name}%")
                 ).fetchone()
 
                 if skill_item:
-                    skill_id, skill_code_b64 = skill_item
-                    skill_code = self.db._decode_content(skill_code_b64)
+                    skill_id, skill_code = skill_item
                     self.logger.debug(f"Found skill code for: {skill_name}")
                     result = self.skill_manager.execute_skill(skill_code, skill_params)
                     self.logger.debug(f"Skill execution result: {result}")
@@ -403,7 +402,7 @@ Error: {error_msg}
 
         try:
             messages = self.db.cursor.execute("""
-                SELECT sender, content_b64 FROM messages
+                SELECT sender, content FROM messages
                 WHERE conversation_id = ?
                 AND sender != 'system'
                 ORDER BY timestamp DESC
@@ -414,8 +413,7 @@ Error: {error_msg}
             messages = messages[::-1]
 
             context = ""
-            for sender, content_b64 in messages:
-                content = self.db._decode_content(content_b64)
+            for sender, content in messages:
                 # Truncate long messages to prevent context bloat
                 if isinstance(content, str) and len(content) > 500:
                     content = content[:497] + "..."
@@ -437,7 +435,7 @@ Error: {error_msg}
             return
 
         messages = self.db.cursor.execute("""
-            SELECT sender, content_b64, timestamp FROM messages
+            SELECT sender, content, timestamp FROM messages
             WHERE conversation_id = ?
             ORDER BY timestamp ASC
         """, (conversation_id,)).fetchall()
@@ -448,8 +446,7 @@ Error: {error_msg}
         raw_filename = f"instance/conversations/conversation_{conversation_id}_{timestamp}.txt"
 
         with open(raw_filename, 'w') as f:
-            for sender, content_b64, ts in messages:
-                content = self.db._decode_content(content_b64)
+            for sender, content, ts in messages:
                 if isinstance(content, (dict, list)):
                     content_str = json.dumps(content, indent=2)
                 else:

@@ -8,7 +8,6 @@ import os
 import logging
 import re
 import json
-import base64
 from typing import Dict, Any
 
 logger = logging.getLogger('walbert.skills')
