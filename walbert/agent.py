@@ -174,7 +174,7 @@ SQL: {sql}
 Result: {result}
 [/walbert_sql_result]
 """
-                self.model_manager.execute_devstral(full_prompt)
+                self.model_manager.execute_model(full_prompt)
             except Exception as e:
                 self.logger.error(f"SQL execution error: {e}")
                 parsed["sql_error"] = str(e)
@@ -184,7 +184,7 @@ SQL: {sql}
 Error: {str(e)}
 [/walbert_sql_error]
 """
-                self.model_manager.execute_devstral(full_prompt)
+                self.model_manager.execute_model(full_prompt)
 
         # Handle Python execution with result feedback
         if parsed.get("python_execute"):
@@ -215,7 +215,7 @@ Code: {parsed['python_execute']}
 Result: {result}
 [/walbert_python_result]
 """
-                self.model_manager.execute_devstral(full_prompt)
+                self.model_manager.execute_model(full_prompt)
             except Exception as e:
                 self.logger.error(f"Python execution error: {e}")
                 parsed["python_error"] = str(e)
@@ -225,7 +225,7 @@ Code: {parsed['python_execute']}
 Error: {str(e)}
 [/walbert_python_error]
 """
-                self.model_manager.execute_devstral(full_prompt)
+                self.model_manager.execute_model(full_prompt)
 
         return parsed
 
@@ -441,7 +441,7 @@ Error: {str(e)}
                     self.logger.debug("Built prompt for model")
 
                     # Process model response
-                    model_response = self.model_manager.execute_devstral(full_prompt)
+                    model_response = self.model_manager.execute_model(full_prompt)
                     self.logger.debug(f"Model response:{chr(10)}{model_response[:500]}...")
 
                     last_parsed_response = self.process_response(model_response)

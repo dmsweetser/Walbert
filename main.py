@@ -29,14 +29,14 @@ def load_config() -> Config:
         with open('instance/config.json', 'r') as f:
             config_data = json.load(f)
             model_configs = {
-                'devstral': ModelConfig(
-                    model_path=config_data['model_configs']['devstral']['model_path'],
-                    context_size=config_data['model_configs']['devstral']['context_size'],
-                    output_tokens=config_data['model_configs']['devstral']['output_tokens'],
-                    temperature=config_data['model_configs']['devstral']['temperature'],
-                    top_p=config_data['model_configs']['devstral']['top_p'],
-                    top_k=config_data['model_configs']['devstral']['top_k'],
-                    min_p=config_data['model_configs']['devstral']['min_p']
+                'model': ModelConfig(
+                    model_path=config_data['model_configs']['model']['model_path'],
+                    context_size=config_data['model_configs']['model']['context_size'],
+                    output_tokens=config_data['model_configs']['model']['output_tokens'],
+                    temperature=config_data['model_configs']['model']['temperature'],
+                    top_p=config_data['model_configs']['model']['top_p'],
+                    top_k=config_data['model_configs']['model']['top_k'],
+                    min_p=config_data['model_configs']['model']['min_p']
                 )
             }
             return Config(
