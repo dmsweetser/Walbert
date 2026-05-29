@@ -25,64 +25,20 @@ class DatabaseManager:
         self.logger.debug(f"Connected to database at {self.db_path}")
 
     def init_schema(self):
-        """Initialize database schema"""
+        """Initialize database schema with minimal structure"""
         self.logger.debug("Initializing database schema")
 
+        # Create minimal items table for basic storage
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS items (
                 id INTEGER PRIMARY KEY,
                 content TEXT,
-                type TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS tags (
-                id INTEGER PRIMARY KEY,
-                name TEXT UNIQUE
-            )
-        """)
-
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS item_tags (
-                item_id INTEGER,
-                tag_id INTEGER,
-                FOREIGN KEY (item_id) REFERENCES items(id),
-                FOREIGN KEY (tag_id) REFERENCES tags(id),
-                PRIMARY KEY (item_id, tag_id)
-            )
-        """)
-
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS conversations (
-                id INTEGER PRIMARY KEY,
-                summary TEXT,
-                start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                end_time TIMESTAMP,
-                channel TEXT
-            )
-        """)
-
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY,
-                conversation_id INTEGER,
-                content TEXT,
-                sender TEXT,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (conversation_id) REFERENCES conversations(id)
-            )
-        """)
-
-        # Create indexes for better performance
-        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_items_type ON items(type)")
-        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_conversations_channel ON conversations(channel)")
-        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)")
-        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender)")
-
         self.conn.commit()
-        self.logger.debug("Database schema initialized")
+        self.logger.debug("Database schema initialized with minimal structure")
 
     def get_schema(self) -> str:
         """Get current database schema"""
@@ -157,39 +113,6 @@ class DatabaseManager:
         except Exception as e:
             self.logger.error(f"SQL execution error: {e}")
             return f"Error executing SQL: {e}"
-
-    def start_conversation(self, channel: str) -> int:
-        """Start a new conversation"""
-        self.logger.debug(f"Starting new conversation on channel {channel}")
-        self.cursor.execute(
-            "INSERT INTO conversations (channel) VALUES (?)",
-            (channel,)
-        )
-        conv_id = self.cursor.lastrowid
-        self.conn.commit()
-        self.logger.debug(f"Started conversation with ID {conv_id}")
-        return conv_id
-
-    def add_message(self, conversation_id: int, content: Any, sender: str = "user") -> int:
-        """Add a message to a conversation"""
-        self.logger.debug(f"Adding message to conversation {conversation_id} from {sender}")
-        self.cursor.execute(
-            "INSERT INTO messages (conversation_id, content, sender) VALUES (?, ?, ?)",
-            (conversation_id, content, sender)
-        )
-        msg_id = self.cursor.lastrowid
-        self.logger.debug(f"Added message with ID {msg_id}")
-        return msg_id
-
-    def end_conversation(self, conversation_id: int, summary: str):
-        """End a conversation"""
-        self.logger.debug(f"Ending conversation {conversation_id} with summary: {summary}")
-        self.cursor.execute(
-            "UPDATE conversations SET end_time = CURRENT_TIMESTAMP, summary = ? WHERE id = ?",
-            (summary, conversation_id)
-        )
-        self.conn.commit()
-        self.logger.debug(f"Conversation {conversation_id} ended")
 
     def close(self):
         """Close database connection"""

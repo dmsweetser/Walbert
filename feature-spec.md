@@ -101,23 +101,17 @@
 - **DATA-001: Items Table**
   Must store text and arbitrary content with generalized tags.
 
-- **DATA-002: Tags Table**
-  Must store unique tag names.
-
-- **DATA-003: Item-Tags Mapping**
-  Must support many-to-many relationships between items and tags.
-
-- **DATA-004: Conversations Table**
-  Must store summarized conversation sessions.
-
-- **DATA-005: Messages Table**
-  Must store individual messages with metadata.
-
-- **DATA-006: Raw Conversation Logs**
+- **DATA-002: Raw Conversation Logs**
   Must log all conversations to file in raw format.
 
-- **DATA-007: Skill Storage**
-  Must store executable skills as items with type='skill'.
+- **DATA-003: Full Database Autonomy**
+  Walbert must have complete control over database schema and data persistence.
+
+- **DATA-004: Minimal Initial Schema**
+  The system must initialize with only an items table for basic storage.
+
+- **DATA-005: Dynamic Schema Evolution**
+  Walbert must be able to modify the database schema through SQL commands.
 
 ---
 
@@ -131,14 +125,6 @@ Walbert must emit **all responses and internal deliberations** using the followi
 SQL_STATEMENT
 [/walbert_sql_execute]
 
-[walbert_skill_execute]
-SKILL_NAME [PARAM1 PARAM2 ...]
-[/walbert_skill_execute]
-
-[walbert_conversation_complete]
-YES/NO
-[/walbert_conversation_complete]
-
 [walbert_user_control_return]
 YES/NO
 [/walbert_user_control_return]
@@ -146,12 +132,6 @@ YES/NO
 [walbert_sql_result]
 SQL_RESULT_CONTENT
 [/walbert_sql_result]
-
-[walbert_skill_result]
-SKILL_NAME
-PARAMETERS
-RESULT_CONTENT
-[/walbert_skill_result]
 ```
 
 ### **5.2 I/O Channel Blocks**
@@ -175,6 +155,9 @@ CHANNEL_NAME
 - Walbert must provide clear indication when background tasks are in progress.
 - Walbert must autonomously determine when a conversation is complete.
 - Walbert may emit response blocks at any time during processing.
+- Walbert has full autonomy over database schema and data persistence.
+- Walbert must manage all data storage and retrieval through SQL commands.
+- No hard-coded database operations are allowed - all persistence must be handled through the protocol.
 
 ---
 

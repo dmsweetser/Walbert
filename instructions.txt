@@ -1,7 +1,13 @@
-I recently decided to have you encode content with base-64. My reasoning was that Walbert can generate arbitrary SQL, and I wanted to avoid syntax errors when persisting.
+I want Walbert to have full autonomy over its DB and all data persistence. Right now, the schema implies message/conversation persistence, and I have special handling for skills and such that persist and retrieve from the DB in hard-coded ways.
 
-However, there was a problem. Because Walbert generates arbitrary SQL, you can't base-64 encode just the contents being committed. It's a whole SQL statement.
+This won't work if Walbert changes its DB schema, and I want it to be able to do that.
 
-I then had you try using detailed, granular walbert_ blocks, but then we lose the flexibility for Walbert to redefine its schema. I don't want it to be locked down if we can help it.
+Get rid of all hard-coded SQL and references to it - let's keep just the basic items table, and let Walbert figure out the rest.
 
-Get rid of all the base-64 stuff. Then we can rethink things.
+For example, let it persist and retrieve skills in its own way, rather than through hard-coded means.
+
+Let it persist and retrieve conversation history in its own way, rather than through hard-coded means.
+
+Get rid of any conversation handling code and skill handling code in the app. Only log the IO input/output and raw LLM output to file as the conversation history.
+
+Can you make these changes for me?

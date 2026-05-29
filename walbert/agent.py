@@ -128,7 +128,6 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.io_config = io_config
         self.model_manager = ModelManager(config)
         self.db = DatabaseManager()
-        self.skill_manager = SkillManager(self.db)
         self.io_factory = IOLayerFactory()
         self.current_conversation_id = None
         self.user_interactive_channel = io_config.io_layers.get('user_interactive_channel', 'console')
@@ -305,13 +304,6 @@ Error: {error_msg}
             block_content = match.group(2).strip()
             result[block_type] = block_content
 
-            # Special handling for skill execution with parameters
-            if block_type == 'skill_execute':
-                # Extract skill name and parameters
-                skill_parts = block_content.split(maxsplit=1)
-                result['skill_name'] = skill_parts[0]
-                result['skill_params'] = skill_parts[1] if len(skill_parts) > 1 else ""
-
             # Special handling for SQL execution
             if block_type == 'sql_execute':
                 # Clean up SQL statements
@@ -328,12 +320,7 @@ Error: {error_msg}
                 if match:
                     result[f"{channel_name}_response"] = match.group(1).strip()
 
-        # Handle conversation complete and user control return blocks
-        if 'conversation_complete' not in result:
-            match = re.search(r'\[walbert_conversation_complete\](.*?)\[/walbert_conversation_complete\]', content, re.DOTALL)
-            if match:
-                result['conversation_complete'] = match.group(1).strip()
-
+        # Handle user control return blocks
         if 'user_control_return' not in result:
             match = re.search(r'\[walbert_user_control_return\](.*?)\[/walbert_user_control_return\]', content, re.DOTALL)
             if match:
@@ -363,9 +350,11 @@ Error: {error_msg}
         return "\n".join(examples)
 
     def start_conversation(self, channel: ChannelType):
-        """Start a new conversation"""
+        """Start a new conversation session"""
         try:
-            self.current_conversation_id = self.db.start_conversation(channel.value)
+            # Create new conversation file
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            self.current_conversation_file = f"instance/conversations/conversation_{timestamp}.txt"
 
             # Wait for model server to be ready before proceeding
             self.logger.info("Waiting for model server to start...")
@@ -373,87 +362,57 @@ Error: {error_msg}
                 raise RuntimeError("Model server failed to start")
             self.logger.info("Model server ready")
 
-            # Store system prompt in database but don't feed it to model yet
+            # Log system prompt to conversation file
             db_schema = self.db.get_schema()
             system_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", db_schema)
             system_prompt = system_prompt.replace("{available_channels}", self.available_channels)
             system_prompt = system_prompt.replace("{channel_response_blocks}", self.channel_response_blocks)
             system_prompt = system_prompt.replace("{user_interactive_channel}", self.user_interactive_channel)
-            self.db.add_message(self.current_conversation_id, system_prompt, "system")
-            self.db.conn.commit()
 
+            self._log_to_conversation_file(system_prompt, "system")
             self.model_ready = True
-            self.logger.info("Conversation started, system prompt stored but not fed to model")
+            self.logger.info("Conversation started")
         except Exception as e:
             self.logger.error(f"Error starting conversation: {e}")
             raise
 
     def end_conversation(self):
         """End current conversation"""
-        if self.current_conversation_id:
-            summary = "End of conversation"
-            self.db.end_conversation(self.current_conversation_id, summary)
-            self.current_conversation_id = None
+        self.current_conversation_file = None
 
-    def build_conversation_context(self, max_messages: int = 10) -> str:
-        """Build conversation context from database with message limit"""
-        if not self.current_conversation_id:
+    def build_conversation_context(self, max_lines: int = 50) -> str:
+        """Build conversation context from raw log file"""
+        if not self.current_conversation_file or not os.path.exists(self.current_conversation_file):
             return ""
 
         try:
-            messages = self.db.cursor.execute("""
-                SELECT sender, content FROM messages
-                WHERE conversation_id = ?
-                AND sender != 'system'
-                ORDER BY timestamp DESC
-                LIMIT ?
-            """, (self.current_conversation_id, max_messages)).fetchall()
+            with open(self.current_conversation_file, 'r') as f:
+                lines = f.readlines()
 
-            # Reverse to maintain chronological order
-            messages = messages[::-1]
-
-            context = ""
-            for sender, content in messages:
-                # Truncate long messages to prevent context bloat
-                if isinstance(content, str) and len(content) > 500:
-                    content = content[:497] + "..."
-                elif isinstance(content, (dict, list)):
-                    content_str = json.dumps(content)
-                    if len(content_str) > 500:
-                        content_str = content_str[:497] + "..."
-                    content = content_str
-                context += f"{sender.capitalize()}: {content}\n\n"
+            # Get last max_lines lines and reverse to maintain chronological order
+            context_lines = lines[-max_lines:]
+            context = "".join(context_lines)
 
             return context
         except Exception as e:
             self.logger.error(f"Error building conversation context: {e}")
             return ""
 
-    def save_conversation_files(self, conversation_id: int):
-        """Save conversation to raw files"""
-        if not conversation_id:
+    def _log_to_conversation_file(self, content: str, sender: str = "user"):
+        """Log content to current conversation file"""
+        if not self.current_conversation_file:
             return
 
-        messages = self.db.cursor.execute("""
-            SELECT sender, content, timestamp FROM messages
-            WHERE conversation_id = ?
-            ORDER BY timestamp ASC
-        """, (conversation_id,)).fetchall()
-
-        timestamp = self.db.cursor.execute("""
-            SELECT start_time FROM conversations WHERE id = ?
-        """, (conversation_id,)).fetchone()[0].replace(" ", "_").replace(":", "-")
-        raw_filename = f"instance/conversations/conversation_{conversation_id}_{timestamp}.txt"
-
-        with open(raw_filename, 'w') as f:
-            for sender, content, ts in messages:
+        try:
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            with open(self.current_conversation_file, 'a') as f:
                 if isinstance(content, (dict, list)):
                     content_str = json.dumps(content, indent=2)
                 else:
                     content_str = str(content)
-                f.write(f"[{ts}] {sender.upper()}:\n{content_str}\n\n")
-
-        self.logger.debug(f"Saved conversation {conversation_id} to {raw_filename}")
+                f.write(f"[{timestamp}] {sender.upper()}:\n{content_str}\n\n")
+        except Exception as e:
+            self.logger.error(f"Error logging to conversation file: {e}")
 
     def run(self):
         """Main agent execution loop with enhanced processing flow"""
@@ -475,10 +434,8 @@ Error: {error_msg}
                 if user_input.lower() in ['exit', 'quit']:
                     break
 
-                # Add user message to conversation
-                if self.current_conversation_id:
-                    self.db.add_message(self.current_conversation_id, user_input, "user")
-                    self.db.conn.commit()
+                # Log user input to conversation file
+                self._log_to_conversation_file(user_input, "user")
 
                 # Reset processing cycle counter
                 self.processing_cycle = 0
@@ -547,9 +504,8 @@ Error: {error_msg}
 
             except KeyboardInterrupt:
                 print("\nGoodbye!")
-                if self.current_conversation_id:
+                if self.current_conversation_file:
                     self.end_conversation()
-                    self.save_conversation_files(self.current_conversation_id)
                 self.model_manager.shutdown()
                 break
             except Exception as e:
