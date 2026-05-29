@@ -1,11 +1,25 @@
-Let Walbert be able to execute python code via new walbert python blocks. I want one that indicates the requirements, and explicitly asks Walbert  to not include version numbers, and then have the block where the actual code will go.
+There are a few issues I want you to fix:
 
-Instead of having Walbert decide when to return control to the user, I want to have that decision happen automatically based on whether there are any SQL or python blocks that have to execute. if so, do not return to the user. Else return.
+-Don't truncate anything in outputs
 
-***
+-Fix things like this:
+[2026-05-29 15:04:08] ASSISTANT:
+[2026-05-29 14:57:44] ASSISTANT:
 
-You started implementing this but didn't complete it. Please finish the implementation. Also, please get rid of all the IO nuance and just have Walbert read from and reply to the console.
+-Make the bot more resilient, so that errors are provided as feedback to it but don't disrupt its execution generally
+Things like SQL errors, Python requirements install errors, etc...
 
-***
+-Get rid of 8b and 3b ministral - they are junk
 
-We don't have anything to execute the python blocks. I want the code to execute in a sandboxed venv after requirements are installed, in a temp dir. Please continue the implementation.
+-Right now the bot thinks it can't use bluetooth because it is supposed to be "local-only"
+Please strip that out of the prompt
+
+-Change the system prompt so that the bot is always inclined to save skills for reuse later
+If I give it a complex task, it should break down the functions into basic components, persist them, and then use them
+
+-Give it the option to pass the SQL result directly to the PYTHON executor
+This is necessary for reusability
+
+-Update the system prompt so that the bot is philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards and the PCA BCO. Also direct it to be perpetually creative, curious and kind.
+
+If a user input is not received in a configurable period of time, have the bot continue autonomously
