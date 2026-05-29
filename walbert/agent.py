@@ -134,7 +134,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.processing_cycle = 0
         self.python_venv_path = None
         self.python_temp_dir = None
-        self.input_timeout = 300  # 5 minutes default timeout for autonomous operation
+        self.input_timeout = self.config.autonomous_operation_timeout
         self.last_input_time = time.time()
         self.conversation_context = ""
 
@@ -318,7 +318,7 @@ Error: {error_msg}
                 [python_path, script_file],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=self.config.python_execution_timeout
             )
 
             output = ""

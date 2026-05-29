@@ -1,1 +1,5 @@
 Move any magic strings or numbers into configuration.
+
+***
+
+Update all the documentation and the install script to align with the new config options.

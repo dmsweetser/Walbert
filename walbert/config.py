@@ -23,3 +23,8 @@ class Config:
     llama_binary_path: str
     mmproj_path: str = ""
     log_level: str = "INFO"
+    server_port: int = 8080
+    server_health_check_timeout: int = 2
+    server_startup_timeout: int = 60
+    python_execution_timeout: int = 120
+    autonomous_operation_timeout: int = 120

@@ -42,7 +42,7 @@ class ModelManager:
             "--top-p", str(model_config.top_p),
             "--top-k", str(model_config.top_k),
             "--min-p", str(model_config.min_p),
-            "--port", "8080"
+            "--port", str(self.config.server_port)
         ]
 
         if mmproj_path:
@@ -51,7 +51,10 @@ class ModelManager:
         logger.info(f"Starting llama-server: {' '.join(cmd)}")
         return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    def wait_for_server(self, timeout: int = 60):
+    def wait_for_server(self, timeout: int = None):
+        """Wait for server to be ready"""
+        if timeout is None:
+            timeout = self.config.server_startup_timeout
         """Wait for server to be ready"""
         start_time = time.time()
         while time.time() - start_time < timeout:
