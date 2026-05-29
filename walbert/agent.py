@@ -144,11 +144,19 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
 
     def read_input(self) -> str:
-        """Read input from console"""
+        """Read input from console with timeout"""
         try:
-            input_text = input("> ")
-            self.logger.debug(f"Received input: {input_text}")
-            return input_text
+            import select
+            import sys
+            self.logger.debug("Waiting for user input...")
+            ready, _, _ = select.select([sys.stdin], [], [], self.input_timeout)
+            if ready:
+                input_text = input("> ")
+                self.logger.debug(f"Received input: {input_text}")
+                return input_text
+            else:
+                self.logger.debug("Input timeout reached, returning empty string")
+                return ""
         except Exception as e:
             self.logger.error(f"Error reading input: {e}")
             return ""
