@@ -1,21 +1,3 @@
-I want Walbert to have full autonomy over its DB and all data persistence. Right now, the schema implies message/conversation persistence, and I have special handling for skills and such that persist and retrieve from the DB in hard-coded ways.
+Let Walbert be able to execute python code via new walbert python blocks. I want one that indicates the requirements, and explicitly asks Walbert  to not include version numbers, and then have the block where the actual code will go.
 
-This won't work if Walbert changes its DB schema, and I want it to be able to do that.
-
-Get rid of all hard-coded SQL and references to it - let's keep just the basic items table, and let Walbert figure out the rest.
-
-For example, let it persist and retrieve skills in its own way, rather than through hard-coded means.
-
-Let it persist and retrieve conversation history in its own way, rather than through hard-coded means.
-
-Get rid of any conversation handling code and skill handling code in the app. Only log the IO input/output and raw LLM output to file as the conversation history.
-
-Can you make these changes for me?
-
-***
-
-You made good headway. The system prompt for Walbert is outdated now though. Can you make any necessary revisions there and elsewhere so the app is cohesive and aligned with the new approach?
-
-***
-
-Can you generate complete, drop-in replacements for all affected files?
+Instead of having Walbert decide when to return control to the user, I want to have that decision happen automatically based on whether there are any SQL or python blocks that have to execute. if so, do not return to the user. Else return.
