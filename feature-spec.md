@@ -125,17 +125,30 @@ Walbert must emit **all responses and internal deliberations** using the followi
 SQL_STATEMENT
 [/walbert_sql_execute]
 
-[walbert_user_control_return]
+[walbert_python_requirements]
+# Python requirements without version numbers
+package1
+package2
+package3
+[/walbert_python_requirements]
+
+[walbert_python_execute]
+# Python code to execute
+import os
+print("Hello from Python!")
+[/walbert_python_execute]
+
+[walbert_conversation_complete]
 YES/NO
-[/walbert_user_control_return]
+[/walbert_conversation_complete]
 
 [walbert_sql_result]
 SQL_RESULT_CONTENT
 [/walbert_sql_result]
 
-[walbert_conversation_complete]
-YES/NO
-[/walbert_conversation_complete]
+[walbert_python_result]
+PYTHON_RESULT_CONTENT
+[/walbert_python_result]
 ```
 
 ### **5.2 I/O Channel Blocks**
@@ -153,7 +166,7 @@ CHANNEL_NAME
 [/walbert_input_channel]
 ```
 
-## **5.4 Rules**
+### **5.4 Rules**
 - All content must be enclosed between matching `walbert_` start and end tags.
 - Walbert may respond to the user immediately while continuing background tasks.
 - Walbert must provide clear indication when background tasks are in progress.
@@ -161,6 +174,7 @@ CHANNEL_NAME
 - Walbert may emit response blocks at any time during processing.
 - Walbert has **FULL AUTONOMY** over database schema and data persistence.
 - **ALL** data storage and retrieval must be managed through SQL commands in `[walbert_sql_execute]` blocks.
+- **ALL** Python code execution must be managed through `[walbert_python_execute]` blocks.
 - No hard-coded database operations are allowed - **ALL** persistence must be handled through the protocol.
 - Walbert must manage **ALL** aspects of its database, including:
   - Schema design and evolution
@@ -172,6 +186,9 @@ CHANNEL_NAME
 - Walbert must use the database **ONLY** for structured data it chooses to persist.
 - **NO** hard-coded assumptions about schema structure are allowed.
 - Walbert must decide what data to persist and how to structure it.
+- Control flow is **AUTOMATIC**:
+  - If there are pending `[walbert_sql_execute]` or `[walbert_python_execute]` blocks, Walbert continues processing
+  - If no pending blocks exist, control automatically returns to the user
 
 ---
 

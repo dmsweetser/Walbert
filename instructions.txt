@@ -1,3 +1,7 @@
 Let Walbert be able to execute python code via new walbert python blocks. I want one that indicates the requirements, and explicitly asks Walbert  to not include version numbers, and then have the block where the actual code will go.
 
 Instead of having Walbert decide when to return control to the user, I want to have that decision happen automatically based on whether there are any SQL or python blocks that have to execute. if so, do not return to the user. Else return.
+
+***
+
+You started implementing this but didn't complete it. Please finish the implementation. Also, please get rid of all the IO nuance and just have Walbert read from and reply to the console.

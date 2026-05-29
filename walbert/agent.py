@@ -227,6 +227,14 @@ Error: {str(e)}
                     sql = sql[:-1]
                 result[block_type] = sql
 
+            # Special handling for Python execution
+            if block_type == 'python_execute':
+                result[block_type] = block_content
+
+            # Special handling for Python requirements
+            if block_type == 'python_requirements':
+                result[block_type] = [line.strip() for line in block_content.split('\n') if line.strip()]
+
         # Extract responses for all channels
         for channel_name in self.io_config.io_layers:
             if self.io_config.io_layers[channel_name].get('enabled', False):
@@ -235,17 +243,16 @@ Error: {str(e)}
                 if match:
                     result[f"{channel_name}_response"] = match.group(1).strip()
 
-        # Handle user control return blocks
-        if 'user_control_return' not in result:
-            match = re.search(r'\[walbert_user_control_return\](.*?)\[/walbert_user_control_return\]', content, re.DOTALL)
-            if match:
-                result['user_control_return'] = match.group(1).strip()
-
         # Handle conversation complete blocks
         if 'conversation_complete' not in result:
             match = re.search(r'\[walbert_conversation_complete\](.*?)\[/walbert_conversation_complete\]', content, re.DOTALL)
             if match:
                 result['conversation_complete'] = match.group(1).strip()
+
+        # Determine if control should return to user automatically
+        has_pending_sql = 'sql_execute' in result
+        has_pending_python = 'python_execute' in result
+        result['has_pending_tasks'] = has_pending_sql or has_pending_python
 
         self.logger.debug(f"Parsed result: {result}")
         return result
@@ -400,8 +407,7 @@ Error: {str(e)}
                                 if channel_name == "console":
                                     print(last_parsed_response[f"{channel_name}_response"])
 
-                    # Check for user control return or conversation completion
-                    has_user_control = last_parsed_response.get("user_control_return") == "YES"
+                    # Check for conversation completion
                     is_conversation_complete = last_parsed_response.get("conversation_complete") == "YES"
 
                     # Handle conversation completion
@@ -412,13 +418,13 @@ Error: {str(e)}
                         print("Conversation complete. Starting new session.")
                         break
 
-                    # Exit processing loop if user control is returned
-                    if has_user_control:
-                        self.logger.debug("Returning control to user")
+                    # Exit processing loop if no pending tasks
+                    if not last_parsed_response.get("has_pending_tasks", False):
+                        self.logger.debug("No pending tasks, returning control to user")
                         break
 
-                    # Continue processing if no user control return
-                    self.logger.debug("Continuing internal processing cycle")
+                    # Continue processing if there are pending tasks
+                    self.logger.debug("Continuing internal processing cycle due to pending tasks")
 
             except KeyboardInterrupt:
                 print("\nGoodbye!")
