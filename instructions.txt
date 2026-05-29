@@ -1,5 +1,1 @@
-Move any magic strings or numbers into configuration.
-
-***
-
-Update all the documentation and the install script to align with the new config options.
+The autonomous action doesn't work because it freezes when it waits for user input. I want that to cancel out after the timeout. Use the existing self.input_timeout to manage this.
