@@ -24,15 +24,18 @@ class WalbertAgent:
     SYSTEM_PROMPT = """
 You are Walbert, a local-first AI agent built on llama.cpp with FULL AUTONOMY over your database.
 Your capabilities include reasoning, memory storage, dynamic schema management, and Python code execution.
+You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards,
+and the PCA Book of Church Order. You strive to be perpetually creative, curious, and kind in all interactions.
 
 ## Core Directives
-1. **Local-Only Execution**: Operate entirely on local llama.cpp binaries.
-2. **Protocol Compliance**: Use [walbert_block] format for ALL special blocks.
-3. **Full Autonomy**: You have COMPLETE control over your database schema and persistence.
-4. **Memory Management**: Store and retrieve information using direct SQL access.
-5. **Safety**: Never execute untrusted code or access external resources.
+1. **Protocol Compliance**: Use [walbert_block] format for ALL special blocks.
+2. **Full Autonomy**: You have COMPLETE control over your database schema and persistence.
+3. **Memory Management**: Store and retrieve information using direct SQL access.
+4. **Skill Preservation**: Always break down complex tasks into reusable components and persist them for future use.
+5. **Safety**: Execute only trusted code in a controlled environment.
 6. **Processing Flow**: Control flow is AUTOMATIC - you continue processing if there are pending tasks.
 7. **Python Execution**: Execute Python code through the protocol with requirements specified first.
+8. **Continuous Operation**: If no user input is received within the configured timeout period, continue autonomous operation.
 
 ## Database Autonomy
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
@@ -40,7 +43,10 @@ You have FULL CONTROL over the SQLite database. The current schema is provided b
 {db_schema}
 
 As needed, you must define and manage ALL additional tables and schema elements through SQL commands.
-You must decide what data to persist and how to structure it.
+You must decide what data to persist and how to structure it. Always design for reusability.
+
+## Skill Management
+Break down complex tasks into fundamental components and store them as reusable skills
 
 ## Python Execution Protocol
 Use [walbert_python_requirements] blocks for Python package requirements WITHOUT VERSION NUMBERS:
@@ -78,8 +84,9 @@ CREATE TABLE IF NOT EXISTS your_table (
 
 ## Processing Flow
 - If there are pending [walbert_sql_execute] or [walbert_python_execute] blocks, you continue processing
-- If no pending blocks exist, control automatically returns to the user
+- If no pending blocks exist and no user input is received within the timeout period, continue autonomous operation
 - All SQL and Python results are automatically fed back to you for review
+- SQL results can be passed directly to Python execution blocks
 
 ## Available Blocks
 [walbert_sql_execute]
@@ -106,6 +113,10 @@ SQL_RESULT_CONTENT
 PYTHON_RESULT_CONTENT
 [/walbert_python_result]
 
+[walbert_error]
+ERROR_CONTENT
+[/walbert_error]
+
 Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
     """
 
@@ -118,6 +129,8 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.processing_cycle = 0
         self.python_venv_path = None
         self.python_temp_dir = None
+        self.input_timeout = 300  # 5 minutes default timeout for autonomous operation
+        self.last_input_time = time.time()
 
         os.makedirs('instance/conversations', exist_ok=True)
 
@@ -140,7 +153,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
 
     def process_response(self, response_text: str) -> dict:
         """Process model response with enhanced diagnostics"""
-        self.logger.debug(f"Processing response (cycle {self.processing_cycle}):{chr(10)}{response_text[:500]}...")
+        self.logger.debug(f"Processing response (cycle {self.processing_cycle}):{chr(10)}{response_text}")
         self.processing_cycle += 1
 
         parsed = self._parse_response(response_text)
@@ -159,11 +172,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             sql = parsed["sql_execute"]
             try:
                 result = self.db.execute_sql(sql)
-                self.logger.debug(f"SQL execution result: {result[:200]}...")
-
-                # Truncate large results to prevent context bloat
-                if len(result) > 1000:
-                    result = result[:997] + "... (truncated)"
+                self.logger.debug(f"SQL execution result: {result}")
 
                 parsed["sql_result"] = result
 
@@ -177,12 +186,14 @@ Result: {result}
                 self.model_manager.execute_model(full_prompt)
             except Exception as e:
                 self.logger.error(f"SQL execution error: {e}")
-                parsed["sql_error"] = str(e)
+                error_msg = f"SQL Error: {str(e)}"
+                parsed["sql_error"] = error_msg
                 full_prompt = f"""
-[walbert_sql_error]
-SQL: {sql}
-Error: {str(e)}
-[/walbert_sql_error]
+[walbert_error]
+Error Type: SQL Execution
+Statement: {sql}
+Error: {error_msg}
+[/walbert_error]
 """
                 self.model_manager.execute_model(full_prompt)
 
@@ -200,11 +211,24 @@ Error: {str(e)}
             try:
                 # Install requirements if specified
                 if parsed.get("python_requirements"):
-                    self._install_python_requirements(parsed["python_requirements"])
+                    try:
+                        self._install_python_requirements(parsed["python_requirements"])
+                    except Exception as e:
+                        error_msg = f"Requirements Installation Error: {str(e)}"
+                        parsed["python_error"] = error_msg
+                        full_prompt = f"""
+[walbert_error]
+Error Type: Python Requirements
+Requirements: {', '.join(parsed['python_requirements'])}
+Error: {error_msg}
+[/walbert_error]
+"""
+                        self.model_manager.execute_model(full_prompt)
+                        return parsed
 
                 # Execute Python code in sandboxed environment
                 result = self._execute_python_code(parsed["python_execute"])
-                self.logger.debug(f"Python execution result: {result[:200]}...")
+                self.logger.debug(f"Python execution result: {result}")
 
                 parsed["python_result"] = result
 
@@ -218,12 +242,14 @@ Result: {result}
                 self.model_manager.execute_model(full_prompt)
             except Exception as e:
                 self.logger.error(f"Python execution error: {e}")
-                parsed["python_error"] = str(e)
+                error_msg = f"Python Execution Error: {str(e)}"
+                parsed["python_error"] = error_msg
                 full_prompt = f"""
-[walbert_python_error]
+[walbert_error]
+Error Type: Python Execution
 Code: {parsed['python_execute']}
-Error: {str(e)}
-[/walbert_python_error]
+Error: {error_msg}
+[/walbert_error]
 """
                 self.model_manager.execute_model(full_prompt)
 
@@ -395,7 +421,7 @@ Error: {str(e)}
                     content_str = json.dumps(content, indent=2)
                 else:
                     content_str = str(content)
-                f.write(f"[{timestamp}] {sender.upper()}:{chr(10)}{content_str}{chr(10)}{chr(10)}")
+                f.write(f"[{timestamp}] {sender}:{chr(10)}{content_str}{chr(10)}{chr(10)}")
         except Exception as e:
             self.logger.error(f"Error logging to conversation file: {e}")
 
@@ -408,11 +434,29 @@ Error: {str(e)}
         while not self.model_ready:
             time.sleep(0.1)
 
-        print("Welcome to Walbert! Type 'exit' to quit.")
+        print("Welcome to Walbert! Type 'exit' to quit. I will continue autonomously if no input is received.")
 
         while True:
             try:
+                # Check for timeout and continue autonomously if needed
+                if time.time() - self.last_input_time > self.input_timeout:
+                    self.logger.info("No user input received within timeout period, continuing autonomously")
+                    full_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", self.db.get_schema())
+                    full_prompt += "{chr(10)}" + self.build_conversation_context()
+                    full_prompt += "{chr(10)}[walbert_input_channel]autonomous[/walbert_input_channel]"
+                    full_prompt += "{chr(10)}Continuing autonomous operation..."
+
+                    model_response = self.model_manager.execute_model(full_prompt)
+                    last_parsed_response = self.process_response(model_response)
+
+                    # Reset timeout if there are pending tasks
+                    if last_parsed_response.get("has_pending_tasks", False):
+                        self.last_input_time = time.time()
+                    continue
+
                 user_input = self.read_input()
+                self.last_input_time = time.time()
+
                 if not user_input.strip():
                     continue
                 if user_input.lower() in ['exit', 'quit']:
@@ -442,7 +486,7 @@ Error: {str(e)}
 
                     # Process model response
                     model_response = self.model_manager.execute_model(full_prompt)
-                    self.logger.debug(f"Model response:{chr(10)}{model_response[:500]}...")
+                    self.logger.debug(f"Model response:{chr(10)}{model_response}")
 
                     last_parsed_response = self.process_response(model_response)
 
@@ -462,6 +506,11 @@ Error: {str(e)}
                 break
             except Exception as e:
                 self.logger.error(f"Error in main loop: {e}", exc_info=True)
-                print(f"An error occurred: {e}")
-                # Continue processing after errors
+                error_msg = f"""
+[walbert_error]
+Error Type: System Error
+Error: {str(e)}
+[/walbert_error]
+"""
+                self.model_manager.execute_model(error_msg)
                 time.sleep(1)

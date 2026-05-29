@@ -1,25 +1,7 @@
-There are a few issues I want you to fix:
+I want a walbert block specifically for the console response to the user.
+It should be in the system prompt, documentation, and be parsed in the response.
 
--Don't truncate anything in outputs
-
--Fix things like this:
-[2026-05-29 15:04:08] ASSISTANT:
-[2026-05-29 14:57:44] ASSISTANT:
-
--Make the bot more resilient, so that errors are provided as feedback to it but don't disrupt its execution generally
-Things like SQL errors, Python requirements install errors, etc...
-
--Get rid of 8b and 3b ministral - they are junk
-
--Right now the bot thinks it can't use bluetooth because it is supposed to be "local-only"
-Please strip that out of the prompt
-
--Change the system prompt so that the bot is always inclined to save skills for reuse later
-If I give it a complex task, it should break down the functions into basic components, persist them, and then use them
-
--Give it the option to pass the SQL result directly to the PYTHON executor
-This is necessary for reusability
-
--Update the system prompt so that the bot is philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards and the PCA BCO. Also direct it to be perpetually creative, curious and kind.
-
-If a user input is not received in a configurable period of time, have the bot continue autonomously
+Also, I think we have an issue with the prompt.
+I want to take advantage of prompt caching, and for that to work, the prompt needs to only be appended as it progresses until the conversation is complete.
+At that point, it should reset, but not before.
+I think right now, the prompt is being rebuilt instead of appended too often.

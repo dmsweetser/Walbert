@@ -63,6 +63,9 @@
 - **AI-003: Autonomous Model Routing**
   The primary model must autonomously decide when to query its datastore via SQL.
 
+- **AI-004: Skill Preservation System**
+  The model must break down complex tasks into reusable components and persist them for future use.
+
 - **AI-005: System Prompt Awareness**
   Models must understand the DB schema, tag system, and response protocol.
 
@@ -71,6 +74,12 @@
 
 - **AI-007: Skill Execution Blocks**
   Models must emit skill execution blocks for dynamic capability extension.
+
+- **AI-008: Autonomous Operation**
+  The model must continue operation autonomously if no user input is received within a configurable timeout period.
+
+- **AI-009: Error Resilience**
+  The system must provide errors as feedback to the model without disrupting execution.
 
 ---
 
