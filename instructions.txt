@@ -15,3 +15,7 @@ Can you make these changes for me?
 ***
 
 You made good headway. The system prompt for Walbert is outdated now though. Can you make any necessary revisions there and elsewhere so the app is cohesive and aligned with the new approach?
+
+***
+
+Can you generate complete, drop-in replacements for all affected files?
