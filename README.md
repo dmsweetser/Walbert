@@ -6,12 +6,18 @@ Walbert is a local-first AI agent system built on llama.cpp compiled binaries.
 
 - **Local-Only Execution**: Runs entirely on your Linux system using local llama.cpp binaries
 - **Multi-Model Support**: Load and manage multiple GGUF models simultaneously
-- **SQLite Datastore**: Stores all data with full autonomy for Walbert
+- **SQLite Datastore**: Walbert has **FULL AUTONOMY** over its database schema and persistence
 - **Hardware Integration**: Interact with serial devices
 - **Unified Response Protocol**: Consistent block-based format for all responses
 - **Configurable I/O Layers**: Enable or disable different I/O channels
-- **Full Database Autonomy**: Walbert manages its own schema and data persistence
+- **Full Database Autonomy**: Walbert manages **ALL** aspects of its database:
+  - Schema design and evolution
+  - Data storage and retrieval
+  - Conversation history (if desired)
+  - Skill management
+  - Memory and knowledge persistence
 - **Raw Conversation Logging**: All input/output and raw LLM output logged to files
+- **Zero Hard-Coded Persistence**: All database operations handled through the protocol
 
 ## Installation
 

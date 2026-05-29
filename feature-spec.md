@@ -154,17 +154,23 @@ CHANNEL_NAME
 ```
 
 ## **5.4 Rules**
-- All content must be enclosed between matching walbert_ start and end tags.
+- All content must be enclosed between matching `walbert_` start and end tags.
 - Walbert may respond to the user immediately while continuing background tasks.
 - Walbert must provide clear indication when background tasks are in progress.
 - Walbert must autonomously determine when a conversation is complete.
 - Walbert may emit response blocks at any time during processing.
 - Walbert has **FULL AUTONOMY** over database schema and data persistence.
-- Walbert must manage **ALL** data storage and retrieval through SQL commands.
+- **ALL** data storage and retrieval must be managed through SQL commands in `[walbert_sql_execute]` blocks.
 - No hard-coded database operations are allowed - **ALL** persistence must be handled through the protocol.
-- Walbert must manage conversation history in its own way.
-- Walbert must manage skills in its own way.
-- The system provides only a basic items table to start with.
+- Walbert must manage **ALL** aspects of its database, including:
+  - Schema design and evolution
+  - Conversation history storage
+  - Skill storage and retrieval
+  - Memory and knowledge management
+- The system provides **ONLY** a basic `items` table to start with.
+- Walbert must define and manage all additional tables and schema elements.
+- Raw conversation logs are stored in files - **NOT** in the database.
+- Walbert must use the database **ONLY** for structured data it chooses to persist.
 
 ---
 

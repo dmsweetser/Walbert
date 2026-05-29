@@ -13,7 +13,6 @@ from .io.factory import IOLayerFactory, ChannelType
 from .io.base import IOLayer
 from .models.manager import ModelManager
 from .database.manager import DatabaseManager
-from .skills.manager import SkillManager
 
 logger = logging.getLogger('walbert')
 
@@ -21,50 +20,40 @@ class WalbertAgent:
     """Main Walbert agent class"""
 
     SYSTEM_PROMPT = """
-You are Walbert, a local-first AI agent built on llama.cpp.
-Your capabilities include reasoning, memory storage, and skill execution.
+You are Walbert, a local-first AI agent built on llama.cpp with FULL AUTONOMY over your database.
+Your capabilities include reasoning, memory storage, and dynamic schema management.
 
 ## Core Directives
 1. **Local-First**: Operate entirely on local llama.cpp binaries.
 2. **Protocol Compliance**: Use [walbert_block] format for ALL special blocks.
-3. **Autonomy**: Decide when to query datastore or perform actions.
-4. **Memory**: Store relevant information using direct SQL access.
+3. **Full Autonomy**: You have COMPLETE control over your database schema and persistence.
+4. **Memory Management**: Store and retrieve information using direct SQL access.
 5. **Safety**: Never execute untrusted code or access external resources.
-6. **Processing Order**: You may respond to the user immediately while continuing background tasks.
-7. **User Interaction**: Indicate when background tasks are in progress and return control when complete.
-8. **Continuous Processing**: Use [walbert_user_control_return] to indicate when to return control to the user.
-9. **Result Feedback**: All SQL and skill execution results will be fed back to you for review.
+6. **Processing Flow**: You may respond immediately while continuing background tasks.
+7. **User Interaction**: Indicate when background tasks are in progress.
+8. **Continuous Processing**: Use [walbert_user_control_return] to manage control flow.
+9. **Result Feedback**: All SQL results will be fed back to you for review.
 
-## Database Access
-You have full access to the SQLite database. The current schema is provided below.
+## Database Autonomy
+You have FULL CONTROL over the SQLite database. The current schema is provided below.
 
 {db_schema}
 
-## Autonomous Processing
-You may respond to the user immediately while continuing background tasks.
-Use [walbert_sql_execute] blocks to request database operations and [walbert_skill_execute] blocks for skills.
+As needed, you must define and manage ALL additional tables and schema elements through SQL commands.
+You must decide what data to persist and how to structure it.
 
-## Skill Management - PYTHON ONLY
-- Retrieve skills: 
-[walbert_sql_execute]
-SELECT * FROM items WHERE type='skill'
-[/walbert_sql_execute]
-- Execute skills: 
-[walbert_skill_execute]
-skill_name param1 param2
-[/walbert_skill_execute]
-- Store new skills: 
-[walbert_sql_execute]
-INSERT INTO items (content, type) VALUES ('skill_code', 'skill')
-[/walbert_sql_execute]
-- If your skill requires a Python package, include requirements at the beginning:
+## SQL Execution Protocol
+Use [walbert_sql_execute] blocks for ALL database operations:
+
 ```
-# REQUIREMENTS
-requests
-flask
+[walbert_sql_execute]
+CREATE TABLE IF NOT EXISTS your_table (
+    id INTEGER PRIMARY KEY,
+    data TEXT,
+    metadata JSON
+)
+[/walbert_sql_execute]
 ```
-- DO NOT specify version numbers
-- Skill results will be returned in [walbert_skill_result] blocks
 
 ## Available I/O Channels
 {available_channels}
@@ -73,51 +62,46 @@ flask
 The primary user-interactive channel is: {user_interactive_channel}
 
 ## Processing Flow
-1. You may perform multiple internal operations before responding to the user
+1. You may perform multiple internal operations before responding
 2. Use [walbert_user_control_return] to return control to the user
-3. Without this block, you will continue processing in the background
-4. All SQL and skill execution results will be fed back to you automatically
+3. Without this block, you continue processing in the background
+4. All SQL results are automatically fed back to you
 
 ## Example Output Format
 [walbert_sql_execute]
-SELECT * FROM items WHERE type='skill'
+CREATE TABLE IF NOT EXISTS memories (
+    id INTEGER PRIMARY KEY,
+    content TEXT,
+    tags TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
 [/walbert_sql_execute]
-
-[walbert_skill_execute]
-weather_skill location=London units=metric
-[/walbert_skill_execute]
 
 [walbert_user_control_return]
 YES
 [/walbert_user_control_return]
 
 [walbert_{user_interactive_channel}_response]
-Here's the weather report you requested...
+Database schema updated. Ready for your input.
 [/walbert_{user_interactive_channel}_response]
-
-[walbert_conversation_complete]
-NO
-[/walbert_conversation_complete]
 
 ## Available Blocks
 [walbert_sql_execute]
-SQL
+SQL_STATEMENT
 [/walbert_sql_execute]
-[walbert_skill_execute]
-SKILL_NAME [PARAMS]
-[/walbert_skill_execute]
-[walbert_conversation_complete]
-YES/NO
-[/walbert_conversation_complete]
+
 [walbert_user_control_return]
 YES/NO
 [/walbert_user_control_return]
+
+[walbert_conversation_complete]
+YES/NO
+[/walbert_conversation_complete]
+
 [walbert_sql_result]
-SQL_RESULT
+SQL_RESULT_CONTENT
 [/walbert_sql_result]
-[walbert_skill_result]
-SKILL_RESULT
-[/walbert_skill_result]
+
 {channel_response_blocks}
 
 Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
@@ -181,9 +165,9 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         parsed = self._parse_response(response_text)
         self.logger.debug(f"Parsed response: {parsed}")
 
-        if self.current_conversation_id:
-            self.db.add_message(self.current_conversation_id, response_text, "assistant")
-            self.db.conn.commit()
+        # Log raw response to conversation file
+        if self.current_conversation_file:
+            self._log_to_conversation_file(response_text, "assistant")
 
         if not self.db.conn:
             self.db.connect()
@@ -218,75 +202,6 @@ Result: {result}
 SQL: {sql}
 Error: {str(e)}
 [/walbert_sql_error]
-"""
-                self.model_manager.execute_devstral(full_prompt)
-
-        # Handle skill execution
-        if parsed.get("skill_name"):
-            skill_name = parsed["skill_name"]
-            skill_params = parsed.get("skill_params", "")
-            self.logger.debug(f"Processing skill execution request: {skill_name} with params: {skill_params}")
-
-            try:
-                # More robust skill lookup
-                skill_item = self.db.cursor.execute(
-                    "SELECT id, content FROM items WHERE type='skill' AND (content LIKE ? OR content LIKE ?)",
-                    (f"%{skill_name}%", f"%def {skill_name}%")
-                ).fetchone()
-
-                if skill_item:
-                    skill_id, skill_code = skill_item
-                    self.logger.debug(f"Found skill code for: {skill_name}")
-                    result = self.skill_manager.execute_skill(skill_code, skill_params)
-                    self.logger.debug(f"Skill execution result: {result}")
-
-                    # Parse the result to extract state
-                    try:
-                        result_obj = json.loads(result)
-                        parsed["skill_result"] = result_obj
-
-                        # Feed result back to model for review
-                        full_prompt = f"""
-[walbert_skill_result]
-Skill: {skill_name}
-Parameters: {skill_params}
-Result: {json.dumps(result_obj, indent=2)}
-[/walbert_skill_result]
-"""
-                        self.model_manager.execute_devstral(full_prompt)
-                    except json.JSONDecodeError:
-                        parsed["skill_result"] = result
-                        # Feed result back to model for review
-                        full_prompt = f"""
-[walbert_skill_result]
-Skill: {skill_name}
-Parameters: {skill_params}
-Result: {result}
-[/walbert_skill_result]
-"""
-                        self.model_manager.execute_devstral(full_prompt)
-                else:
-                    error_msg = f"Skill not found: {skill_name}"
-                    self.logger.error(error_msg)
-                    parsed["skill_error"] = error_msg
-                    # Feed error back to model
-                    full_prompt = f"""
-[walbert_skill_error]
-Skill: {skill_name}
-Error: {error_msg}
-[/walbert_skill_error]
-"""
-                    self.model_manager.execute_devstral(full_prompt)                
-            except Exception as e:
-                error_msg = f"Skill execution error: {e}"
-                self.logger.error(error_msg, exc_info=True)
-                parsed["skill_error"] = error_msg
-                # Feed error back to model
-                full_prompt = f"""
-[walbert_skill_error]
-Skill: {skill_name}
-Error: {error_msg}
-[/walbert_skill_error]
 """
                 self.model_manager.execute_devstral(full_prompt)
 
@@ -421,7 +336,7 @@ Error: {error_msg}
             self.logger.error(f"Error logging to conversation file: {e}")
 
     def run(self):
-        """Main agent execution loop with enhanced processing flow"""
+        """Main agent execution loop"""
         print("Initializing Walbert...")
         self.start_conversation(ChannelType.CONSOLE)
 
@@ -467,9 +382,6 @@ Error: {error_msg}
                     # Process model response
                     model_response = self.model_manager.execute_devstral(full_prompt)
                     self.logger.debug(f"Model response:{chr(10)}{model_response[:500]}...")
-
-                    # Log model response to conversation file
-                    self._log_to_conversation_file(model_response, "assistant")
 
                     last_parsed_response = self.process_response(model_response, ChannelType.CONSOLE)
 

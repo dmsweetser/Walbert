@@ -4,11 +4,10 @@ Database manager implementation
 
 import sqlite3
 import logging
-import json
 from typing import List, Tuple, Any, Dict
 
 class DatabaseManager:
-    """Manages SQLite database operations"""
+    """Manages SQLite database operations with FULL AUTONOMY for Walbert"""
     def __init__(self, db_path: str = "instance/walbert.db"):
         self.db_path = db_path
         self.logger = logging.getLogger('walbert')
@@ -28,7 +27,7 @@ class DatabaseManager:
         """Initialize database schema with minimal structure"""
         self.logger.debug("Initializing database schema")
 
-        # Create minimal items table for basic storage
+        # Create minimal items table - Walbert will define all other tables
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS items (
                 id INTEGER PRIMARY KEY,
