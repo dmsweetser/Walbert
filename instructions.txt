@@ -4,8 +4,4 @@ Instead of having Walbert decide when to return control to the user, I want to h
 
 ***
 
-You started implementing this but didn't complete it. Please finish the implementation. Also, please get rid of all the IO nuance and just have Walbert read from and reply to the console.
-
-***
-
-Please continue the implementation.
+You started implementing this but didn't complete it. Please finish the implementation.
