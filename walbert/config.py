@@ -26,5 +26,8 @@ class Config:
     server_port: int = 8080
     server_health_check_timeout: int = 2
     server_startup_timeout: int = 60
-    python_execution_timeout: int = 120
+    python_execution_timeout: int = 30
     autonomous_operation_timeout: int = 120
+    conversation_log_dir: str = "instance/conversations"
+    database_path: str = "instance/walbert.db"
+    temp_dir_prefix: str = "walbert_python_"

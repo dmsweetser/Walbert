@@ -189,10 +189,17 @@ CHANNEL_NAME
   Must activate venv, validate llama.cpp binaries, and start the console interface.
 
 - **ENV-003: requirements.txt**
-  Must list only essential Python packages.
+  Must list only essential Python packages. Should include python-dotenv for configuration management.
 
 - **ENV-004: Config System**
-  Must define paths to all GGUF models and llama.cpp compiled binaries.
+  Must define complete system configuration including:
+  - Paths to all GGUF models and llama.cpp compiled binaries
+  - Server port and timeout settings
+  - Python execution timeout
+  - Autonomous operation timeout
+  - Conversation log directory
+  - Database path
+  - Temporary directory settings
 
 ---
 

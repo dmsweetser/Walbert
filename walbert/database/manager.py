@@ -10,7 +10,7 @@ class DatabaseManager:
     """Manages SQLite database operations with FULL AUTONOMY for Walbert"""
     def __init__(self, db_path: str = "instance/walbert.db"):
         self.db_path = db_path
-        self.logger = logging.getLogger('walbert')
+        self.logger = logging.getLogger('walbert.database')
         self.connect()
 
     def connect(self):

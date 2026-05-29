@@ -1,20 +1,17 @@
 #!/bin/bash
 # Walbert installation script
-# Creates virtual environment, installs dependencies, and downloads required files
 
-set -e
-
+# Create directories
 mkdir -p instance
+mkdir -p instance/conversations
 mkdir -p instance/llama.cpp
 mkdir -p instance/llama.cpp/bin
 mkdir -p instance/models
 
 echo "Select a model to install:"
 echo "1) Devstral 24B"
-echo "2) Ministral 3B"
-echo "3) Ministral 8B"
-echo "4) Ministral 14B"
-read -p "Enter choice [1-4]: " model_choice
+echo "2) Ministral 14B"
+read -p "Enter choice [1-2]: " model_choice
 
 case $model_choice in
     1)
@@ -24,18 +21,6 @@ case $model_choice in
         MMPROJ_URL="https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true"
         ;;
     2)
-        MODEL_NAME="Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
-        MMPROJ_NAME="Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf"
-        MODEL_URL="https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf?download=true"
-        MMPROJ_URL="https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf?download=true"
-        ;;
-    3)
-        MODEL_NAME="Ministral-3-8B-Instruct-2512-Q4_K_M.gguf"
-        MMPROJ_NAME="Ministral-3-8B-Instruct-2512-BF16-mmproj.gguf"
-        MODEL_URL="https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf?download=true"
-        MMPROJ_URL="https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-BF16-mmproj.gguf?download=true"
-        ;;
-    4)
         MODEL_NAME="Ministral-3-14B-Instruct-2512-Q4_K_M.gguf"
         MMPROJ_NAME="Ministral-3-14B-Instruct-2512-BF16-mmproj.gguf"
         MODEL_URL="https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512-GGUF/resolve/main/Ministral-3-14B-Instruct-2512-Q4_K_M.gguf?download=true"
@@ -65,16 +50,17 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Install dependencies
-echo "Installing Python dependencies..."
+# Install requirements
+pip install --upgrade pip
 pip install -r requirements.txt
 if [ $? -ne 0 ]; then
     echo "Error: Failed to install dependencies"
     exit 1
 fi
 
-# Create config.json dynamically
-cat > instance/config.json << EOL
+# Create default config if it doesn't exist
+if [ ! -f "instance/config.json" ]; then
+    cat > instance/config.json <<EOL
 {
     "model_configs": {
         "model": {
@@ -89,9 +75,20 @@ cat > instance/config.json << EOL
     },
     "llama_binary_path": "instance/llama.cpp/bin/llama-server",
     "mmproj_path": "instance/models/$MMPROJ_NAME",
-    "log_level": "DEBUG"
+    "log_level": "DEBUG",
+    "server_port": 8080,
+    "server_health_check_timeout": 2,
+    "server_startup_timeout": 60,
+    "python_execution_timeout": 30,
+    "autonomous_operation_timeout": 120,
+    "conversation_log_dir": "instance/conversations",
+    "database_path": "instance/walbert.db"
 }
 EOL
+    echo "Created default config at instance/config.json"
+    echo "Please edit this file with your specific paths and settings"
+fi
+
 
 # Download models if missing
 download_model() {
@@ -123,4 +120,8 @@ else
     echo "llama.cpp already exists, skipping download."
 fi
 
-echo "Installation complete."
+echo "Installation complete"
+echo "Please edit instance/config.json with your specific paths before running Walbert"
+
+# Make run script executable
+chmod +x run.sh

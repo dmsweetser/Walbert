@@ -128,7 +128,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
     def __init__(self, config: Config):
         self.config = config
         self.model_manager = ModelManager(config)
-        self.db = DatabaseManager()
+        self.db = DatabaseManager(self.config.database_path)
         self.current_conversation_file = None
         self.model_ready = False
         self.processing_cycle = 0
@@ -138,7 +138,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.last_input_time = time.time()
         self.conversation_context = ""
 
-        os.makedirs('instance/conversations', exist_ok=True)
+        os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
         self.logger = logging.getLogger('walbert.agent')
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
@@ -271,6 +271,7 @@ Error: {error_msg}
 
     def _create_python_venv(self):
         """Create a sandboxed Python virtual environment"""
+        self.python_temp_dir = tempfile.mkdtemp(prefix=self.config.temp_dir_prefix)
         self.python_venv_path = os.path.join(self.python_temp_dir, "venv")
         self.logger.debug(f"Creating Python venv at {self.python_venv_path}")
 
@@ -381,7 +382,11 @@ Error: {error_msg}
         try:
             # Create new conversation file
             timestamp = time.strftime("%Y%m%d_%H%M%S")
-            self.current_conversation_file = f"instance/conversations/conversation_{timestamp}.txt"
+            os.makedirs(self.config.conversation_log_dir, exist_ok=True)
+            self.current_conversation_file = os.path.join(
+                self.config.conversation_log_dir,
+                f"conversation_{timestamp}.txt"
+            )
             self.conversation_context = ""
 
             # Wait for model server to be ready before proceeding

@@ -59,7 +59,15 @@ cd walbert
         }
     },
     "llama_binary_path": "/path/to/llama.cpp/bin/llama-server",
-    "log_level": "INFO"
+    "mmproj_path": "",
+    "log_level": "INFO",
+    "server_port": 8080,
+    "server_health_check_timeout": 2,
+    "server_startup_timeout": 60,
+    "python_execution_timeout": 30,
+    "autonomous_operation_timeout": 120,
+    "conversation_log_dir": "instance/conversations",
+    "database_path": "instance/walbert.db"
 }
 ```
 
