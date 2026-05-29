@@ -8,7 +8,7 @@ import sys
 import os
 import logging
 import json
-from walbert import Config, IOConfig, WalbertAgent
+from walbert import Config, WalbertAgent
 from walbert.config import ModelConfig
 
 # Initialize logging
@@ -52,28 +52,13 @@ def load_config() -> Config:
         logger.error(f"Error loading config: {e}")
         sys.exit(1)
 
-def load_io_config() -> IOConfig:
-    """Load I/O configuration"""
-    try:
-        with open('instance/io_config.json', 'r') as f:
-            io_config_data = json.load(f)
-            return IOConfig(io_config_data)
-    except FileNotFoundError:
-        logger.error("instance/io_config.json not found")
-        sys.exit(1)
-    except Exception as e:
-        logger.error(f"Error loading I/O config: {e}")
-        sys.exit(1)
-
 def main():
     """Main entry point"""
     config = load_config()
-    io_config = load_io_config()
-
     log_level = getattr(logging, config.log_level.upper(), logging.INFO)
     logger.setLevel(log_level)
 
-    agent = WalbertAgent(config, io_config)
+    agent = WalbertAgent(config)
     agent.run()
 
 if __name__ == "__main__":

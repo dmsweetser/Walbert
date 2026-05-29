@@ -93,20 +93,6 @@ cat > instance/config.json << EOL
 }
 EOL
 
-# Create default I/O config file
-if [ ! -f "instance/io_config.json" ]; then
-    cat > instance/io_config.json << 'EOL'
-{
-    "io_layers": {
-        "console": {
-            "enabled": true,
-            "require_authorization": false
-        }
-    }
-}
-EOL
-fi
-
 # Download models if missing
 download_model() {
     local model_name=$1

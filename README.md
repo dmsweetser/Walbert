@@ -30,7 +30,7 @@ cd walbert
 ./install.sh
 ```
 
-3. Configure your system by editing `instance/config.json` and `instance/io_config.json`
+3. Configure your system by editing `instance/config.json`
 
 ## Configuration
 
@@ -50,16 +50,6 @@ cd walbert
     },
     "llama_binary_path": "/path/to/llama.cpp/bin/llama-server",
     "log_level": "INFO"
-}
-```
-
-### io_config.json
-```json
-{
-    "user_interactive_channel": "console",
-    "console": {
-        "enabled": true
-    }
 }
 ```
 
