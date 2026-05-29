@@ -11,6 +11,7 @@ Walbert is a local-first AI agent system built on llama.cpp compiled binaries.
 - **Unified Response Protocol**: Consistent block-based format for all responses
 - **Configurable I/O Layers**: Enable or disable different I/O channels
 - **Full Database Autonomy**: Walbert manages its own schema and data persistence
+- **Raw Conversation Logging**: All input/output and raw LLM output logged to files
 
 ## Installation
 
@@ -51,8 +52,9 @@ cd walbert
 ### io_config.json
 ```json
 {
+    "user_interactive_channel": "console",
     "console": {
-        "enabled": true,
+        "enabled": true
     },
     "serial": {
         "enabled": false,

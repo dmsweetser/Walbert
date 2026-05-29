@@ -129,7 +129,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.model_manager = ModelManager(config)
         self.db = DatabaseManager()
         self.io_factory = IOLayerFactory()
-        self.current_conversation_id = None
+        self.current_conversation_file = None
         self.user_interactive_channel = io_config.io_layers.get('user_interactive_channel', 'console')
         self.model_ready = False
         self.processing_cycle = 0
@@ -326,6 +326,12 @@ Error: {error_msg}
             if match:
                 result['user_control_return'] = match.group(1).strip()
 
+        # Handle conversation complete blocks
+        if 'conversation_complete' not in result:
+            match = re.search(r'\[walbert_conversation_complete\](.*?)\[/walbert_conversation_complete\]', content, re.DOTALL)
+            if match:
+                result['conversation_complete'] = match.group(1).strip()
+
         self.logger.debug(f"Parsed result: {result}")
         return result
 
@@ -418,7 +424,6 @@ Error: {error_msg}
         """Main agent execution loop with enhanced processing flow"""
         print("Initializing Walbert...")
         self.start_conversation(ChannelType.CONSOLE)
-        self.logger.debug(f"Started new conversation with ID {self.current_conversation_id}")
 
         # Wait until model is ready before prompting user
         while not self.model_ready:
@@ -463,8 +468,10 @@ Error: {error_msg}
                     model_response = self.model_manager.execute_devstral(full_prompt)
                     self.logger.debug(f"Model response:{chr(10)}{model_response[:500]}...")
 
+                    # Log model response to conversation file
+                    self._log_to_conversation_file(model_response, "assistant")
+
                     last_parsed_response = self.process_response(model_response, ChannelType.CONSOLE)
-                    self.save_conversation_files(self.current_conversation_id)
 
                     # Handle channel responses
                     target_channels = [
@@ -489,7 +496,6 @@ Error: {error_msg}
                     if is_conversation_complete:
                         self.logger.debug("Conversation marked as complete")
                         self.end_conversation()
-                        self.save_conversation_files(self.current_conversation_id)
                         self.start_conversation(ChannelType.CONSOLE)
                         print("Conversation complete. Starting new session.")
                         break

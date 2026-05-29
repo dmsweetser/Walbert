@@ -38,8 +38,8 @@
 - **GEN-010: Conversation Reset**
   Walbert must autonomously determine when a conversation is complete.
 
-- **GEN-011: Dual Conversation Logging**
-  All conversations must be logged to both the database and raw log files.
+- **GEN-011: Raw Conversation Logging**
+  All input/output and raw LLM output must be logged to raw log files.
 
 - **GEN-012: Comprehensive Testing Framework**
   The system must include unit tests and integration tests for all components.
@@ -99,10 +99,10 @@
 # **4. Data & Storage Features (DATA)**
 
 - **DATA-001: Items Table**
-  Must store text and arbitrary content with generalized tags.
+  Must provide a basic items table for initial storage.
 
 - **DATA-002: Raw Conversation Logs**
-  Must log all conversations to file in raw format.
+  Must log all input/output and raw LLM output to file in raw format.
 
 - **DATA-003: Full Database Autonomy**
   Walbert must have complete control over database schema and data persistence.
@@ -132,6 +132,10 @@ YES/NO
 [walbert_sql_result]
 SQL_RESULT_CONTENT
 [/walbert_sql_result]
+
+[walbert_conversation_complete]
+YES/NO
+[/walbert_conversation_complete]
 ```
 
 ### **5.2 I/O Channel Blocks**
@@ -155,9 +159,12 @@ CHANNEL_NAME
 - Walbert must provide clear indication when background tasks are in progress.
 - Walbert must autonomously determine when a conversation is complete.
 - Walbert may emit response blocks at any time during processing.
-- Walbert has full autonomy over database schema and data persistence.
-- Walbert must manage all data storage and retrieval through SQL commands.
-- No hard-coded database operations are allowed - all persistence must be handled through the protocol.
+- Walbert has **FULL AUTONOMY** over database schema and data persistence.
+- Walbert must manage **ALL** data storage and retrieval through SQL commands.
+- No hard-coded database operations are allowed - **ALL** persistence must be handled through the protocol.
+- Walbert must manage conversation history in its own way.
+- Walbert must manage skills in its own way.
+- The system provides only a basic items table to start with.
 
 ---
 

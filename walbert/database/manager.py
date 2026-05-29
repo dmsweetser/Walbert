@@ -38,7 +38,7 @@ class DatabaseManager:
         """)
 
         self.conn.commit()
-        self.logger.debug("Database schema initialized with minimal structure")
+        self.logger.debug("Database schema initialized with minimal items table only")
 
     def get_schema(self) -> str:
         """Get current database schema"""

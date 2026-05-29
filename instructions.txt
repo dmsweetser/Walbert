@@ -11,3 +11,7 @@ Let it persist and retrieve conversation history in its own way, rather than thr
 Get rid of any conversation handling code and skill handling code in the app. Only log the IO input/output and raw LLM output to file as the conversation history.
 
 Can you make these changes for me?
+
+***
+
+You made good headway. The system prompt for Walbert is outdated now though. Can you make any necessary revisions there and elsewhere so the app is cohesive and aligned with the new approach?
