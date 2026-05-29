@@ -136,6 +136,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.python_temp_dir = None
         self.input_timeout = 300  # 5 minutes default timeout for autonomous operation
         self.last_input_time = time.time()
+        self.conversation_context = ""
 
         os.makedirs('instance/conversations', exist_ok=True)
 
@@ -381,6 +382,7 @@ Error: {error_msg}
             # Create new conversation file
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             self.current_conversation_file = f"instance/conversations/conversation_{timestamp}.txt"
+            self.conversation_context = ""
 
             # Wait for model server to be ready before proceeding
             self.logger.info("Waiting for model server to start...")
@@ -388,11 +390,12 @@ Error: {error_msg}
                 raise RuntimeError("Model server failed to start")
             self.logger.info("Model server ready")
 
-            # Log system prompt to conversation file
+            # Log system prompt to conversation file and initialize context
             db_schema = self.db.get_schema()
             system_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", db_schema)
 
             self._log_to_conversation_file(system_prompt, "system")
+            self.conversation_context = system_prompt + chr(10)
             self.model_ready = True
             self.logger.info("Conversation started")
         except Exception as e:
@@ -408,26 +411,9 @@ Error: {error_msg}
             self.python_temp_dir = None
             self.python_venv_path = None
 
-    def build_conversation_context(self, max_lines: int = 9999999) -> str:
-        """Build conversation context from raw log file"""
-        if not self.current_conversation_file or not os.path.exists(self.current_conversation_file):
-            return ""
-
-        try:
-            with open(self.current_conversation_file, 'r') as f:
-                lines = f.readlines()
-
-            # Get last max_lines lines and reverse to maintain chronological order
-            context_lines = lines[-max_lines:]
-            context = "".join(context_lines)
-
-            return context
-        except Exception as e:
-            self.logger.error(f"Error building conversation context: {e}")
-            return ""
 
     def _log_to_conversation_file(self, content: str, sender: str = "user"):
-        """Log content to current conversation file"""
+        """Log content to current conversation file and append to in-memory context"""
         if not self.current_conversation_file:
             return
 
@@ -439,6 +425,12 @@ Error: {error_msg}
                 else:
                     content_str = str(content)
                 f.write(f"[{timestamp}] {sender}:{chr(10)}{content_str}{chr(10)}{chr(10)}")
+
+            # Append to in-memory context
+            if sender == "system":
+                self.conversation_context = content_str + chr(10)
+            else:
+                self.conversation_context += f"[{timestamp}] {sender}:{chr(10)}{content_str}{chr(10)}{chr(10)}"
         except Exception as e:
             self.logger.error(f"Error logging to conversation file: {e}")
 
