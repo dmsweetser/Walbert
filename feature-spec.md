@@ -126,10 +126,10 @@ SQL_STATEMENT
 [/walbert_sql_execute]
 
 [walbert_python_requirements]
-# Python requirements without version numbers
+# Python requirements WITHOUT VERSION NUMBERS
+# Example:
 package1
 package2
-package3
 [/walbert_python_requirements]
 
 [walbert_python_execute]
@@ -175,6 +175,7 @@ CHANNEL_NAME
 - Walbert has **FULL AUTONOMY** over database schema and data persistence.
 - **ALL** data storage and retrieval must be managed through SQL commands in `[walbert_sql_execute]` blocks.
 - **ALL** Python code execution must be managed through `[walbert_python_execute]` blocks.
+- **ALL** Python requirements must be specified in `[walbert_python_requirements]` blocks without version numbers.
 - No hard-coded database operations are allowed - **ALL** persistence must be handled through the protocol.
 - Walbert must manage **ALL** aspects of its database, including:
   - Schema design and evolution
