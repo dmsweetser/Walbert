@@ -84,31 +84,42 @@ class DatabaseManager:
         return schema_str
 
     def execute_sql(self, sql: str) -> str:
-        """Execute arbitrary SQL statement"""
+        """Execute arbitrary SQL statement(s)"""
         self.logger.debug(f"Executing SQL: {sql}")
         try:
-            result = self.cursor.execute(sql)
+            # Split multiple statements by semicolon
+            statements = [s.strip() for s in sql.split(';') if s.strip()]
 
-            if sql.strip().upper().startswith("SELECT"):
-                rows = result.fetchall()
-                if not rows:
-                    return "Query executed successfully. No rows returned."
+            results = []
+            for statement in statements:
+                if not statement:
+                    continue
 
-                output = []
-                columns = [desc[0] for desc in result.description]
-                output.append("\t".join(columns))
-                output.append("-" * (sum(len(col) for col in columns) + len(columns) * 3))
+                result = self.cursor.execute(statement)
 
-                for row in rows:
-                    output_row = []
-                    for val in row:
-                        output_row.append(str(val) if val is not None else "NULL")
-                    output.append("\t".join(output_row))
+                if statement.strip().upper().startswith("SELECT"):
+                    rows = result.fetchall()
+                    if not rows:
+                        results.append("Query executed successfully. No rows returned.")
+                        continue
 
-                return "\n".join(output)
-            else:
-                self.conn.commit()
-                return f"SQL executed successfully. Rows affected: {self.cursor.rowcount}"
+                    output = []
+                    columns = [desc[0] for desc in result.description]
+                    output.append("\t".join(columns))
+                    output.append("-" * (sum(len(col) for col in columns) + len(columns) * 3))
+
+                    for row in rows:
+                        output_row = []
+                        for val in row:
+                            output_row.append(str(val) if val is not None else "NULL")
+                        output.append("\t".join(output_row))
+
+                    results.append("\n".join(output))
+                else:
+                    results.append(f"SQL executed successfully. Rows affected: {self.cursor.rowcount}")
+
+            self.conn.commit()
+            return "\n\n".join(results)
         except Exception as e:
             self.logger.error(f"SQL execution error: {e}")
             return f"Error executing SQL: {e}"
