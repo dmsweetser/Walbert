@@ -32,6 +32,7 @@ case $model_choice in
         MMPROJ_NAME=""
         MODEL_URL="https://huggingface.co/MaziyarPanahi/Mistral-7B-Instruct-v0.3-GGUF/resolve/main/Mistral-7B-Instruct-v0.3.IQ4_XS.gguf?download=true"
         MMPROJ_URL=""
+        ;;
     *)
         echo "Invalid choice"
         exit 1
