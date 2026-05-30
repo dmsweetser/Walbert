@@ -1,6 +1,22 @@
 # Walbert - Local-First AI Agent
+      
+```
+ ___            ___     
+/   \          /   \     
+\_   \        /  __/     
+ _\   \      /  /__     
+ \___  \____/   __/     
+     \_       _/     
+       | @ @  \_     
+       |     
+     _/     /\     
+    /o)  (o/\ \_     
+    \_____/ /     
+      \____/     
+             
+```
 
-Walbert is a local-first AI agent system built on llama.cpp compiled binaries.
+Welcome to Walbert! The local-first AI agent.
 
 ## Features
 
@@ -31,7 +47,7 @@ Walbert is a local-first AI agent system built on llama.cpp compiled binaries.
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/walbert.git
+git clone https://github.com/dmsweetser/walbert.git
 cd walbert
 ```
 
@@ -82,7 +98,7 @@ Available commands:
 - `exit`/`quit`: Exit the program
 - `auto`: Enter autonomous mode (any input returns to normal mode)
 
-## Testing
+## Testing (there are no tests)
 
 Run the test suite with:
 ```bash
