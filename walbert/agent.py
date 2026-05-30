@@ -460,7 +460,7 @@ Error: {error_msg}
         """Main agent execution loop with autonomous mode control"""
         print("""
       
-___            ___     
+ ___            ___     
 /   \          /   \     
 \_   \        /  __/     
  _\   \      /  /__     
