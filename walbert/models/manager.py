@@ -101,7 +101,7 @@ class ModelManager:
                 response = requests.post(
                     "http://localhost:8080/v1/chat/completions",
                     json=payload,
-                    timeout=600
+                    timeout=7200
                 )
                 response.raise_for_status()
                 result = response.json()
