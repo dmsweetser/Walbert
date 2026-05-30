@@ -349,6 +349,7 @@ Error: {error_msg}
         block_pattern = r'\[walbert_([a-z_]+)\](.*?)\[/walbert_\1\]'
         sql_blocks = []
         python_blocks = []
+        python_requirements_blocks = []
 
         for match in re.finditer(block_pattern, content, re.DOTALL):
             block_type = match.group(1)
@@ -368,7 +369,8 @@ Error: {error_msg}
 
             # Special handling for Python requirements
             elif block_type == 'python_requirements':
-                result[block_type] = [line.strip() for line in block_content.split('{chr(10)}') if line.strip()]
+                requirements = [line.strip() for line in block_content.split(chr(10)) if line.strip()]
+                python_requirements_blocks.extend(requirements)
 
             # Special handling for console response
             elif block_type == 'console_response':
@@ -383,6 +385,8 @@ Error: {error_msg}
             result['sql_execute'] = sql_blocks
         if python_blocks:
             result['python_execute'] = python_blocks
+        if python_requirements_blocks:
+            result['python_requirements'] = python_requirements_blocks
 
         # Determine if control should return to user automatically
         has_pending_sql = 'sql_execute' in result
@@ -453,12 +457,18 @@ Error: {error_msg}
     def run(self):
         """Main agent execution loop with autonomous mode control"""
         print("""
-  /\\___/\\
- (  o   o  )
- (  =^=  )
-  (      )
-   (    )
-    (__)
+ ___            ___
+/   \          /   \
+\_   \        /  __/
+ _\   \      /  /__
+ \___  \____/   __/
+     \_       _/
+       | @ @  \_
+       |
+     _/     /\
+    /o)  (o/\ \_
+    \_____/ /
+      \____/
 
 Welcome to Walbert! The local-first AI agent.
 Available commands:
