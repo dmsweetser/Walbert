@@ -135,7 +135,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.python_venv_path = None
         self.python_temp_dir = None
         self.input_timeout = self.config.autonomous_operation_timeout
-        self.last_input_time = time.time()
+        self.last_input_time = 0  # Initialize to 0 to ensure first check triggers autonomous mode
         self.conversation_context = ""
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
@@ -149,13 +149,14 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             import select
             import sys
             self.logger.debug("Waiting for user input...")
-            ready, _, _ = select.select([sys.stdin], [], [], self.input_timeout)
+            ready, _, _ = select.select([sys.stdin], [], [], 1)  # Reduced timeout for more responsive checking
             if ready:
                 input_text = input("> ")
                 self.logger.debug(f"Received input: {input_text}")
+                self.last_input_time = time.time()  # Update last input time on actual input
                 return input_text
             else:
-                self.logger.debug("Input timeout reached, returning empty string")
+                self.logger.debug("Input timeout reached, checking autonomous operation")
                 return ""
         except Exception as e:
             self.logger.error(f"Error reading input: {e}")
@@ -457,20 +458,20 @@ Error: {error_msg}
         while True:
             try:
                 # Check for timeout and continue autonomously if needed
-                if time.time() - self.last_input_time > self.input_timeout:
+                current_time = time.time()
+                if current_time - self.last_input_time > self.input_timeout:
                     self.logger.info("No user input received within timeout period, continuing autonomously")
                     full_prompt = self.conversation_context
-                    full_prompt += "{chr(10)}[walbert_input_channel]autonomous[/walbert_input_channel]"
-                    full_prompt += "{chr(10)}Continuing autonomous operation..."
+                    full_prompt += chr(10) + "[walbert_input_channel]autonomous[/walbert_input_channel]"
+                    full_prompt += chr(10) + "Continuing autonomous operation. Please perform any necessary tasks or reflections."
 
                     model_response = self.model_manager.execute_model(full_prompt)
                     last_parsed_response = self.process_response(model_response)
                     self._log_to_conversation_file(model_response, "assistant")
                     self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
 
-                    # Reset timeout if there are pending tasks
-                    if last_parsed_response.get("has_pending_tasks", False):
-                        self.last_input_time = time.time()
+                    # Reset timeout to continue autonomous operation
+                    self.last_input_time = current_time
                     continue
 
                 user_input = self.read_input()
