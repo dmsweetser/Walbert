@@ -5,3 +5,7 @@ When Walbert receives input during autonomous mode, it sees it, but doesn't proc
 Can we also reset the conversation context every time we interact? So every question has a new context.
 
 Figure out a way to make that work.
+
+***
+
+Also remove any unused code, and fix any issues you see so the app is fully functional.
