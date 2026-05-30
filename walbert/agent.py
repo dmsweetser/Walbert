@@ -489,6 +489,7 @@ Available commands:
         in_autonomous_mode = False
 
         while True:
+            interruption_input = ""
             try:
                 if in_autonomous_mode:
                     # Autonomous mode - continue processing without waiting for user input
@@ -512,11 +513,12 @@ Available commands:
                             if user_input.strip():
                                 if user_input.lower() in ['exit', 'quit']:
                                     break
-                                # Any input exits autonomous mode
+                                # Process input as normal user input, not just exiting autonomous mode
                                 in_autonomous_mode = False
                                 self._log_to_conversation_file(user_input, "user")
-                                self.conversation_context += f"User:{chr(10)}{user_input}{chr(10)}{chr(10)}"
+                                interruption_input = user_input
                                 self.processing_cycle = 0
+                                # Continue to process the input like normal mode
                                 break
 
                         # Exit processing loop if no pending tasks
@@ -531,7 +533,10 @@ Available commands:
                         self.processing_cycle += 1
                 else:
                     # Normal mode - wait for user input
-                    user_input = self.read_input()
+                    if interruption_input != "":
+                        user_input = interruption_input
+                    else:
+                        user_input = self.read_input()
 
                     if not user_input.strip():
                         continue

@@ -1,2 +1,3 @@
-I'm finding that when I enter autonomous mode, it returns control back to the user after one round of processing. I don't want it to do that. It should continue autonomously until user input is available that disrupts its flow.
+If you receive input during autonomous mode, I want that to be treated as the user input and process it normally. Right now, it just exits autonomous mode but doesn't process that input as normal user input for the next round.
 
+Fix this and any other issues you see.
