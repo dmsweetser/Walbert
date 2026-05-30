@@ -477,8 +477,8 @@ Error: {error_msg}
 Welcome to Walbert! The local-first AI agent.
 Available commands:
 - exit/quit: Exit the program
-- auto: Enter autonomous mode
-- Any other input returns from autonomous mode
+- auto: Enter autonomoose mode
+- Any other input returns from autonomoose mode
         """)
         self.start_conversation()
 
