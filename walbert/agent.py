@@ -491,26 +491,44 @@ Available commands:
         while True:
             try:
                 if in_autonomous_mode:
-                    # Autonomous mode - continue processing without user input
-                    full_prompt = self.conversation_context
-                    full_prompt += chr(10) + "[walbert_input_channel]autonomous[/walbert_input_channel]"
-                    full_prompt += chr(10) + "Continuing autonomous operation. Please perform any necessary tasks or reflections."
+                    # Autonomous mode - continue processing without waiting for user input
+                    while True:
+                        full_prompt = self.conversation_context
+                        full_prompt += chr(10) + "[walbert_input_channel]autonomous[/walbert_input_channel]"
+                        full_prompt += chr(10) + "Continuing autonomous operation. Please perform any necessary tasks or reflections."
 
-                    model_response = self.model_manager.execute_model(full_prompt)
-                    last_parsed_response = self.process_response(model_response)
-                    self._log_to_conversation_file(model_response, "assistant")
-                    self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
+                        model_response = self.model_manager.execute_model(full_prompt)
+                        last_parsed_response = self.process_response(model_response)
+                        self._log_to_conversation_file(model_response, "assistant")
+                        self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
 
-                    # Check if user wants to exit autonomous mode
-                    user_input = self.read_input()
-                    if user_input.strip():
-                        if user_input.lower() in ['exit', 'quit']:
-                            break
-                        # Any input exits autonomous mode
-                        in_autonomous_mode = False
-                        self._log_to_conversation_file(user_input, "user")
-                        self.conversation_context += f"User:{chr(10)}{user_input}{chr(10)}{chr(10)}"
-                        self.processing_cycle = 0
+                        # Handle console response if present
+                        if "console_response" in last_parsed_response:
+                            self.write_output(f"[walbert_console_response]{last_parsed_response['console_response']}[/walbert_console_response]")
+
+                        # Check for user input without blocking (non-blocking check)
+                        if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+                            user_input = self.read_input()
+                            if user_input.strip():
+                                if user_input.lower() in ['exit', 'quit']:
+                                    break
+                                # Any input exits autonomous mode
+                                in_autonomous_mode = False
+                                self._log_to_conversation_file(user_input, "user")
+                                self.conversation_context += f"User:{chr(10)}{user_input}{chr(10)}{chr(10)}"
+                                self.processing_cycle = 0
+                                break
+
+                        # Exit processing loop if no pending tasks
+                        if not last_parsed_response.get("has_pending_tasks", False):
+                            self.logger.debug("No pending tasks in autonomous mode, continuing reflection")
+                            # Add a small delay to prevent CPU overload
+                            time.sleep(0.1)
+                            continue
+
+                        # Continue processing if there are pending tasks
+                        self.logger.debug("Continuing internal processing cycle due to pending tasks")
+                        self.processing_cycle += 1
                 else:
                     # Normal mode - wait for user input
                     user_input = self.read_input()
@@ -530,34 +548,34 @@ Available commands:
                     self.conversation_context += f"User:{chr(10)}{user_input}{chr(10)}{chr(10)}"
                     self.processing_cycle = 0
 
-                while True:
-                    # Build prompt using the in-memory conversation context
-                    full_prompt = self.conversation_context
+                    while True:
+                        # Build prompt using the in-memory conversation context
+                        full_prompt = self.conversation_context
 
-                    self.logger.debug("Built prompt for model using in-memory context")
+                        self.logger.debug("Built prompt for model using in-memory context")
 
-                    # Process model response
-                    model_response = self.model_manager.execute_model(full_prompt)
-                    self.logger.debug(f"Model response:{chr(10)}{model_response}")
+                        # Process model response
+                        model_response = self.model_manager.execute_model(full_prompt)
+                        self.logger.debug(f"Model response:{chr(10)}{model_response}")
 
-                    last_parsed_response = self.process_response(model_response)
+                        last_parsed_response = self.process_response(model_response)
 
-                    # Log assistant response to conversation file and append to context
-                    self._log_to_conversation_file(model_response, "assistant")
-                    self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
+                        # Log assistant response to conversation file and append to context
+                        self._log_to_conversation_file(model_response, "assistant")
+                        self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
 
-                    # Handle console response if present
-                    if "console_response" in last_parsed_response:
-                        self.write_output(f"[walbert_console_response]{last_parsed_response['console_response']}[/walbert_console_response]")
+                        # Handle console response if present
+                        if "console_response" in last_parsed_response:
+                            self.write_output(f"[walbert_console_response]{last_parsed_response['console_response']}[/walbert_console_response]")
 
-                    # Exit processing loop if no pending tasks
-                    if not last_parsed_response.get("has_pending_tasks", False):
-                        self.logger.debug("No pending tasks, returning control to user")
-                        break
+                        # Exit processing loop if no pending tasks
+                        if not last_parsed_response.get("has_pending_tasks", False):
+                            self.logger.debug("No pending tasks, returning control to user")
+                            break
 
-                    # Continue processing if there are pending tasks
-                    self.logger.debug("Continuing internal processing cycle due to pending tasks")
-                    self.processing_cycle += 1
+                        # Continue processing if there are pending tasks
+                        self.logger.debug("Continuing internal processing cycle due to pending tasks")
+                        self.processing_cycle += 1
 
             except KeyboardInterrupt:
                 print(f"{chr(10)}Goodbye!")

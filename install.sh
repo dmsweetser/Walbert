@@ -11,7 +11,8 @@ mkdir -p instance/models
 echo "Select a model to install:"
 echo "1) Devstral 24B"
 echo "2) Ministral 14B"
-read -p "Enter choice [1-2]: " model_choice
+echo "3) Mistral 7B"
+read -p "Enter choice: " model_choice
 
 case $model_choice in
     1)
@@ -26,6 +27,11 @@ case $model_choice in
         MODEL_URL="https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512-GGUF/resolve/main/Ministral-3-14B-Instruct-2512-Q4_K_M.gguf?download=true"
         MMPROJ_URL="https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512-GGUF/resolve/main/Ministral-3-14B-Instruct-2512-BF16-mmproj.gguf?download=true"
         ;;
+    3)
+        MODEL_NAME="Mistral-7B-Instruct-v0.3.IQ4_XS.gguf"
+        MMPROJ_NAME=""
+        MODEL_URL="https://huggingface.co/MaziyarPanahi/Mistral-7B-Instruct-v0.3-GGUF/resolve/main/Mistral-7B-Instruct-v0.3.IQ4_XS.gguf?download=true"
+        MMPROJ_URL=""
     *)
         echo "Invalid choice"
         exit 1

@@ -1,6 +1,2 @@
-I get this error:
+I'm finding that when I enter autonomous mode, it returns control back to the user after one round of processing. I don't want it to do that. It should continue autonomously until user input is available that disrupts its flow.
 
-2026-05-30 04:31:00,049 - walbert.database - ERROR - SQL execution error: You can only execute one statement at a time.
-2026-05-30 04:31:00,049 - walbert.agent - DEBUG - SQL execution result: Error executing SQL: You can only execute one statement at a time.
-
-Can you make it so I can have more than one SQL statement inside each SQL block?
