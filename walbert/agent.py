@@ -175,7 +175,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             print(text)
 
     def process_response(self, response_text: str) -> dict:
-        """Process model response with enhanced diagnostics"""
+        """Process model response with enhanced diagnostics for multiple blocks"""
         self.logger.debug(f"Processing response (cycle {self.processing_cycle}):{chr(10)}{response_text}")
         self.processing_cycle += 1
 
@@ -189,40 +189,45 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         if not self.db.conn:
             self.db.connect()
 
-        # Handle SQL execution with result feedback
+        # Handle multiple SQL executions
         if parsed.get("sql_execute"):
-            self.logger.debug(f"Executing SQL: {parsed['sql_execute']}")
-            sql = parsed["sql_execute"]
-            try:
-                result = self.db.execute_sql(sql)
-                self.logger.debug(f"SQL execution result: {result}")
+            if isinstance(parsed["sql_execute"], list):
+                sql_statements = parsed["sql_execute"]
+            else:
+                sql_statements = [parsed["sql_execute"]]
 
-                parsed["sql_result"] = result
+            for sql in sql_statements:
+                self.logger.debug(f"Executing SQL: {sql}")
+                try:
+                    result = self.db.execute_sql(sql)
+                    self.logger.debug(f"SQL execution result: {result}")
 
-                # Feed SQL result back to model for review
-                full_prompt = f"""
+                    # Feed SQL result back to model for review
+                    full_prompt = f"""
 [walbert_sql_result]
 SQL: {sql}
 Result: {result}
 [/walbert_sql_result]
 """
-                self.model_manager.execute_model(full_prompt)
-            except Exception as e:
-                self.logger.error(f"SQL execution error: {e}")
-                error_msg = f"SQL Error: {str(e)}"
-                parsed["sql_error"] = error_msg
-                full_prompt = f"""
+                    self.model_manager.execute_model(full_prompt)
+                except Exception as e:
+                    self.logger.error(f"SQL execution error: {e}")
+                    error_msg = f"SQL Error: {str(e)}"
+                    full_prompt = f"""
 [walbert_error]
 Error Type: SQL Execution
 Statement: {sql}
 Error: {error_msg}
 [/walbert_error]
 """
-                self.model_manager.execute_model(full_prompt)
+                    self.model_manager.execute_model(full_prompt)
 
-        # Handle Python execution with result feedback
+        # Handle multiple Python executions
         if parsed.get("python_execute"):
-            self.logger.debug(f"Executing Python code")
+            if isinstance(parsed["python_execute"], list):
+                python_blocks = parsed["python_execute"]
+            else:
+                python_blocks = [parsed["python_execute"]]
 
             # Create temporary directory for Python execution
             if not self.python_temp_dir:
@@ -231,50 +236,47 @@ Error: {error_msg}
             if not self.python_venv_path:
                 self._create_python_venv()
 
-            try:
-                # Install requirements if specified
-                if parsed.get("python_requirements"):
-                    try:
-                        self._install_python_requirements(parsed["python_requirements"])
-                    except Exception as e:
-                        error_msg = f"Requirements Installation Error: {str(e)}"
-                        parsed["python_error"] = error_msg
-                        full_prompt = f"""
+            # Install requirements if specified
+            if parsed.get("python_requirements"):
+                try:
+                    self._install_python_requirements(parsed["python_requirements"])
+                except Exception as e:
+                    error_msg = f"Requirements Installation Error: {str(e)}"
+                    full_prompt = f"""
 [walbert_error]
 Error Type: Python Requirements
 Requirements: {', '.join(parsed['python_requirements'])}
 Error: {error_msg}
 [/walbert_error]
 """
-                        self.model_manager.execute_model(full_prompt)
-                        return parsed
+                    self.model_manager.execute_model(full_prompt)
+                    return parsed
 
-                # Execute Python code in sandboxed environment
-                result = self._execute_python_code(parsed["python_execute"])
-                self.logger.debug(f"Python execution result: {result}")
+            for code in python_blocks:
+                self.logger.debug(f"Executing Python code")
+                try:
+                    result = self._execute_python_code(code)
+                    self.logger.debug(f"Python execution result: {result}")
 
-                parsed["python_result"] = result
-
-                # Feed Python result back to model for review
-                full_prompt = f"""
+                    # Feed Python result back to model for review
+                    full_prompt = f"""
 [walbert_python_result]
-Code: {parsed['python_execute']}
+Code: {code}
 Result: {result}
 [/walbert_python_result]
 """
-                self.model_manager.execute_model(full_prompt)
-            except Exception as e:
-                self.logger.error(f"Python execution error: {e}")
-                error_msg = f"Python Execution Error: {str(e)}"
-                parsed["python_error"] = error_msg
-                full_prompt = f"""
+                    self.model_manager.execute_model(full_prompt)
+                except Exception as e:
+                    self.logger.error(f"Python execution error: {e}")
+                    error_msg = f"Python Execution Error: {str(e)}"
+                    full_prompt = f"""
 [walbert_error]
 Error Type: Python Execution
-Code: {parsed['python_execute']}
+Code: {code}
 Error: {error_msg}
 [/walbert_error]
 """
-                self.model_manager.execute_model(full_prompt)
+                    self.model_manager.execute_model(full_prompt)
 
         return parsed
 
@@ -347,16 +349,18 @@ Error: {error_msg}
             raise RuntimeError(f"Python execution error: {e}")
 
     def _parse_response(self, content: str) -> dict:
-        """Parse response with enhanced block detection"""
+        """Parse response with enhanced block detection for multiple blocks"""
         result = {}
         self.logger.debug(f"Parsing response content: {content[:200]}...")
 
         # Parse all walbert blocks
         block_pattern = r'\[walbert_([a-z_]+)\](.*?)\[/walbert_\1\]'
+        sql_blocks = []
+        python_blocks = []
+
         for match in re.finditer(block_pattern, content, re.DOTALL):
             block_type = match.group(1)
             block_content = match.group(2).strip()
-            result[block_type] = block_content
 
             # Special handling for SQL execution
             if block_type == 'sql_execute':
@@ -364,19 +368,29 @@ Error: {error_msg}
                 sql = block_content.strip()
                 if sql.endswith(';'):
                     sql = sql[:-1]
-                result[block_type] = sql
+                sql_blocks.append(sql)
 
             # Special handling for Python execution
-            if block_type == 'python_execute':
-                result[block_type] = block_content
+            elif block_type == 'python_execute':
+                python_blocks.append(block_content)
 
             # Special handling for Python requirements
-            if block_type == 'python_requirements':
+            elif block_type == 'python_requirements':
                 result[block_type] = [line.strip() for line in block_content.split('{chr(10)}') if line.strip()]
 
             # Special handling for console response
-            if block_type == 'console_response':
+            elif block_type == 'console_response':
                 result[block_type] = block_content
+
+            # Handle other block types
+            else:
+                result[block_type] = block_content
+
+        # Store multiple blocks if found
+        if sql_blocks:
+            result['sql_execute'] = sql_blocks
+        if python_blocks:
+            result['python_execute'] = python_blocks
 
         # Determine if control should return to user automatically
         has_pending_sql = 'sql_execute' in result
@@ -445,22 +459,33 @@ Error: {error_msg}
             self.logger.error(f"Error logging to conversation file: {e}")
 
     def run(self):
-        """Main agent execution loop"""
-        print("Initializing Walbert...")
+        """Main agent execution loop with autonomous mode control"""
+        print("""
+  /\\___/\\
+ (  o   o  )
+ (  =^=  )
+  (      )
+   (    )
+    (__)
+
+Welcome to Walbert! The local-first AI agent.
+Available commands:
+- exit/quit: Exit the program
+- auto: Enter autonomous mode
+- Any other input returns from autonomous mode
+        """)
         self.start_conversation()
 
         # Wait until model is ready before prompting user
         while not self.model_ready:
             time.sleep(0.1)
 
-        print("Welcome to Walbert! Type 'exit' to quit. I will continue autonomously if no input is received.")
+        in_autonomous_mode = False
 
         while True:
             try:
-                # Check for timeout and continue autonomously if needed
-                current_time = time.time()
-                if current_time - self.last_input_time > self.input_timeout:
-                    self.logger.info("No user input received within timeout period, continuing autonomously")
+                if in_autonomous_mode:
+                    # Autonomous mode - continue processing without user input
                     full_prompt = self.conversation_context
                     full_prompt += chr(10) + "[walbert_input_channel]autonomous[/walbert_input_channel]"
                     full_prompt += chr(10) + "Continuing autonomous operation. Please perform any necessary tasks or reflections."
@@ -470,22 +495,34 @@ Error: {error_msg}
                     self._log_to_conversation_file(model_response, "assistant")
                     self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
 
-                    # Reset timeout to continue autonomous operation
-                    self.last_input_time = current_time
-                    continue
+                    # Check if user wants to exit autonomous mode
+                    user_input = self.read_input()
+                    if user_input.strip():
+                        if user_input.lower() in ['exit', 'quit']:
+                            break
+                        # Any input exits autonomous mode
+                        in_autonomous_mode = False
+                        self._log_to_conversation_file(user_input, "user")
+                        self.conversation_context += f"User:{chr(10)}{user_input}{chr(10)}{chr(10)}"
+                        self.processing_cycle = 0
+                else:
+                    # Normal mode - wait for user input
+                    user_input = self.read_input()
 
-                user_input = self.read_input()
-                self.last_input_time = time.time()
+                    if not user_input.strip():
+                        continue
+                    if user_input.lower() in ['exit', 'quit']:
+                        break
+                    if user_input.lower() == 'auto':
+                        in_autonomous_mode = True
+                        self._log_to_conversation_file("Entering autonomous mode", "system")
+                        self.conversation_context += f"System:{chr(10)}Entering autonomous mode{chr(10)}{chr(10)}"
+                        continue
 
-                if not user_input.strip():
-                    continue
-                if user_input.lower() in ['exit', 'quit']:
-                    break
-
-                # Log user input to conversation file and append to context
-                self._log_to_conversation_file(user_input, "user")
-                self.conversation_context += f"User:{chr(10)}{user_input}{chr(10)}{chr(10)}"
-                self.processing_cycle = 0
+                    # Log user input to conversation file and append to context
+                    self._log_to_conversation_file(user_input, "user")
+                    self.conversation_context += f"User:{chr(10)}{user_input}{chr(10)}{chr(10)}"
+                    self.processing_cycle = 0
 
                 while True:
                     # Build prompt using the in-memory conversation context
