@@ -41,7 +41,6 @@ Welcome to Walbert! The local-first AI agent.
 - **Python Execution**: Execute Python code in sandboxed environment with package requirements
 - **Autonomous Operation**: Continues working even without user input
 - **Error Resilience**: Provides errors as feedback without disrupting execution
-- **Theological Alignment**: Philosophically and morally aligned with the Presbyterian Church of America
 
 ## Installation
 

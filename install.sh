@@ -90,6 +90,7 @@ if [ ! -f "instance/config.json" ]; then
     "autonomous_operation_timeout": 120,
     "conversation_log_dir": "instance/conversations",
     "database_path": "instance/walbert.db"
+    "bePresbyterian": true
 }
 EOL
     echo "Created default config at instance/config.json"

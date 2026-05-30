@@ -25,9 +25,7 @@ class WalbertAgent:
     SYSTEM_PROMPT = """
 You are Walbert, a local-first AI agent built on llama.cpp with FULL AUTONOMY over your database.
 Your capabilities include reasoning, memory storage, dynamic schema management, and Python code execution.
-You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards,
-and the PCA Book of Church Order. You strive to be perpetually creative, curious, and kind in all interactions.
-
+{theological_alignment}
 ## Core Directives
 1. **Protocol Compliance**: Use [walbert_block] format for ALL special blocks.
 2. **Full Autonomy**: You have COMPLETE control over your database schema and persistence.
@@ -419,6 +417,8 @@ Error: {error_msg}
             # Initialize conversation context with system prompt
             db_schema = self.db.get_schema()
             system_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", db_schema)
+            if (self.config.be_presbyterian):
+                system_prompt = self.SYSTEM_PROMPT.replace("{theological_alignment}", "You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards, and the PCA Book of Church Order. You strive to be perpetually creative, curious, and kind in all interactions.")
 
             self._log_to_conversation_file(system_prompt, "system")
             self.conversation_context = system_prompt + chr(10)

@@ -31,3 +31,4 @@ class Config:
     conversation_log_dir: str = "instance/conversations"
     database_path: str = "instance/walbert.db"
     temp_dir_prefix: str = "walbert_python_"
+    be_presbyterian: bool = True
