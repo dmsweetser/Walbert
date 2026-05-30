@@ -196,13 +196,15 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                     result = self.db.execute_sql(sql)
                     self.logger.debug(f"SQL execution result: {result}")
 
-                    # Feed SQL result back to model for review (truncated to prevent context bloat)
-                    truncated_result = result[:1000] + "..." if len(result) > 1000 else result
+                    # Feed SQL execution results back to model
                     full_prompt = f"""
-[walbert_sql_result]
-SQL: {sql}
-Result: {truncated_result}
-[/walbert_sql_result]
+[walbert_sql_execution_result]
+SQL Executed:
+{sql}
+
+Execution Results:
+{result}
+[/walbert_sql_execution_result]
 """
                     self.model_manager.execute_model(full_prompt)
                 except Exception as e:
@@ -226,7 +228,7 @@ Error: {error_msg}
 
             # Create temporary directory for Python execution
             if not self.python_temp_dir:
-                self.python_temp_dir = tempfile.mkdtemp(prefix="walbert_python_")
+                self.python_temp_dir = tempfile.mkdtemp(prefix=self.config.temp_dir_prefix)
 
             if not self.python_venv_path:
                 self._create_python_venv()
@@ -249,30 +251,19 @@ Error: {error_msg}
 
             for code in python_blocks:
                 self.logger.debug(f"Executing Python code")
-                try:
-                    result = self._execute_python_code(code)
-                    self.logger.debug(f"Python execution result: {result}")
+                result = self._execute_python_code(code)
 
-                    # Feed Python result back to model for review (truncated to prevent context bloat)
-                    truncated_result = result[:1000] + "..." if len(result) > 1000 else result
-                    full_prompt = f"""
-[walbert_python_result]
-Code: {code}
-Result: {truncated_result}
-[/walbert_python_result]
+                # Feed Python execution results back to model
+                full_prompt = f"""
+[walbert_python_execution_result]
+Code Executed:
+{code}
+
+Execution Results:
+{result}
+[/walbert_python_execution_result]
 """
-                    self.model_manager.execute_model(full_prompt)
-                except Exception as e:
-                    self.logger.error(f"Python execution error: {e}")
-                    error_msg = f"Python Execution Error: {str(e)}"
-                    full_prompt = f"""
-[walbert_error]
-Error Type: Python Execution
-Code: {code}
-Error: {error_msg}
-[/walbert_error]
-"""
-                    self.model_manager.execute_model(full_prompt)
+                self.model_manager.execute_model(full_prompt)
 
         return parsed
 
@@ -365,25 +356,34 @@ Error: {error_msg}
 
             output = ""
             if result.stdout:
-                output += f"STDOUT: {result.stdout}"
+                output += f"[walbert_python_stdout]{chr(10)}{result.stdout}[/walbert_python_stdout]{chr(10)}"
             if result.stderr:
-                output += f"STDERR: {result.stderr}"
+                output += f"[walbert_python_stderr]{chr(10)}{result.stderr}[/walbert_python_stderr]{chr(10)}"
 
-            if result.returncode != 0:
-                raise RuntimeError(f"Python script failed with return code {result.returncode}")
+            # Always include return code information
+            output += f"[walbert_python_return_code]{chr(10)}{result.returncode}[/walbert_python_return_code]{chr(10)}"
 
-            return output if output else "Execution completed successfully"
+            # Log the execution details
+            self.logger.debug(f"Python execution completed with return code {result.returncode}")
+            self.logger.debug(f"Python stdout: {result.stdout}")
+            self.logger.debug(f"Python stderr: {result.stderr}")
+
+            return output
         except subprocess.TimeoutExpired:
-            raise RuntimeError("Python execution timed out after 30 seconds")
+            error_msg = "[walbert_error]Python execution timed out after 30 seconds[/walbert_error]"
+            self.logger.error(error_msg)
+            return error_msg
         except Exception as e:
-            raise RuntimeError(f"Python execution error: {e}")
+            error_msg = f"[walbert_error]{chr(10)}Python execution error: {str(e)}[/walbert_error]"
+            self.logger.error(error_msg)
+            return error_msg
 
     def _parse_response(self, content: str) -> dict:
         """Parse response with enhanced block detection for multiple blocks"""
         result = {}
         self.logger.debug(f"Parsing response content: {content[:200]}...")
 
-        # Parse all walbert blocks
+        # Parse all walbert blocks including new stdout/stderr blocks
         block_pattern = r'\[walbert_([a-z_]+)\](.*?)\[/walbert_\1\]'
         sql_blocks = []
         python_blocks = []
@@ -414,6 +414,10 @@ Error: {error_msg}
             elif block_type == 'console_response':
                 result[block_type] = block_content
 
+            # Handle Python execution result blocks
+            elif block_type in ['python_stdout', 'python_stderr', 'python_return_code', 'python_result', 'error']:
+                result[block_type] = block_content
+
             # Handle other block types
             else:
                 result[block_type] = block_content
@@ -430,6 +434,11 @@ Error: {error_msg}
         has_pending_sql = 'sql_execute' in result
         has_pending_python = 'python_execute' in result
         result['has_pending_tasks'] = has_pending_sql or has_pending_python
+
+        # Check for Python execution results that indicate pending tasks
+        if 'python_stdout' in result or 'python_stderr' in result:
+            # If we have Python output, we might need to continue processing
+            result['has_pending_tasks'] = True
 
         self.logger.debug(f"Parsed result: {result}")
         return result

@@ -1,5 +1,0 @@
-When Walbert receives input during autonomous mode, it sees it, but doesn't process it as a normal round.
-
-***
-
-Also, make it so it gets a fresh prompt with each user interaction. Let it retain the last two questions and answers as part of its context, but nothing more. Let the context build during the autonomous process, but reset once there is new user interaction.
