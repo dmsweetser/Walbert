@@ -467,10 +467,6 @@ Error: {error_msg}
                     last_parsed_response = self.process_response(model_response)
                     self._log_to_conversation_file(model_response, "assistant")
                     self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
-
-                    # Reset timeout if there are pending tasks
-                    if last_parsed_response.get("has_pending_tasks", False):
-                        self.last_input_time = time.time()
                     continue
 
                 user_input = self.read_input()
