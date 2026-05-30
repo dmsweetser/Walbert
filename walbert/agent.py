@@ -147,6 +147,10 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         try:
             input_text = input("> ")
             self.logger.debug(f"Received input: {input_text}")
+            if input_text.strip():
+                # Reset conversation context when new user input is received
+                if self.current_conversation_file:
+                    self._reset_conversation_context()
             return input_text
         except Exception as e:
             self.logger.error(f"Error reading input: {e}")
@@ -271,6 +275,40 @@ Error: {error_msg}
                     self.model_manager.execute_model(full_prompt)
 
         return parsed
+
+    def _reset_conversation_context(self):
+        """Reset conversation context while retaining last two Q&A pairs"""
+        if not self.current_conversation_file:
+            return
+
+        # Extract last two Q&A pairs from current context
+        context_lines = self.conversation_context.split(chr(10))
+        qa_pairs = []
+        current_pair = []
+
+        for line in context_lines:
+            if line.startswith("User:") or line.startswith("Assistant:"):
+                if current_pair and len(current_pair) >= 2:
+                    qa_pairs.append(chr(10).join(current_pair))
+                    current_pair = []
+                current_pair.append(line)
+            elif current_pair:
+                current_pair.append(line)
+
+        if current_pair:
+            qa_pairs.append(chr(10).join(current_pair))
+
+        # Keep only the last two Q&A pairs
+        retained_context = chr(10).join(qa_pairs[-2:]) if qa_pairs else ""
+
+        # Reset context with system prompt and retained Q&A
+        db_schema = self.db.get_schema()
+        system_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", db_schema)
+        if (self.config.be_presbyterian):
+            system_prompt = self.SYSTEM_PROMPT.replace("{theological_alignment}", "You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards, and the PCA Book of Church Order. You strive to be perpetually creative, curious, and kind in all interactions.")
+
+        self.conversation_context = system_prompt + chr(10) + chr(10) + retained_context
+        self.processing_cycle = 0
 
     def _create_python_venv(self):
         """Create a sandboxed Python virtual environment"""
@@ -424,6 +462,7 @@ Error: {error_msg}
             self.conversation_context = system_prompt + chr(10)
             self.model_ready = True
             self.processing_cycle = 0
+            self.last_input_time = time.time()
             self.logger.info("Conversation started")
         except Exception as e:
             self.logger.error(f"Error starting conversation: {e}")
@@ -516,8 +555,11 @@ Available commands:
                                 # Process input as normal user input, not just exiting autonomous mode
                                 in_autonomous_mode = False
                                 self._log_to_conversation_file(user_input, "user")
+                                self._reset_conversation_context()
+                                self.conversation_context += f"User:{chr(10)}{user_input}{chr(10)}{chr(10)}"
                                 interruption_input = user_input
                                 self.processing_cycle = 0
+                                self.last_input_time = time.time()
                                 # Continue to process the input like normal mode
                                 break
 
@@ -548,10 +590,11 @@ Available commands:
                         self.conversation_context += f"System:{chr(10)}Entering autonomous mode{chr(10)}{chr(10)}"
                         continue
 
-                    # Log user input to conversation file and append to context
+                    # Log user input to conversation file and start fresh context
                     self._log_to_conversation_file(user_input, "user")
                     self.conversation_context += f"User:{chr(10)}{user_input}{chr(10)}{chr(10)}"
                     self.processing_cycle = 0
+                    self.last_input_time = time.time()
 
                     while True:
                         # Build prompt using the in-memory conversation context
