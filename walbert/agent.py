@@ -459,18 +459,20 @@ Error: {error_msg}
     def run(self):
         """Main agent execution loop with autonomous mode control"""
         print("""
- ___            ___
-/   \          /   \
-\_   \        /  __/
- _\   \      /  /__
- \___  \____/   __/
-     \_       _/
-       | @ @  \_
-       |
-     _/     /\
-    /o)  (o/\ \_
-    \_____/ /
-      \____/
+      
+___            ___     
+/   \          /   \     
+\_   \        /  __/     
+ _\   \      /  /__     
+ \___  \____/   __/     
+     \_       _/     
+       | @ @  \_     
+       |     
+     _/     /\     
+    /o)  (o/\ \_     
+    \_____/ /     
+      \____/     
+              
 
 Welcome to Walbert! The local-first AI agent.
 Available commands:

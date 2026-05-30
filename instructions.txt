@@ -1,1 +1,6 @@
-I want you to truncate the results that get fed back to the LLM (like SQL results) to avoid context bloat. But don't truncate the LLM response to the user.
+I get this error:
+
+2026-05-30 04:31:00,049 - walbert.database - ERROR - SQL execution error: You can only execute one statement at a time.
+2026-05-30 04:31:00,049 - walbert.agent - DEBUG - SQL execution result: Error executing SQL: You can only execute one statement at a time.
+
+Can you make it so I can have more than one SQL statement inside each SQL block?
