@@ -78,6 +78,10 @@ Start the agent with:
 ./run.sh
 ```
 
+Available commands:
+- `exit`/`quit`: Exit the program
+- `auto`: Enter autonomous mode (any input returns to normal mode)
+
 ## Testing
 
 Run the test suite with:

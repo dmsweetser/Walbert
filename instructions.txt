@@ -1,5 +1,3 @@
-Make it so Walbert can process multiple sql or python blocks in a round. Right now, it can only do one of each.
+I want to allow multiples of the python requirements blocks too.
 
-Also, get rid of the user timeout to enter autonomous mode. Instead. give a keyword like quit, call it "auto", to enter autonomous mode. Make it possible for the user to enter any input to return from autonomous mode after it is entered.
-
-When Walbert loads, show the list of keywords, and an ascii moose.
+Also, make it a better ascii moose. Big antlers, derpy looking, facing forward at the user.

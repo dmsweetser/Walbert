@@ -11,6 +11,7 @@ import tempfile
 import subprocess
 import shutil
 import sys
+import select
 from typing import Optional
 from .config import Config
 from .models.manager import ModelManager
@@ -144,20 +145,11 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
 
     def read_input(self) -> str:
-        """Read input from console with timeout"""
+        """Read input from console"""
         try:
-            import select
-            import sys
-            self.logger.debug("Waiting for user input...")
-            ready, _, _ = select.select([sys.stdin], [], [], 1)  # Reduced timeout for more responsive checking
-            if ready:
-                input_text = input("> ")
-                self.logger.debug(f"Received input: {input_text}")
-                self.last_input_time = time.time()  # Update last input time on actual input
-                return input_text
-            else:
-                self.logger.debug("Input timeout reached, checking autonomous operation")
-                return ""
+            input_text = input("> ")
+            self.logger.debug(f"Received input: {input_text}")
+            return input_text
         except Exception as e:
             self.logger.error(f"Error reading input: {e}")
             return ""
