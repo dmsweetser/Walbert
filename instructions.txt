@@ -1,3 +1,1 @@
-I want to allow multiples of the python requirements blocks too.
-
-Also, make it a better ascii moose. Big antlers, derpy looking, facing forward at the user.
+I want you to truncate the results that get fed back to the LLM (like SQL results) to avoid context bloat. But don't truncate the LLM response to the user.

@@ -194,11 +194,12 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                     result = self.db.execute_sql(sql)
                     self.logger.debug(f"SQL execution result: {result}")
 
-                    # Feed SQL result back to model for review
+                    # Feed SQL result back to model for review (truncated to prevent context bloat)
+                    truncated_result = result[:1000] + "..." if len(result) > 1000 else result
                     full_prompt = f"""
 [walbert_sql_result]
 SQL: {sql}
-Result: {result}
+Result: {truncated_result}
 [/walbert_sql_result]
 """
                     self.model_manager.execute_model(full_prompt)
@@ -250,11 +251,12 @@ Error: {error_msg}
                     result = self._execute_python_code(code)
                     self.logger.debug(f"Python execution result: {result}")
 
-                    # Feed Python result back to model for review
+                    # Feed Python result back to model for review (truncated to prevent context bloat)
+                    truncated_result = result[:1000] + "..." if len(result) > 1000 else result
                     full_prompt = f"""
 [walbert_python_result]
 Code: {code}
-Result: {result}
+Result: {truncated_result}
 [/walbert_python_result]
 """
                     self.model_manager.execute_model(full_prompt)
