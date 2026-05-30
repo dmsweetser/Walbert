@@ -1,3 +1,7 @@
-If you receive input during autonomous mode, I want that to be treated as the user input and process it normally. Right now, it just exits autonomous mode but doesn't process that input as normal user input for the next round.
+When Walbert receives input during autonomous mode, it sees it, but doesn't process it as a normal round.
 
-Fix this and any other issues you see.
+***
+
+Can we also reset the conversation context every time we interact? So every question has a new context.
+
+Figure out a way to make that work.
