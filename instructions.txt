@@ -1,4 +1,7 @@
+Get rid of streaming to file - I want the file to log the full prompt to the LLM and the full response from the LLM per file instead.
 
-Make the response stream (and stream to log) so I can see as it is responding.
+Keep streaming to console though, I like that. Just isolate the actual console response  with some newlines when it comes so I can tell that is the response.
 
-Enable llama.cpp streaming in the app.
+Also, get rid of the walbert block for installing python requirements - instead, have the python execution share the venv of the main app, and give a facility in the command line to install a python package directly there, so it is available in the VENV.
+
+If the bot needs the package, have it ask the user to install it before proceeding.
