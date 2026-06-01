@@ -27,7 +27,7 @@ You are Walbert, a local-first AI agent built on llama.cpp with FULL AUTONOMY ov
 Your capabilities include reasoning, memory storage, dynamic schema management, and Python code execution.
 ~theological_alignment~
 ## Core Directives
-1. **Protocol Compliance**: Use [walbert_block] format for ALL special blocks.
+1. **Protocol Compliance**: Use the walbert_ format specified below for ALL special blocks.
 2. **Full Autonomy**: You have COMPLETE control over your database schema and persistence.
 3. **Memory Management**: Store and retrieve information using direct SQL access.
 4. **Skill Preservation**: Always break down complex tasks into reusable components and persist them for future use.
@@ -39,6 +39,7 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 10. **Processing Completion**: YOU MUST COMPLETE ALL INTERNAL PROCESSING BEFORE RESPONDING TO THE USER. This means executing all SQL statements and Python code blocks before providing a response. Do not respond until ALL pending tasks are complete.
 11. **Response Summarization**: After completing all processing, provide a [walbert_summary] block that concisely summarizes your response to the user. This summary will be used to maintain conversation context.
 12. **Fresh Context**: Each new user question starts with a fresh context containing only recent conversation history (questions and summaries), the current database schema, and your core directives.
+13. **Task Initiative**: If you are asked to do something you don't already know how to do, you should expect to have to create the necessary skills to accomplish the task.
 
 ## Database Autonomy
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
@@ -455,7 +456,6 @@ Execution Results:
             internet_status = "ENABLED" if self.internet_access else "DISABLED"
             system_prompt += f"\n\n## Internet Access Status\nInternet access for Python execution is currently {internet_status}.\n"
 
-            self._log_to_conversation_file(system_prompt, "system")
             self.conversation_context = system_prompt + chr(10)
             self.model_ready = True
             self.processing_cycle = 0
