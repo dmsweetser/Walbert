@@ -1,1 +1,8 @@
-Right now, the Python or SQL results are fed back into the model as the entirety of the prompt. No good. I want it to be appended to the continuing prompt that was used initially.
+I want us to do some things differently:
+
+-Rather than using the user scripts, I want to disable or enable internet access as a Walbert command line option
+-I want a fresh prompt every time a user asks a question
+    -To accomplish this, I want you to add a new walbert block where it can summarize its response to the user
+    -Then, have the context include the last X number of questions, and the summarizations of the responses
+
+Generate drop-in replacements for any impacted files.
