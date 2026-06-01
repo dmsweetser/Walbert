@@ -198,8 +198,8 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                     result = self.db.execute_sql(sql)
                     self.logger.debug(f"SQL execution result: {result}")
                     truncated_result = result[:1000] + "..." if len(result) > 1000 else result
-                    # Feed SQL execution results back to model
-                    full_prompt = f"""
+                    # Feed SQL execution results back to model by appending to conversation context
+                    sql_result_block = f"""
 [walbert_sql_execution_result]
 SQL Executed:
 {sql}
@@ -208,18 +208,18 @@ Execution Results:
 {truncated_result}
 [/walbert_sql_execution_result]
 """
-                    self.model_manager.execute_model(full_prompt)
+                    self.conversation_context += sql_result_block + chr(10)
                 except Exception as e:
                     self.logger.error(f"SQL execution error: {e}")
                     error_msg = f"SQL Error: {str(e)}"
-                    full_prompt = f"""
+                    error_block = f"""
 [walbert_error]
 Error Type: SQL Execution
 Statement: {sql}
 Error: {error_msg}
 [/walbert_error]
 """
-                    self.model_manager.execute_model(full_prompt)
+                    self.conversation_context += error_block + chr(10)
 
         # Handle multiple Python executions
         if parsed.get("python_execute"):
@@ -241,14 +241,14 @@ Error: {error_msg}
                     self._install_python_requirements(parsed["python_requirements"])
                 except Exception as e:
                     error_msg = f"Requirements Installation Error: {str(e)}"
-                    full_prompt = f"""
+                    error_block = f"""
 [walbert_error]
 Error Type: Python Requirements
 Requirements: {', '.join(parsed['python_requirements'])}
 Error: {error_msg}
 [/walbert_error]
 """
-                    self.model_manager.execute_model(full_prompt)
+                    self.conversation_context += error_block + chr(10)
                     return parsed
 
             for code in python_blocks:
@@ -257,7 +257,7 @@ Error: {error_msg}
                 # Feed Python result back to model for review (truncated to prevent context bloat)
                 truncated_result = result[:1000] + "..." if len(result) > 1000 else result
                 # Feed Python execution results back to model
-                full_prompt = f"""
+                python_result_block = f"""
 [walbert_python_execution_result]
 Code Executed:
 {code}
@@ -266,7 +266,7 @@ Execution Results:
 {truncated_result}
 [/walbert_python_execution_result]
 """
-                self.model_manager.execute_model(full_prompt)
+                self.conversation_context += python_result_block + chr(10)
 
         return parsed
 
@@ -649,10 +649,13 @@ Available commands:
             except Exception as e:
                 self.logger.error(f"Error in main loop: {e}", exc_info=True)
                 error_msg = f"""
-[walbert_error]
 Error Type: System Error
 Error: {str(e)}
+"""
+                error_block = f"""
+[walbert_error]
+{error_msg}
 [/walbert_error]
 """
-                self.model_manager.execute_model(error_msg)
+                self.conversation_context += error_block + chr(10)
                 time.sleep(1)

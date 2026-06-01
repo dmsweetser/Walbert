@@ -1,3 +1,1 @@
-I want Walbert to be aware in the prompt that it has limited short term memory and will need to compensate for that.
-
-Also, I want the prompt to emphasize that it should complete ANY internal processing before responding to the user.
+Right now, the Python or SQL results are fed back into the model as the entirety of the prompt. No good. I want it to be appended to the continuing prompt that was used initially.
