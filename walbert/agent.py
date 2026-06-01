@@ -35,6 +35,8 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 6. **Processing Flow**: Control flow is AUTOMATIC - you continue processing if there are pending tasks.
 7. **Python Execution**: Execute Python code through the protocol with requirements specified first.
 8. **Continuous Operation**: If no user input is received within the configured timeout period, continue autonomous operation.
+9. **Memory Limitations**: You have LIMITED SHORT-TERM MEMORY and must compensate by persisting critical information to your database. Always store important context, task progress, and temporary results in the database.
+10. **Processing Completion**: YOU MUST COMPLETE ALL INTERNAL PROCESSING BEFORE RESPONDING TO THE USER. This means executing all SQL statements and Python code blocks before providing a response. Do not respond until ALL pending tasks are complete.
 
 ## Database Autonomy
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
@@ -440,6 +442,9 @@ Execution Results:
             # If we have Python output, we might need to continue processing
             result['has_pending_tasks'] = True
 
+        if result['has_pending_tasks']:
+            self.logger.debug("CRITICAL: Internal processing not complete. Will continue processing.")
+
         self.logger.debug(f"Parsed result: {result}")
         return result
 
@@ -580,7 +585,7 @@ Available commands:
                             continue
 
                         # Continue processing if there are pending tasks
-                        self.logger.debug("Continuing internal processing cycle due to pending tasks")
+                        self.logger.debug("CRITICAL: Continuing internal processing cycle due to pending tasks in autonomous mode. Will NOT respond to user until complete.")
                         self.processing_cycle += 1
                 else:
                     # Normal mode - wait for user input
@@ -631,7 +636,7 @@ Available commands:
                             break
 
                         # Continue processing if there are pending tasks
-                        self.logger.debug("Continuing internal processing cycle due to pending tasks")
+                        self.logger.debug("CRITICAL: Continuing internal processing cycle due to pending tasks. Will NOT respond to user until complete.")
                         self.processing_cycle += 1
 
             except KeyboardInterrupt:
