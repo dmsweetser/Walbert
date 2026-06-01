@@ -166,17 +166,26 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             self.logger.error(f"Error reading input: {e}")
             return ""
 
-    def write_output(self, text: str) -> None:
-        """Write output to console"""
+    def write_output(self, text: str, stream: bool = False) -> None:
+        """Write output to console with streaming support"""
         if text.startswith("[walbert_console_response]"):
             # Extract content from console response block
             match = re.search(r'\[walbert_console_response\](.*?)\[/walbert_console_response\]', text, re.DOTALL)
             if match:
-                print(match.group(1).strip())
+                content = match.group(1).strip()
+                if stream:
+                    for char in content:
+                        print(char, end='', flush=True)
+                else:
+                    print(content)
             else:
                 print(text)
         else:
-            print(text)
+            if stream:
+                for char in text:
+                    print(char, end='', flush=True)
+            else:
+                print(text)
 
     def process_response(self, response_text: str) -> dict:
         """Process model response with enhanced diagnostics for multiple blocks"""
@@ -608,7 +617,10 @@ Execution Results:
                         full_prompt += chr(10) + "[walbert_input_channel]autonomous[/walbert_input_channel]"
                         full_prompt += chr(10) + "Continuing autonomous operation. Please perform any necessary tasks or reflections."
 
-                        model_response = self.model_manager.execute_model(full_prompt)
+                        def streaming_callback(chunk):
+                            self._log_to_conversation_file(chunk, "assistant_stream")
+
+                        model_response = self.model_manager.execute_model(full_prompt, streaming_callback)
                         last_parsed_response = self.process_response(model_response)
                         self._log_to_conversation_file(model_response, "assistant")
                         self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
@@ -699,9 +711,13 @@ Execution Results:
 
                         self.logger.debug("Built prompt for model using in-memory context")
 
-                        # Process model response
-                        model_response = self.model_manager.execute_model(full_prompt)
-                        self.logger.debug(f"Model response:{chr(10)}{model_response}")
+                        # Process model response with streaming
+                        def streaming_callback(chunk):
+                            self.write_output(chunk, stream=True)
+                            self._log_to_conversation_file(chunk, "assistant_stream")
+
+                        model_response = self.model_manager.execute_model(full_prompt, streaming_callback)
+                        self.logger.debug(f"Model response processing complete")
 
                         last_parsed_response = self.process_response(model_response)
 

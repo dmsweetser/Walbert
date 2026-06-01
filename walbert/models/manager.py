@@ -2,6 +2,7 @@
 Model manager implementation
 """
 
+import json
 import os
 import subprocess
 import logging
@@ -80,8 +81,8 @@ class ModelManager:
         self.server_thread.start()
         self.server_thread.join(timeout=60)
 
-    def execute_model(self, prompt: str) -> str:
-        """Execute model using existing server"""
+    def execute_model(self, prompt: str, callback=None) -> str:
+        """Execute model using existing server with streaming support"""
         model_config = self.config.model_configs['model']
         payload = {
             "model": "default",
@@ -93,22 +94,39 @@ class ModelManager:
             "top_p": model_config.top_p,
             "top_k": model_config.top_k,
             "min_p": model_config.min_p,
-            "stream": False
+            "stream": True
         }
 
         try:
             try:
+                full_response = ""
                 response = requests.post(
                     "http://localhost:8080/v1/chat/completions",
                     json=payload,
-                    timeout=7200
+                    timeout=7200,
+                    stream=True
                 )
                 response.raise_for_status()
-                result = response.json()
-                if "choices" in result and len(result["choices"]) > 0:
-                    return result["choices"][0]["message"]["content"]
-                else:
-                    raise RuntimeError(f"Invalid response format: {result}")
+
+                for line in response.iter_lines():
+                    if line:
+                        line_str = line.decode('utf-8')
+                        if line_str.startswith('data: '):
+                            line_str = line_str[6:]
+                            if line_str == '[DONE]':
+                                break
+                            try:
+                                chunk = json.loads(line_str)
+                                if "choices" in chunk and len(chunk["choices"]) > 0:
+                                    content = chunk["choices"][0].get("delta", {}).get("content", "")
+                                    if content:
+                                        full_response += content
+                                        if callback:
+                                            callback(content)
+                            except json.JSONDecodeError:
+                                continue
+
+                return full_response
             except Exception as e:
                 logger.error(f"Error executing model: {e}")
                 raise
