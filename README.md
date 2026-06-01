@@ -95,7 +95,9 @@ Start the agent with:
 
 Available commands:
 - `exit`/`quit`: Exit the program
-- `auto`: Enter autonomous mode (any input returns to normal mode)
+- `auto`: Enter autonomoose mode (any input returns to normal mode)
+- `inet on`: Enable internet access for Python execution
+- `inet off`: Disable internet access for Python execution
 
 ## Testing (there are no tests)
 

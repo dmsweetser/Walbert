@@ -6,3 +6,9 @@ I want us to do some things differently:
     -Then, have the context include the last X number of questions, and the summarizations of the responses
 
 Generate drop-in replacements for any impacted files.
+
+***
+
+You did this before, but you made it something you set when you run the run.sh. Instead, I want it to be something I can turn on or off while it is running.
+
+Also, for any impacted file, generate a complete, drop-in replacement for the entire file.

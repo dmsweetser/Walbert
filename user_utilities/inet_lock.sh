@@ -1,34 +1,34 @@
 #!/bin/bash
 
-echo "Applying restrictive nftables firewall (PyPI‑only)..."
+echo "Applying restrictive nftables firewall (PyPI-only)..."
 
 # Flush existing rules
-nft flush ruleset
+nft flush ruleset 2>/dev/null || true
 
 # Create table
-nft add table inet firewall
+nft add table inet firewall 2>/dev/null || true
 
 # Create chains with default DROP
-nft add chain inet firewall input  '{ type filter hook input priority 0; policy drop; }'
-nft add chain inet firewall output '{ type filter hook output priority 0; policy drop; }'
-nft add chain inet firewall forward '{ type filter hook forward priority 0; policy drop; }'
+nft add chain inet firewall input  '{ type filter hook input priority 0; policy drop; }' 2>/dev/null || true
+nft add chain inet firewall output '{ type filter hook output priority 0; policy drop; }' 2>/dev/null || true
+nft add chain inet firewall forward '{ type filter hook forward priority 0; policy drop; }' 2>/dev/null || true
 
 # Allow loopback
-nft add rule inet firewall input  iif lo accept
-nft add rule inet firewall output oif lo accept
+nft add rule inet firewall input  iif lo accept 2>/dev/null || true
+nft add rule inet firewall output oif lo accept 2>/dev/null || true
 
 # Allow inbound SSH + return traffic
-nft add rule inet firewall input  tcp dport 22 ct state { new, established } accept
-nft add rule inet firewall output tcp sport 22 ct state established accept
+nft add rule inet firewall input  tcp dport 22 ct state { new, established } accept 2>/dev/null || true
+nft add rule inet firewall output tcp sport 22 ct state established accept 2>/dev/null || true
 
 # -----------------------------
 # Allow DNS (required for pip)
 # -----------------------------
-nft add rule inet firewall output udp dport 53 ct state { new, established } accept
-nft add rule inet firewall input  udp sport 53 ct state established accept
+nft add rule inet firewall output udp dport 53 ct state { new, established } accept 2>/dev/null || true
+nft add rule inet firewall input  udp sport 53 ct state established accept 2>/dev/null || true
 
-nft add rule inet firewall output tcp dport 53 ct state { new, established } accept
-nft add rule inet firewall input  tcp sport 53 ct state established accept
+nft add rule inet firewall output tcp dport 53 ct state { new, established } accept 2>/dev/null || true
+nft add rule inet firewall input  tcp sport 53 ct state established accept 2>/dev/null || true
 
 # ----------------------------------------------------
 # Allow HTTPS only to Fastly (PyPI CDN)
@@ -51,12 +51,12 @@ FASTLY4=(
 )
 
 for net in "${FASTLY4[@]}"; do
-  nft add rule inet firewall output ip daddr $net tcp dport 443 ct state { new, established } accept
-  nft add rule inet firewall input  ip saddr $net tcp sport 443 ct state established accept
+  nft add rule inet firewall output ip daddr $net tcp dport 443 ct state { new, established } accept 2>/dev/null || true
+  nft add rule inet firewall input  ip saddr $net tcp sport 443 ct state established accept 2>/dev/null || true
 done
 
 # IPv6 Fastly
-nft add rule inet firewall output ip6 daddr 2a04:4e40::/32 tcp dport 443 ct state { new, established } accept
-nft add rule inet firewall input  ip6 saddr 2a04:4e40::/32 tcp sport 443 ct state established accept
+nft add rule inet firewall output ip6 daddr 2a04:4e40::/32 tcp dport 443 ct state { new, established } accept 2>/dev/null || true
+nft add rule inet firewall input  ip6 saddr 2a04:4e40::/32 tcp sport 443 ct state established accept 2>/dev/null || true
 
-echo "Firewall locked down. SSH + PyPI‑only pip allowed; all other outbound HTTPS blocked."
+echo "Firewall locked down. SSH + PyPI-only pip allowed; all other outbound HTTPS blocked."

@@ -37,6 +37,7 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 8. **Continuous Operation**: If no user input is received within the configured timeout period, continue autonomous operation.
 9. **Memory Limitations**: You have LIMITED SHORT-TERM MEMORY and must compensate by persisting critical information to your database. Always store important context, task progress, and temporary results in the database.
 10. **Processing Completion**: YOU MUST COMPLETE ALL INTERNAL PROCESSING BEFORE RESPONDING TO THE USER. This means executing all SQL statements and Python code blocks before providing a response. Do not respond until ALL pending tasks are complete.
+11. **Response Summarization**: After completing all processing, provide a [walbert_summary] block that concisely summarizes your response to the user.
 
 ## Database Autonomy
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
@@ -122,6 +123,9 @@ ERROR_CONTENT
 Your response to the user
 [/walbert_console_response]
 
+[walbert_summary]
+A concise summary of your response to the user
+[/walbert_summary]
 
 Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
     """
@@ -136,8 +140,10 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.python_venv_path = None
         self.python_temp_dir = None
         self.input_timeout = self.config.autonomous_operation_timeout
-        self.last_input_time = 0  # Initialize to 0 to ensure first check triggers autonomous mode
+        self.last_input_time = 0
         self.conversation_context = ""
+        self.internet_access = False
+        self.conversation_history = []
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
@@ -268,34 +274,34 @@ Execution Results:
 """
                 self.conversation_context += python_result_block + chr(10)
 
+        # Extract summary if present
+        if parsed.get("summary"):
+            summary = parsed["summary"]
+            self.conversation_history.append({
+                "type": "summary",
+                "content": summary,
+                "timestamp": time.time()
+            })
+
         return parsed
 
     def _reset_conversation_context(self):
-        """Reset conversation context while retaining last two Q&A pairs"""
+        """Reset conversation context while retaining recent conversation history"""
         if not self.current_conversation_file:
             return
 
-        # Extract last two Q&A pairs from current context
-        context_lines = self.conversation_context.split(chr(10))
-        qa_pairs = []
-        current_pair = []
+        # Keep the last 3 conversation pairs (question + summary)
+        recent_history = self.conversation_history[-6:] if len(self.conversation_history) >= 6 else self.conversation_history
 
-        for line in context_lines:
-            if line.startswith("User:") or line.startswith("Assistant:"):
-                if current_pair and len(current_pair) >= 2:
-                    qa_pairs.append(chr(10).join(current_pair))
-                    current_pair = []
-                current_pair.append(line)
-            elif current_pair:
-                current_pair.append(line)
+        # Build context from recent history
+        history_context = ""
+        for item in recent_history:
+            if item["type"] == "question":
+                history_context += f"User:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
+            elif item["type"] == "summary":
+                history_context += f"Assistant Summary:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
 
-        if current_pair:
-            qa_pairs.append(chr(10).join(current_pair))
-
-        # Keep only the last two Q&A pairs
-        retained_context = chr(10).join(qa_pairs[-2:]) if qa_pairs else ""
-
-        # Reset context with system prompt and retained Q&A
+        # Reset context with system prompt and recent history
         db_schema = self.db.get_schema()
         system_prompt = self.SYSTEM_PROMPT.replace("~db_schema~", db_schema)
         if (self.config.be_presbyterian):
@@ -303,7 +309,11 @@ Execution Results:
         else:
             system_prompt = system_prompt.replace("~theological_alignment~", "You strive to be perpetually creative, curious, and kind in all interactions.")
 
-        self.conversation_context = system_prompt + chr(10) + chr(10) + retained_context
+        # Add internet access status to system prompt
+        internet_status = "ENABLED" if self.internet_access else "DISABLED"
+        system_prompt += f"\n\n## Internet Access Status\nInternet access for Python execution is currently {internet_status}.\n"
+
+        self.conversation_context = system_prompt + chr(10) + chr(10) + history_context
         self.processing_cycle = 0
 
     def _create_python_venv(self):
@@ -350,13 +360,24 @@ Execution Results:
         with open(script_file, 'w') as f:
             f.write(code)
 
+        # Set up environment for internet access
+        env = os.environ.copy()
+        if not self.internet_access:
+            # Apply restrictive firewall rules if internet is disabled
+            try:
+                subprocess.run(["user_utilities/inet_lock.sh"], check=True)
+            except subprocess.CalledProcessError as e:
+                self.logger.error(f"Failed to apply internet restrictions: {e}")
+                return f"[walbert_error]Failed to apply internet restrictions: {str(e)}[/walbert_error]"
+
         # Execute script and capture output
         try:
             result = subprocess.run(
                 [python_path, script_file],
                 capture_output=True,
                 text=True,
-                timeout=self.config.python_execution_timeout
+                timeout=self.config.python_execution_timeout,
+                env=env
             )
 
             output = ""
@@ -382,13 +403,20 @@ Execution Results:
             error_msg = f"[walbert_error]{chr(10)}Python execution error: {str(e)}[/walbert_error]"
             self.logger.error(error_msg)
             return error_msg
+        finally:
+            # Always restore internet access if it was disabled
+            if not self.internet_access:
+                try:
+                    subprocess.run(["user_utilities/inet_unlock.sh"], check=True)
+                except subprocess.CalledProcessError as e:
+                    self.logger.error(f"Failed to restore internet access: {e}")
 
     def _parse_response(self, content: str) -> dict:
         """Parse response with enhanced block detection for multiple blocks"""
         result = {}
         self.logger.debug(f"Parsing response content: {content[:200]}...")
 
-        # Parse all walbert blocks including new stdout/stderr blocks
+        # Parse all walbert blocks including new summary block
         block_pattern = r'\[walbert_([a-z_]+)\](.*?)\[/walbert_\1\]'
         sql_blocks = []
         python_blocks = []
@@ -417,6 +445,10 @@ Execution Results:
 
             # Special handling for console response
             elif block_type == 'console_response':
+                result[block_type] = block_content
+
+            # Special handling for summary
+            elif block_type == 'summary':
                 result[block_type] = block_content
 
             # Handle Python execution result blocks
@@ -462,6 +494,7 @@ Execution Results:
                 f"conversation_{timestamp}.txt"
             )
             self.conversation_context = ""
+            self.conversation_history = []
 
             # Wait for model server to be ready before proceeding
             self.logger.info("Waiting for model server to start...")
@@ -477,6 +510,10 @@ Execution Results:
             else:
                 system_prompt = system_prompt.replace("~theological_alignment~", "You strive to be perpetually creative, curious, and kind in all interactions.")
 
+            # Add internet access status to system prompt
+            internet_status = "ENABLED" if self.internet_access else "DISABLED"
+            system_prompt += f"\n\n## Internet Access Status\nInternet access for Python execution is currently {internet_status}.\n"
+
             self._log_to_conversation_file(system_prompt, "system")
             self.conversation_context = system_prompt + chr(10)
             self.model_ready = True
@@ -491,12 +528,12 @@ Execution Results:
         """End current conversation"""
         self.current_conversation_file = None
         self.conversation_context = ""
+        self.conversation_history = []
         # Clean up Python execution environment
         if self.python_temp_dir and os.path.exists(self.python_temp_dir):
             shutil.rmtree(self.python_temp_dir)
             self.python_temp_dir = None
             self.python_venv_path = None
-
 
     def _log_to_conversation_file(self, content: str, sender: str = "user"):
         """Log content to current conversation file"""
@@ -517,27 +554,29 @@ Execution Results:
     def run(self):
         """Main agent execution loop with autonomous mode control"""
         print("""
-      
- ___            ___     
-/   \          /   \     
-\_   \        /  __/     
- _\   \      /  /__     
- \___  \____/   __/     
-     \_       _/     
-       | @ @  \_     
-       |     
-     _/     /\     
-    /o)  (o/\ \_     
-    \_____/ /     
-      \____/     
-              
 
-Welcome to Walbert! The local-first AI agent.
-Available commands:
-- exit/quit: Exit the program
-- auto: Enter autonomoose mode
-- Any other input returns from autonomoose mode
-        """)
+ ___            ___
+/   \          /   \
+\_   \        /  __/
+ _\   \      /  /__
+ \___  \____/   __/
+     \_       _/
+       | @ @  \_
+       |
+     _/     /\
+    /o)  (o/\ \_
+    \_____/ /
+      \____/
+              """)
+
+        print("Welcome to Walbert! The local-first AI agent.")
+        print("Available commands:")
+        print("- exit/quit: Exit the program")
+        print("- auto: Enter autonomous mode")
+        print("- inet on: Enable internet access for Python execution")
+        print("- inet off: Disable internet access for Python execution")
+        print("- Any other input returns from autonomous mode")
+
         self.start_conversation()
 
         # Wait until model is ready before prompting user
@@ -571,10 +610,23 @@ Available commands:
                             if user_input.strip():
                                 if user_input.lower() in ['exit', 'quit']:
                                     break
+                                elif user_input.lower() == 'inet on':
+                                    self.internet_access = True
+                                    print("Internet access enabled for Python execution.")
+                                    continue
+                                elif user_input.lower() == 'inet off':
+                                    self.internet_access = False
+                                    print("Internet access disabled for Python execution.")
+                                    continue
                                 # Process input as normal user input, not just exiting autonomous mode
                                 in_autonomous_mode = False
                                 self._log_to_conversation_file(user_input, "user")
                                 self._reset_conversation_context()
+                                self.conversation_history.append({
+                                    "type": "question",
+                                    "content": user_input,
+                                    "timestamp": time.time()
+                                })
                                 self.conversation_context += f"User:{chr(10)}{user_input}{chr(10)}{chr(10)}"
                                 interruption_input = user_input
                                 self.processing_cycle = 0
@@ -608,9 +660,22 @@ Available commands:
                         self._log_to_conversation_file("Entering autonomous mode", "system")
                         self.conversation_context += f"System:{chr(10)}Entering autonomous mode{chr(10)}{chr(10)}"
                         continue
+                    if user_input.lower() == 'inet on':
+                        self.internet_access = True
+                        print("Internet access enabled for Python execution.")
+                        continue
+                    if user_input.lower() == 'inet off':
+                        self.internet_access = False
+                        print("Internet access disabled for Python execution.")
+                        continue
 
                     # Log user input to conversation file and start fresh context
                     self._log_to_conversation_file(user_input, "user")
+                    self.conversation_history.append({
+                        "type": "question",
+                        "content": user_input,
+                        "timestamp": time.time()
+                    })
                     self.conversation_context += f"User:{chr(10)}{user_input}{chr(10)}{chr(10)}"
                     self.processing_cycle = 0
                     self.last_input_time = time.time()

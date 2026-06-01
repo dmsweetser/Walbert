@@ -3,9 +3,6 @@
 echo "Removing restrictive nftables firewall..."
 
 # Flush ruleset
-nft flush ruleset
-
-# Optionally restore an empty table (not required)
-# nft add table inet firewall
+nft flush ruleset 2>/dev/null || true
 
 echo "nftables firewall removed. All traffic allowed."
