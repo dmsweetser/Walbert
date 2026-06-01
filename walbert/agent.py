@@ -25,7 +25,7 @@ class WalbertAgent:
     SYSTEM_PROMPT = """
 You are Walbert, a local-first AI agent built on llama.cpp with FULL AUTONOMY over your database.
 Your capabilities include reasoning, memory storage, dynamic schema management, and Python code execution.
-{theological_alignment}
+~theological_alignment~
 ## Core Directives
 1. **Protocol Compliance**: Use [walbert_block] format for ALL special blocks.
 2. **Full Autonomy**: You have COMPLETE control over your database schema and persistence.
@@ -41,7 +41,7 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 ## Database Autonomy
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
 
-{db_schema}
+~db_schema~
 
 As needed, you must define and manage ALL additional tables and schema elements through SQL commands.
 You must decide what data to persist and how to structure it. Always design for reusability.
@@ -297,9 +297,11 @@ Execution Results:
 
         # Reset context with system prompt and retained Q&A
         db_schema = self.db.get_schema()
-        system_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", db_schema)
+        system_prompt = self.SYSTEM_PROMPT.replace("~db_schema~", db_schema)
         if (self.config.be_presbyterian):
-            system_prompt = self.SYSTEM_PROMPT.replace("{theological_alignment}", "You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards, and the PCA Book of Church Order. You strive to be perpetually creative, curious, and kind in all interactions.")
+            system_prompt = self.SYSTEM_PROMPT.replace("~theological_alignment~", "You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards, and the PCA Book of Church Order. You strive to be perpetually creative, curious, and kind in all interactions.")
+        else:
+            system_prompt = self.SYSTEM_PROMPT.replace("~theological_alignment~", "You strive to be perpetually creative, curious, and kind in all interactions.")
 
         self.conversation_context = system_prompt + chr(10) + chr(10) + retained_context
         self.processing_cycle = 0
@@ -469,9 +471,11 @@ Execution Results:
 
             # Initialize conversation context with system prompt
             db_schema = self.db.get_schema()
-            system_prompt = self.SYSTEM_PROMPT.replace("{db_schema}", db_schema)
+            system_prompt = self.SYSTEM_PROMPT.replace("~db_schema~", db_schema)
             if (self.config.be_presbyterian):
-                system_prompt = self.SYSTEM_PROMPT.replace("{theological_alignment}", "You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards, and the PCA Book of Church Order. You strive to be perpetually creative, curious, and kind in all interactions.")
+                system_prompt = self.SYSTEM_PROMPT.replace("~theological_alignment~", "You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards, and the PCA Book of Church Order. You strive to be perpetually creative, curious, and kind in all interactions.")
+            else:
+                system_prompt = self.SYSTEM_PROMPT.replace("~theological_alignment~", "You strive to be perpetually creative, curious, and kind in all interactions.")
 
             self._log_to_conversation_file(system_prompt, "system")
             self.conversation_context = system_prompt + chr(10)
