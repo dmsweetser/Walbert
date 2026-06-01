@@ -197,7 +197,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                 try:
                     result = self.db.execute_sql(sql)
                     self.logger.debug(f"SQL execution result: {result}")
-
+                    truncated_result = result[:1000] + "..." if len(result) > 1000 else result
                     # Feed SQL execution results back to model
                     full_prompt = f"""
 [walbert_sql_execution_result]
@@ -205,7 +205,7 @@ SQL Executed:
 {sql}
 
 Execution Results:
-{result}
+{truncated_result}
 [/walbert_sql_execution_result]
 """
                     self.model_manager.execute_model(full_prompt)
@@ -254,7 +254,8 @@ Error: {error_msg}
             for code in python_blocks:
                 self.logger.debug(f"Executing Python code")
                 result = self._execute_python_code(code)
-
+                # Feed Python result back to model for review (truncated to prevent context bloat)
+                truncated_result = result[:1000] + "..." if len(result) > 1000 else result
                 # Feed Python execution results back to model
                 full_prompt = f"""
 [walbert_python_execution_result]
@@ -262,7 +263,7 @@ Code Executed:
 {code}
 
 Execution Results:
-{result}
+{truncated_result}
 [/walbert_python_execution_result]
 """
                 self.model_manager.execute_model(full_prompt)
