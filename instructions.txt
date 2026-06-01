@@ -5,3 +5,7 @@ Keep streaming to console though, I like that. Just isolate the actual console r
 Also, get rid of the walbert block for installing python requirements - instead, have the python execution share the venv of the main app, and give a facility in the command line to install a python package directly there, so it is available in the VENV.
 
 If the bot needs the package, have it ask the user to install it before proceeding.
+
+***
+
+Please generate complete drop-in revisions of any impacted files.

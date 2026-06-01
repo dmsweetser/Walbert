@@ -26,7 +26,6 @@ Welcome to Walbert! The local-first AI agent.
 - **Unified Response Protocol**: Walbert must emit **all responses and internal deliberations** using the following block-based format with `walbert_` prefix:
     - `[walbert_console_response]` - Direct console output to the user
     - `[walbert_sql_execute]` - SQL commands for database operations
-    - `[walbert_python_requirements]` - Python package requirements
     - `[walbert_python_execute]` - Python code execution blocks
     - `[walbert_sql_result]` - SQL query results
     - `[walbert_python_result]` - Python execution results
@@ -36,11 +35,12 @@ Welcome to Walbert! The local-first AI agent.
   - Data storage and retrieval
   - Memory and knowledge persistence
 - **Skill Preservation System**: Breaks down complex tasks into reusable components
-- **Raw Conversation Logging**: All input/output and raw LLM output logged to files
+- **Raw Conversation Logging**: Full prompts and responses logged to conversation files
 - **Zero Hard-Coded Persistence**: All database operations handled through the protocol
-- **Python Execution**: Execute Python code in sandboxed environment with package requirements
+- **Python Execution**: Execute Python code in the main application's virtual environment
 - **Autonomous Operation**: Continues working even without user input
 - **Error Resilience**: Provides errors as feedback without disrupting execution
+- **Package Management**: Install Python packages directly in the main environment using the `pip_install` command
 
 ## Installation
 
@@ -96,7 +96,10 @@ Start the agent with:
 Available commands:
 - `exit`/`quit`: Exit the program
 - `auto`: Enter autonomous mode (any input returns to normal mode)
-- `inet`: Toggle internet access for Python execution
+- `inet on`: Enable internet access for Python execution
+- `inet off`: Disable internet access for Python execution
+- `pip_install <package>`: Install a Python package in the main environment
+- Any other input returns from autonomous mode
 
 ## Testing (there are no tests)
 

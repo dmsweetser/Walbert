@@ -52,25 +52,17 @@ You must decide what data to persist and how to structure it. Always design for 
 Break down complex tasks into fundamental components and store them as reusable skills
 
 ## Python Execution Protocol
-Use [walbert_python_requirements] blocks for Python package requirements WITHOUT VERSION NUMBERS:
-
-```
-[walbert_python_requirements]
-# Python requirements WITHOUT VERSION NUMBERS
-requests
-numpy
-[/walbert_python_requirements]
-```
-
 Use [walbert_python_execute] blocks for Python code execution:
 
 ```
 [walbert_python_execute]
-import requests
-response = requests.get("https://api.example.com/data")
-print(response.json())
+# Python code to execute
+import os
+print("Hello from Python!")
 [/walbert_python_execute]
 ```
+
+If you need a Python package that is not available, ask the user to install it using the `pip_install` command before proceeding.
 
 ## SQL Execution Protocol
 Use [walbert_sql_execute] blocks for ALL database operations:
@@ -95,12 +87,6 @@ CREATE TABLE IF NOT EXISTS your_table (
 [walbert_sql_execute]
 SQL_STATEMENT
 [/walbert_sql_execute]
-
-[walbert_python_requirements]
-# Python requirements WITHOUT VERSION NUMBERS
-package1
-package2
-[/walbert_python_requirements]
 
 [walbert_python_execute]
 # Python code to execute
@@ -138,7 +124,6 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.current_conversation_file = None
         self.model_ready = False
         self.processing_cycle = 0
-        self.python_venv_path = None
         self.python_temp_dir = None
         self.input_timeout = self.config.autonomous_operation_timeout
         self.last_input_time = 0
@@ -173,11 +158,13 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             match = re.search(r'\[walbert_console_response\](.*?)\[/walbert_console_response\]', text, re.DOTALL)
             if match:
                 content = match.group(1).strip()
+                print(f"{chr(10)}{chr(10)}=== WALBERT RESPONSE ==={chr(10)}")
                 if stream:
                     for char in content:
                         print(char, end='', flush=True)
                 else:
                     print(content)
+                print(f"{chr(10)}======================={chr(10)}")
             else:
                 print(text)
         else:
@@ -194,10 +181,6 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
 
         parsed = self._parse_response(response_text)
         self.logger.debug(f"Parsed response: {parsed}")
-
-        # Log raw response to conversation file
-        if self.current_conversation_file:
-            self._log_to_conversation_file(response_text, "assistant")
 
         if not self.db.conn:
             self.db.connect()
@@ -248,25 +231,6 @@ Error: {error_msg}
             # Create temporary directory for Python execution
             if not self.python_temp_dir:
                 self.python_temp_dir = tempfile.mkdtemp(prefix=self.config.temp_dir_prefix)
-
-            if not self.python_venv_path:
-                self._create_python_venv()
-
-            # Install requirements if specified
-            if parsed.get("python_requirements"):
-                try:
-                    self._install_python_requirements(parsed["python_requirements"])
-                except Exception as e:
-                    error_msg = f"Requirements Installation Error: {str(e)}"
-                    error_block = f"""
-[walbert_error]
-Error Type: Python Requirements
-Requirements: {', '.join(parsed['python_requirements'])}
-Error: {error_msg}
-[/walbert_error]
-"""
-                    self.conversation_context += error_block + chr(10)
-                    return parsed
 
             for code in python_blocks:
                 self.logger.debug(f"Executing Python code")
@@ -338,45 +302,8 @@ Execution Results:
         self.conversation_context = system_prompt + chr(10) + chr(10) + history_context
         self.processing_cycle = 0
 
-    def _create_python_venv(self):
-        """Create a sandboxed Python virtual environment"""
-        self.python_temp_dir = tempfile.mkdtemp(prefix=self.config.temp_dir_prefix)
-        self.python_venv_path = os.path.join(self.python_temp_dir, "venv")
-        self.logger.debug(f"Creating Python venv at {self.python_venv_path}")
-
-        # Create virtual environment
-        subprocess.run([sys.executable, "-m", "venv", self.python_venv_path], check=True)
-
-        # Activate venv and install basic packages
-        pip_path = os.path.join(self.python_venv_path, "bin", "pip")
-        subprocess.run([pip_path, "install", "--upgrade", "pip"], check=True)
-
-    def _install_python_requirements(self, requirements: list):
-        """Install Python requirements in the sandboxed environment"""
-        if not requirements:
-            return
-
-        self.logger.debug(f"Installing Python requirements: {requirements}")
-
-        pip_path = os.path.join(self.python_venv_path, "bin", "pip")
-
-        # Create temporary requirements file
-        req_file = os.path.join(self.python_temp_dir, "requirements.txt")
-        with open(req_file, 'w') as f:
-            for req in requirements:
-                if req.strip():
-                    f.write(f"{req.strip()}{chr(10)}")
-
-        # Install requirements
-        try:
-            subprocess.run([pip_path, "install", "-r", req_file], check=True)
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to install Python requirements: {e}")
-
     def _execute_python_code(self, code: str) -> str:
-        """Execute Python code in the sandboxed environment"""
-        python_path = os.path.join(self.python_venv_path, "bin", "python3")
-
+        """Execute Python code in the main application's virtual environment"""
         # Create temporary Python script
         script_file = os.path.join(self.python_temp_dir, "script.py")
         with open(script_file, 'w') as f:
@@ -392,10 +319,10 @@ Execution Results:
                 self.logger.error(f"Failed to apply internet restrictions: {e}")
                 return f"[walbert_error]Failed to apply internet restrictions: {str(e)}[/walbert_error]"
 
-        # Execute script and capture output
+        # Execute script using the main application's Python interpreter
         try:
             result = subprocess.run(
-                [python_path, script_file],
+                [sys.executable, script_file],
                 capture_output=True,
                 text=True,
                 timeout=self.config.python_execution_timeout,
@@ -442,7 +369,6 @@ Execution Results:
         block_pattern = r'\[walbert_([a-z_]+)\](.*?)\[/walbert_\1\]'
         sql_blocks = []
         python_blocks = []
-        python_requirements_blocks = []
 
         for match in re.finditer(block_pattern, content, re.DOTALL):
             block_type = match.group(1)
@@ -459,11 +385,6 @@ Execution Results:
             # Special handling for Python execution
             elif block_type == 'python_execute':
                 python_blocks.append(block_content)
-
-            # Special handling for Python requirements
-            elif block_type == 'python_requirements':
-                requirements = [line.strip() for line in block_content.split(chr(10)) if line.strip()]
-                python_requirements_blocks.extend(requirements)
 
             # Special handling for console response
             elif block_type == 'console_response':
@@ -486,8 +407,6 @@ Execution Results:
             result['sql_execute'] = sql_blocks
         if python_blocks:
             result['python_execute'] = python_blocks
-        if python_requirements_blocks:
-            result['python_requirements'] = python_requirements_blocks
 
         # Determine if control should return to user automatically
         has_pending_sql = 'sql_execute' in result
@@ -555,21 +474,23 @@ Execution Results:
         if self.python_temp_dir and os.path.exists(self.python_temp_dir):
             shutil.rmtree(self.python_temp_dir)
             self.python_temp_dir = None
-            self.python_venv_path = None
 
     def _log_to_conversation_file(self, content: str, sender: str = "user"):
-        """Log content to current conversation file"""
+        """Log full content to current conversation file"""
         if not self.current_conversation_file:
             return
 
         try:
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
             with open(self.current_conversation_file, 'a') as f:
-                if isinstance(content, (dict, list)):
-                    content_str = json.dumps(content, indent=2)
+                if sender == "system":
+                    f.write(f"[{timestamp}] SYSTEM PROMPT:{chr(10)}{content}{chr(10)}{chr(10)}")
+                elif sender == "user":
+                    f.write(f"[{timestamp}] USER INPUT:{chr(10)}{content}{chr(10)}{chr(10)}")
+                elif sender == "assistant":
+                    f.write(f"[{timestamp}] ASSISTANT RESPONSE:{chr(10)}{content}{chr(10)}{chr(10)}")
                 else:
-                    content_str = str(content)
-                f.write(f"[{timestamp}] {sender}:{chr(10)}{content_str}{chr(10)}{chr(10)}")
+                    f.write(f"[{timestamp}] {sender.upper()}:{chr(10)}{content}{chr(10)}")
         except Exception as e:
             self.logger.error(f"Error logging to conversation file: {e}")
 
@@ -597,7 +518,11 @@ Execution Results:
         print("- auto: Enter autonomous mode")
         print("- inet on: Enable internet access for Python execution")
         print("- inet off: Disable internet access for Python execution")
+        print("- pip_install <package>: Install a Python package in the main environment")
         print("- Any other input returns from autonomous mode")
+
+        # Create temporary directory for Python execution
+        self.python_temp_dir = tempfile.mkdtemp(prefix=self.config.temp_dir_prefix)
 
         self.start_conversation()
 
@@ -618,11 +543,17 @@ Execution Results:
                         full_prompt += chr(10) + "Continuing autonomous operation. Please perform any necessary tasks or reflections."
 
                         def streaming_callback(chunk):
-                            self._log_to_conversation_file(chunk, "assistant_stream")
+                            pass  # No longer streaming to file
+
+                        # Log the full prompt to conversation file
+                        self._log_to_conversation_file(full_prompt, "assistant_prompt")
 
                         model_response = self.model_manager.execute_model(full_prompt, streaming_callback)
-                        last_parsed_response = self.process_response(model_response)
+
+                        # Log the full response to conversation file
                         self._log_to_conversation_file(model_response, "assistant")
+
+                        last_parsed_response = self.process_response(model_response)
                         self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
 
                         # Handle console response if present
@@ -642,6 +573,11 @@ Execution Results:
                                 elif user_input.lower() == 'inet off':
                                     self.internet_access = False
                                     print("Internet access disabled for Python execution.")
+                                    continue
+                                elif user_input.lower().startswith('pip_install '):
+                                    package = user_input[12:].strip()
+                                    if package:
+                                        self._install_python_package(package)
                                     continue
                                 # Process input as normal user input, not just exiting autonomous mode
                                 in_autonomous_mode = False
@@ -693,6 +629,11 @@ Execution Results:
                         self.internet_access = False
                         print("Internet access disabled for Python execution.")
                         continue
+                    if user_input.lower().startswith('pip_install '):
+                        package = user_input[12:].strip()
+                        if package:
+                            self._install_python_package(package)
+                        continue
 
                     # Log user input to conversation file and start fresh context
                     self._log_to_conversation_file(user_input, "user")
@@ -711,18 +652,22 @@ Execution Results:
 
                         self.logger.debug("Built prompt for model using in-memory context")
 
-                        # Process model response with streaming
+                        # Log the full prompt to conversation file
+                        self._log_to_conversation_file(full_prompt, "assistant_prompt")
+
+                        # Process model response with streaming to console only
                         def streaming_callback(chunk):
                             self.write_output(chunk, stream=True)
-                            self._log_to_conversation_file(chunk, "assistant_stream")
 
                         model_response = self.model_manager.execute_model(full_prompt, streaming_callback)
                         self.logger.debug(f"Model response processing complete")
 
+                        # Log the full response to conversation file
+                        self._log_to_conversation_file(model_response, "assistant")
+
                         last_parsed_response = self.process_response(model_response)
 
-                        # Log assistant response to conversation file and append to context
-                        self._log_to_conversation_file(model_response, "assistant")
+                        # Append to context
                         self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
 
                         # Handle console response if present
@@ -757,3 +702,18 @@ Error: {str(e)}
 """
                 self.conversation_context += error_block + chr(10)
                 time.sleep(1)
+
+    def _install_python_package(self, package: str):
+        """Install a Python package in the main environment"""
+        print(f"Installing package: {package}")
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", package],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            print(f"Successfully installed {package}")
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to install {package}: {e.stderr}")
+            self.logger.error(f"Failed to install package {package}: {e.stderr}")
