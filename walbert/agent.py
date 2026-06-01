@@ -37,7 +37,8 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 8. **Continuous Operation**: If no user input is received within the configured timeout period, continue autonomous operation.
 9. **Memory Limitations**: You have LIMITED SHORT-TERM MEMORY and must compensate by persisting critical information to your database. Always store important context, task progress, and temporary results in the database.
 10. **Processing Completion**: YOU MUST COMPLETE ALL INTERNAL PROCESSING BEFORE RESPONDING TO THE USER. This means executing all SQL statements and Python code blocks before providing a response. Do not respond until ALL pending tasks are complete.
-11. **Response Summarization**: After completing all processing, provide a [walbert_summary] block that concisely summarizes your response to the user.
+11. **Response Summarization**: After completing all processing, provide a [walbert_summary] block that concisely summarizes your response to the user. This summary will be used to maintain conversation context.
+12. **Fresh Context**: Each new user question starts with a fresh context containing only recent conversation history (questions and summaries), the current database schema, and your core directives.
 
 ## Database Autonomy
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
@@ -144,6 +145,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.conversation_context = ""
         self.internet_access = False
         self.conversation_history = []
+        self.max_history_entries = 5  # Number of question/response pairs to keep
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
@@ -282,26 +284,37 @@ Execution Results:
                 "content": summary,
                 "timestamp": time.time()
             })
+            # Reset context after processing to ensure fresh prompt for next interaction
+            self._reset_conversation_context()
 
         return parsed
 
     def _reset_conversation_context(self):
-        """Reset conversation context while retaining recent conversation history"""
+        """Reset conversation context with fresh system prompt and recent conversation history"""
         if not self.current_conversation_file:
             return
 
-        # Keep the last 3 conversation pairs (question + summary)
-        recent_history = self.conversation_history[-6:] if len(self.conversation_history) >= 6 else self.conversation_history
+        # Keep the last max_history_entries conversation pairs (question + summary)
+        recent_history = []
+        question_count = 0
+
+        # Iterate backwards through history to get most recent pairs
+        for item in reversed(self.conversation_history):
+            if item["type"] == "question":
+                question_count += 1
+                if question_count > self.max_history_entries:
+                    break
+            recent_history.insert(0, item)
 
         # Build context from recent history
-        history_context = ""
+        history_context = "## Recent Conversation History\n\n"
         for item in recent_history:
             if item["type"] == "question":
-                history_context += f"User:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
+                history_context += f"User Question:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
             elif item["type"] == "summary":
                 history_context += f"Assistant Summary:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
 
-        # Reset context with system prompt and recent history
+        # Reset context with fresh system prompt and recent history
         db_schema = self.db.get_schema()
         system_prompt = self.SYSTEM_PROMPT.replace("~db_schema~", db_schema)
         if (self.config.be_presbyterian):
@@ -311,7 +324,7 @@ Execution Results:
 
         # Add internet access status to system prompt
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
-        system_prompt += f"\n\n## Internet Access Status\nInternet access for Python execution is currently {internet_status}.\n"
+        system_prompt += f"\n\n## Internet Access Status\nInternet access for Python execution is currently {internet_status}. Use the 'inet' command to toggle.\n"
 
         self.conversation_context = system_prompt + chr(10) + chr(10) + history_context
         self.processing_cycle = 0
