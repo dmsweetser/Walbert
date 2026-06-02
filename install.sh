@@ -66,7 +66,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Install Vosk model for speech-to-text
-if [ ! -f "instance/models/vosk-model-small-en-us-0.15" ]; then
+if [ ! -f "instance/models/vosk-model-small-en-us-0.15/README" ]; then
     echo "Downloading Vosk model for speech-to-text..."
     wget -q -O instance/models/vosk-model-small-en-us-0.15.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
     unzip -q instance/models/vosk-model-small-en-us-0.15.zip -d instance/models
