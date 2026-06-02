@@ -46,8 +46,7 @@ class SpeechToText:
         """Audio callback for recording"""
         if status:
             logger.warning(f"Audio status: {status}")
-        audio_array = np.frombuffer(indata, dtype=np.float32)
-        self.buffer.put(audio_array.astype('int16').tobytes())
+        self.buffer.put(bytes(indata))
 
     def start_listening(self, start_event):
         """Start continuous listening for voice commands"""
