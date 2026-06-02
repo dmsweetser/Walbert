@@ -22,8 +22,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('instance/walbert.log'),
-        logging.StreamHandler()
+        logging.FileHandler('instance/walbert.log')
     ]
 )
 logger = logging.getLogger('walbert')
