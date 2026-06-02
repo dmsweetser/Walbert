@@ -29,7 +29,7 @@ class SpeechToText:
         """Initialize STT engine"""
         try:
             # Load Vosk model
-            model_path = "models/vosk-model-small-en-us-0.15"
+            model_path = "instance/models/vosk-model-small-en-us-0.15"
             if not os.path.exists(model_path):
                 logger.error(f"Vosk model not found at {model_path}")
                 return False
