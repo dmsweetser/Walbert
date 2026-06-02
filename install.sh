@@ -67,10 +67,9 @@ fi
 
 # Install Vosk model for speech-to-text
 echo "Downloading Vosk model for speech-to-text..."
-mkdir -p models
-wget -q -O models/vosk-model-small-en-us-0.15.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
-unzip -q models/vosk-model-small-en-us-0.15.zip -d models
-rm models/vosk-model-small-en-us-0.15.zip
+wget -q -O instance/models/vosk-model-small-en-us-0.15.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+unzip -q instance/models/vosk-model-small-en-us-0.15.zip -d instance/models
+rm instance/models/vosk-model-small-en-us-0.15.zip
 
 # Create default config if it doesn't exist
 if [ ! -f "instance/config.json" ]; then
