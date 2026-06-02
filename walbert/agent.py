@@ -189,7 +189,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         parsed = self._parse_response(response_text)
         self.logger.debug(f"Parsed response: {parsed}")
 
-        if not self.db.conn:
+        if not self.db.conn or self.db.conn.closed:
             self.db.connect()
 
         # Handle multiple SQL executions
@@ -451,6 +451,7 @@ Execution Results:
             self.logger.info("Model server ready")
 
             # Initialize conversation context with system prompt
+            # Get schema in the same thread to avoid SQLite thread issues
             db_schema = self.db.get_schema()
             system_prompt = self.SYSTEM_PROMPT.replace("~db_schema~", db_schema)
             if (self.config.be_presbyterian):
@@ -502,6 +503,8 @@ Execution Results:
 
     def run_autonomous(self, input_queue):
         """Main agent execution loop running autonomously with input queue"""
+        # Connect to database in this thread before starting conversation
+        self.db.connect()
         self.start_conversation()
 
         # Wait until model is ready before proceeding

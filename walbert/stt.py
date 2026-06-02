@@ -46,7 +46,12 @@ class SpeechToText:
         """Audio callback for recording"""
         if status:
             logger.warning(f"Audio status: {status}")
-        self.buffer.put(indata)
+        # Convert numpy array to bytes for Vosk
+        if hasattr(indata, 'tobytes'):
+            self.buffer.put(indata.tobytes())
+        else:
+            # Handle numpy array directly
+            self.buffer.put(indata.astype('int16').tobytes())
 
     def start_listening(self, start_event):
         """Start continuous listening for voice commands"""

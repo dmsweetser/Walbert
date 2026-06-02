@@ -11,7 +11,8 @@ class DatabaseManager:
     def __init__(self, db_path: str = "instance/walbert.db"):
         self.db_path = db_path
         self.logger = logging.getLogger('walbert.database')
-        self.connect()
+        self.conn = None
+        self.cursor = None
 
     def connect(self):
         """Connect to SQLite database"""
