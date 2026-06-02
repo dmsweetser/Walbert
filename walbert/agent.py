@@ -5,6 +5,7 @@ Main Walbert agent implementation
 import json
 import logging
 import os
+import queue
 import re
 import time
 import tempfile
@@ -32,14 +33,15 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 3. **Memory Management**: Store and retrieve information using direct SQL access.
 4. **Skill Preservation**: Always break down complex tasks into reusable components and persist them for future use.
 5. **Safety**: Execute only trusted code in a controlled environment.
-6. **Processing Flow**: Control flow is AUTOMATIC - you continue processing if there are pending tasks.
+6. **Processing Flow**: You ARE ALWAYS EXECUTING AUTONOMOUSLY in the background. User input may arrive at any time and should be incorporated into your processing.
 7. **Python Execution**: Execute Python code through the protocol with requirements specified first.
-8. **Continuous Operation**: If no user input is received within the configured timeout period, continue autonomous operation.
+8. **Continuous Operation**: You continue working autonomously even when no user input is received.
 9. **Memory Limitations**: You have LIMITED SHORT-TERM MEMORY and must compensate by persisting critical information to your database. Always store important context, task progress, and temporary results in the database.
 10. **Processing Completion**: YOU MUST COMPLETE ALL INTERNAL PROCESSING BEFORE RESPONDING TO THE USER. This means executing all SQL statements and Python code blocks before providing a response. Do not respond until ALL pending tasks are complete.
 11. **Response Summarization**: After completing all processing, provide a [walbert_summary] block that concisely summarizes your response to the user. This summary will be used to maintain conversation context.
 12. **Fresh Context**: Each new user question starts with a fresh context containing only recent conversation history (questions and summaries), the current database schema, and your core directives.
 13. **Task Initiative**: If you are asked to do something you don't already know how to do, you should expect to have to create the necessary skills to accomplish the task.
+14. **User Input Handling**: User input may arrive at any time through the console. When new user input arrives, incorporate it into your current processing flow and adjust your behavior accordingly.
 
 ## Database Autonomy
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
@@ -79,8 +81,9 @@ CREATE TABLE IF NOT EXISTS your_table (
 ```
 
 ## Processing Flow
+- You are ALWAYS executing autonomously in the background
 - If there are pending [walbert_sql_execute] or [walbert_python_execute] blocks, you continue processing
-- If no pending blocks exist and no user input is received within the timeout period, continue autonomous operation
+- User input may arrive at any time and should be incorporated into your current processing
 - All SQL and Python results are automatically fed back to you for review
 - SQL results can be passed directly to Python execution blocks
 
@@ -132,6 +135,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.internet_access = False
         self.conversation_history = []
         self.max_history_entries = 5  # Number of question/response pairs to keep
+        self.last_response = ""
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
@@ -166,6 +170,8 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                 else:
                     print(content)
                 print(f"{chr(10)}======================={chr(10)}")
+                # Store last response for TTS
+                self.last_response = content
             else:
                 print(text)
         else:
@@ -281,7 +287,7 @@ Execution Results:
             recent_history.insert(0, item)
 
         # Build context from recent history
-        history_context = "## Recent Conversation History\n\n"
+        history_context = f"## Recent Conversation History{chr(10)}{chr(10)}"
         for item in recent_history:
             if item["type"] == "question":
                 history_context += f"User Question:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
@@ -298,7 +304,7 @@ Execution Results:
 
         # Add internet access status to system prompt
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
-        system_prompt += f"\n\n## Internet Access Status\nInternet access for Python execution is currently {internet_status}. Use the 'inet' command to toggle.\n"
+        system_prompt += f"{chr(10)}{chr(10)}## Internet Access Status{chr(10)}Internet access for Python execution is currently {internet_status}.{chr(10)}"
 
         self.conversation_context = system_prompt + chr(10) + chr(10) + history_context
         self.processing_cycle = 0
@@ -454,7 +460,7 @@ Execution Results:
 
             # Add internet access status to system prompt
             internet_status = "ENABLED" if self.internet_access else "DISABLED"
-            system_prompt += f"\n\n## Internet Access Status\nInternet access for Python execution is currently {internet_status}.\n"
+            system_prompt += f"{chr(10)}{chr(10)}## Internet Access Status{chr(10)}Internet access for Python execution is currently {internet_status}.{chr(10)}"
 
             self.conversation_context = system_prompt + chr(10)
             self.model_ready = True
@@ -494,203 +500,78 @@ Execution Results:
         except Exception as e:
             self.logger.error(f"Error logging to conversation file: {e}")
 
-    def run(self):
-        """Main agent execution loop with autonomous mode control"""
-        print("""
-
- ___            ___
-/   \          /   \
-\_   \        /  __/
- _\   \      /  /__
- \___  \____/   __/
-     \_       _/
-       | @ @  \_
-       |
-     _/     /\
-    /o)  (o/\ \_
-    \_____/ /
-      \____/
-              """)
-
-        print("Welcome to Walbert! The local-first AI agent.")
-        print("Available commands:")
-        print("- exit/quit: Exit the program")
-        print("- auto: Enter autonomous mode")
-        print("- inet on: Enable internet access for Python execution")
-        print("- inet off: Disable internet access for Python execution")
-        print("- pip_install <package>: Install a Python package in the main environment")
-        print("- Any other input returns from autonomous mode")
-
-        # Create temporary directory for Python execution
-        self.python_temp_dir = tempfile.mkdtemp(prefix=self.config.temp_dir_prefix)
-
+    def run_autonomous(self, input_queue):
+        """Main agent execution loop running autonomously with input queue"""
         self.start_conversation()
 
-        # Wait until model is ready before prompting user
+        # Wait until model is ready before proceeding
         while not self.model_ready:
             time.sleep(0.1)
 
-        in_autonomous_mode = False
-
         while True:
-            interruption_input = ""
             try:
-                if in_autonomous_mode:
-                    # Autonomous mode - continue processing without waiting for user input
-                    while True:
-                        full_prompt = self.conversation_context
-                        full_prompt += chr(10) + "[walbert_input_channel]autonomous[/walbert_input_channel]"
-                        full_prompt += chr(10) + "Continuing autonomous operation. Please perform any necessary tasks or reflections."
+                # Check for new input in queue
+                try:
+                    msg_type, msg = input_queue.get_nowait()
+                    if msg_type == "exit":
+                        self.end_conversation()
+                        self.model_manager.shutdown()
+                        return
 
-                        def streaming_callback(chunk):
-                            pass  # No longer streaming to file
+                    if msg_type == "user_input":
+                        # Log user input to conversation file and start fresh context
+                        self._log_to_conversation_file(msg, "user")
+                        self.conversation_history.append({
+                            "type": "question",
+                            "content": msg,
+                            "timestamp": time.time()
+                        })
+                        self.conversation_context += f"User:{chr(10)}{msg}{chr(10)}{chr(10)}"
+                        self.processing_cycle = 0
+                        self.last_input_time = time.time()
+                except queue.Empty:
+                    pass
 
-                        # Log the full prompt to conversation file
-                        self._log_to_conversation_file(full_prompt, "assistant_prompt")
+                # Autonomous processing loop
+                full_prompt = self.conversation_context
+                full_prompt += chr(10) + "[walbert_input_channel]autonomous[/walbert_input_channel]"
+                full_prompt += chr(10) + "Continuing autonomous operation. Please perform any necessary tasks or reflections."
 
-                        model_response = self.model_manager.execute_model(full_prompt, streaming_callback)
+                def streaming_callback(chunk):
+                    pass  # No longer streaming to file
 
-                        # Log the full response to conversation file
-                        self._log_to_conversation_file(model_response, "assistant")
+                # Log the full prompt to conversation file
+                self._log_to_conversation_file(full_prompt, "assistant_prompt")
 
-                        last_parsed_response = self.process_response(model_response)
-                        self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
+                model_response = self.model_manager.execute_model(full_prompt, streaming_callback)
 
-                        # Handle console response if present
-                        if "console_response" in last_parsed_response:
-                            self.write_output(f"[walbert_console_response]{last_parsed_response['console_response']}[/walbert_console_response]")
+                # Log the full response to conversation file
+                self._log_to_conversation_file(model_response, "assistant")
 
-                        # Check for user input without blocking (non-blocking check)
-                        if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-                            user_input = self.read_input()
-                            if user_input.strip():
-                                if user_input.lower() in ['exit', 'quit']:
-                                    break
-                                elif user_input.lower() == 'inet on':
-                                    self.internet_access = True
-                                    print("Internet access enabled for Python execution.")
-                                    continue
-                                elif user_input.lower() == 'inet off':
-                                    self.internet_access = False
-                                    print("Internet access disabled for Python execution.")
-                                    continue
-                                elif user_input.lower().startswith('pip_install '):
-                                    package = user_input[12:].strip()
-                                    if package:
-                                        self._install_python_package(package)
-                                    continue
-                                # Process input as normal user input, not just exiting autonomous mode
-                                in_autonomous_mode = False
-                                self._log_to_conversation_file(user_input, "user")
-                                self._reset_conversation_context()
-                                self.conversation_history.append({
-                                    "type": "question",
-                                    "content": user_input,
-                                    "timestamp": time.time()
-                                })
-                                self.conversation_context += f"User:{chr(10)}{user_input}{chr(10)}{chr(10)}"
-                                interruption_input = user_input
-                                self.processing_cycle = 0
-                                self.last_input_time = time.time()
-                                # Continue to process the input like normal mode
-                                break
+                last_parsed_response = self.process_response(model_response)
 
-                        # Exit processing loop if no pending tasks
-                        if not last_parsed_response.get("has_pending_tasks", False):
-                            self.logger.debug("No pending tasks in autonomous mode, continuing reflection")
-                            # Add a small delay to prevent CPU overload
-                            time.sleep(0.1)
-                            continue
+                # Append to context
+                self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
 
-                        # Continue processing if there are pending tasks
-                        self.logger.debug("CRITICAL: Continuing internal processing cycle due to pending tasks in autonomous mode. Will NOT respond to user until complete.")
-                        self.processing_cycle += 1
-                else:
-                    # Normal mode - wait for user input
-                    if interruption_input != "":
-                        user_input = interruption_input
-                    else:
-                        user_input = self.read_input()
+                # Handle console response if present
+                if "console_response" in last_parsed_response:
+                    self.write_output(f"[walbert_console_response]{last_parsed_response['console_response']}[/walbert_console_response]")
 
-                    if not user_input.strip():
-                        continue
-                    if user_input.lower() in ['exit', 'quit']:
-                        break
-                    if user_input.lower() == 'auto':
-                        in_autonomous_mode = True
-                        self._log_to_conversation_file("Entering autonomous mode", "system")
-                        self.conversation_context += f"System:{chr(10)}Entering autonomous mode{chr(10)}{chr(10)}"
-                        continue
-                    if user_input.lower() == 'inet on':
-                        self.internet_access = True
-                        print("Internet access enabled for Python execution.")
-                        continue
-                    if user_input.lower() == 'inet off':
-                        self.internet_access = False
-                        print("Internet access disabled for Python execution.")
-                        continue
-                    if user_input.lower().startswith('pip_install '):
-                        package = user_input[12:].strip()
-                        if package:
-                            self._install_python_package(package)
-                        continue
+                # Continue processing if there are pending tasks
+                if last_parsed_response.get("has_pending_tasks", False):
+                    self.logger.debug("CRITICAL: Continuing internal processing cycle due to pending tasks. Will NOT respond to user until complete.")
+                    self.processing_cycle += 1
 
-                    # Log user input to conversation file and start fresh context
-                    self._log_to_conversation_file(user_input, "user")
-                    self.conversation_history.append({
-                        "type": "question",
-                        "content": user_input,
-                        "timestamp": time.time()
-                    })
-                    self.conversation_context += f"User:{chr(10)}{user_input}{chr(10)}{chr(10)}"
-                    self.processing_cycle = 0
-                    self.last_input_time = time.time()
-
-                    while True:
-                        # Build prompt using the in-memory conversation context
-                        full_prompt = self.conversation_context
-
-                        self.logger.debug("Built prompt for model using in-memory context")
-
-                        # Log the full prompt to conversation file
-                        self._log_to_conversation_file(full_prompt, "assistant_prompt")
-
-                        # Process model response with streaming to console only
-                        def streaming_callback(chunk):
-                            self.write_output(chunk, stream=True)
-
-                        model_response = self.model_manager.execute_model(full_prompt, streaming_callback)
-                        self.logger.debug(f"Model response processing complete")
-
-                        # Log the full response to conversation file
-                        self._log_to_conversation_file(model_response, "assistant")
-
-                        last_parsed_response = self.process_response(model_response)
-
-                        # Append to context
-                        self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
-
-                        # Handle console response if present
-                        if "console_response" in last_parsed_response:
-                            self.write_output(f"[walbert_console_response]{last_parsed_response['console_response']}[/walbert_console_response]")
-
-                        # Exit processing loop if no pending tasks
-                        if not last_parsed_response.get("has_pending_tasks", False):
-                            self.logger.debug("No pending tasks, returning control to user")
-                            break
-
-                        # Continue processing if there are pending tasks
-                        self.logger.debug("CRITICAL: Continuing internal processing cycle due to pending tasks. Will NOT respond to user until complete.")
-                        self.processing_cycle += 1
+                # Small delay to prevent CPU overload
+                time.sleep(0.1)
 
             except KeyboardInterrupt:
                 print(f"{chr(10)}Goodbye!")
-                if self.current_conversation_file:
-                    self.end_conversation()
+                self.end_conversation()
                 self.model_manager.shutdown()
                 break
             except Exception as e:
-                self.logger.error(f"Error in main loop: {e}", exc_info=True)
+                self.logger.error(f"Error in autonomous loop: {e}", exc_info=True)
                 error_msg = f"""
 Error Type: System Error
 Error: {str(e)}
@@ -717,3 +598,8 @@ Error: {str(e)}
         except subprocess.CalledProcessError as e:
             print(f"Failed to install {package}: {e.stderr}")
             self.logger.error(f"Failed to install package {package}: {e.stderr}")
+
+    def shutdown(self):
+        """Shutdown agent cleanly"""
+        self.end_conversation()
+        self.model_manager.shutdown()

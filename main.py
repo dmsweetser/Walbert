@@ -8,8 +8,13 @@ import sys
 import os
 import logging
 import json
+import threading
+import time
+import queue
 from walbert import Config, WalbertAgent
 from walbert.config import ModelConfig
+from walbert.tts import TextToSpeech
+from walbert.stt import SpeechToText
 
 # Initialize logging
 os.makedirs('instance', exist_ok=True)
@@ -59,8 +64,112 @@ def main():
     log_level = getattr(logging, config.log_level.upper(), logging.INFO)
     logger.setLevel(log_level)
 
+    # Initialize TTS and STT
+    tts = TextToSpeech()
+    stt = SpeechToText()
+
+    # Start STT in continuous listening mode
+    stt_start_event = threading.Event()
+    stt_thread = threading.Thread(target=stt.start_listening, args=(stt_start_event,))
+    stt_thread.daemon = True
+    stt_thread.start()
+
+    # Give STT thread time to initialize
+    time.sleep(2)
+    stt_start_event.set()
+
+    # Create input/output queue
+    input_queue = queue.Queue()
+
+    # Create agent
     agent = WalbertAgent(config)
-    agent.run()
+
+    # Start agent in autonomous mode in separate thread
+    agent_thread = threading.Thread(target=agent.run_autonomous, args=(input_queue,))
+    agent_thread.daemon = True
+    agent_thread.start()
+
+    # Main console loop
+    print("""
+ ___            ___
+/   \          /   \
+\_   \        /  __/
+ _\   \      /  /__
+ \___  \____/   __/
+     \_       _/
+       | @ @  \_
+       |
+     _/     /\
+    /o)  (o/\ \_
+    \_____/ /
+      \____/
+              """)
+
+    print("Welcome to Walbert! The local-first AI agent.")
+    print("Available commands:")
+    print("- exit/quit: Exit the program")
+    print("- inet on: Enable internet access for Python execution")
+    print("- inet off: Disable internet access for Python execution")
+    print("- pip_install <package>: Install a Python package in the main environment")
+    print("- tts on: Enable text-to-speech")
+    print("- tts off: Disable text-to-speech")
+    print("- stt on: Enable speech-to-text")
+    print("- stt off: Disable speech-to-text")
+    print("- Any other input will be treated as a request to Walbert")
+    print("")
+    print("Say 'Hey Walbert' to activate voice input, and 'Thanks' to end voice input.")
+    print("")
+
+    tts_enabled = True
+    stt_enabled = True
+
+    try:
+        while True:
+            user_input = input("> ")
+            if user_input.strip():
+                # Handle commands
+                if user_input.lower() in ['exit', 'quit']:
+                    input_queue.put(("exit",))
+                    break
+                elif user_input.lower() == 'inet on':
+                    agent.internet_access = True
+                    print("Internet access enabled for Python execution.")
+                elif user_input.lower() == 'inet off':
+                    agent.internet_access = False
+                    print("Internet access disabled for Python execution.")
+                elif user_input.lower().startswith('pip_install '):
+                    package = user_input[12:].strip()
+                    if package:
+                        agent._install_python_package(package)
+                elif user_input.lower() == 'tts on':
+                    tts_enabled = True
+                    print("Text-to-speech enabled.")
+                elif user_input.lower() == 'tts off':
+                    tts_enabled = False
+                    print("Text-to-speech disabled.")
+                elif user_input.lower() == 'stt on':
+                    stt_enabled = True
+                    stt.resume_listening()
+                    print("Speech-to-text enabled.")
+                elif user_input.lower() == 'stt off':
+                    stt_enabled = False
+                    stt.pause_listening()
+                    print("Speech-to-text disabled.")
+                else:
+                    # Put user input into queue for agent
+                    input_queue.put(("user_input", user_input))
+
+                    # If TTS is enabled, speak the response
+                    if tts_enabled and agent.last_response:
+                        tts.speak(agent.last_response)
+    except KeyboardInterrupt:
+        print(f"{chr(10)}Goodbye!")
+        input_queue.put(("exit",))
+    except Exception as e:
+        logger.error(f"Error in main loop: {e}", exc_info=True)
+    finally:
+        agent.shutdown()
+        stt.stop()
 
 if __name__ == "__main__":
     main()

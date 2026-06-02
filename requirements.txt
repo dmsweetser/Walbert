@@ -1,2 +1,6 @@
 python-dotenv
 requests
+pyttsx3
+vosk
+sounddevice
+numpy
