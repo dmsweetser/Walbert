@@ -46,7 +46,7 @@ class SpeechToText:
         """Audio callback for recording"""
         if status:
             logger.warning(f"Audio status: {status}")
-        self.buffer.put(indata.tobytes())
+        self.buffer.put(indata)
 
     def start_listening(self, start_event):
         """Start continuous listening for voice commands"""
