@@ -66,10 +66,15 @@ if [ $? -ne 0 ]; then
 fi
 
 # Install Vosk model for speech-to-text
-echo "Downloading Vosk model for speech-to-text..."
-wget -q -O instance/models/vosk-model-small-en-us-0.15.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
-unzip -q instance/models/vosk-model-small-en-us-0.15.zip -d instance/models
-rm instance/models/vosk-model-small-en-us-0.15.zip
+if [ ! -f "instance/models/vosk-model-small-en-us-0.15" ]; then
+    echo "Downloading Vosk model for speech-to-text..."
+    wget -q -O instance/models/vosk-model-small-en-us-0.15.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+    unzip -q instance/models/vosk-model-small-en-us-0.15.zip -d instance/models
+    rm instance/models/vosk-model-small-en-us-0.15.zip
+else
+    echo "Vosk already exists, skipping download."
+fi
+
 
 # Create default config if it doesn't exist
 if [ ! -f "instance/config.json" ]; then
