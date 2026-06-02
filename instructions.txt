@@ -1,1 +1,5 @@
 Please consolidate redundant parts of the prompt so that it is terse as possible while maintaining the current directives. 
+
+I want you to change the approach of the app - have walbert always be executing autonomously in a separate thread, and have user input be available at all times through the console, as well as the ability to execute other commands like inet on or off. Change the system prompt to philosophically aligned with this where walbert understands it should always be executing autonomously, but should consider user requests as it proceeds. So if a user request becomes available, it will become part of the prompt. 
+
+Add a wrapper on top of the console input output that allows for text to speech and speech to text. It should have minimal impact on the existing system, which should still be executing to the console output and receive console input. Use offline models that are downloaded as part of the installer to accomplish this. Have the speech to text be listening continuously and have it demarcate when it identifies hey walbert and thanks as the start and end markers for a request which it should then feed into the model as a user input.
