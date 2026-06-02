@@ -189,7 +189,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         parsed = self._parse_response(response_text)
         self.logger.debug(f"Parsed response: {parsed}")
 
-        if not self.db.conn or self.db.conn.closed:
+        if not self.db.conn:
             self.db.connect()
 
         # Handle multiple SQL executions
