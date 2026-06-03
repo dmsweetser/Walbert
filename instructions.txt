@@ -1,3 +1,9 @@
-Get rid of the current implementation for turning internet on or off. Instead, have the python execution process externally block any IP access.
+Right now, if Walbert decides to return control to the user, it doesn't work properly. It doesn't actually wait for input - instead, it just moves on to another autonomous mode.
 
-Also, have the console clear when starting, when a user provides a request, and when a console response comes from the agent. I want it to be a clean interface.
+I want it to wait for a period of time (configurable, max 5 min for now) for a user input to be detected, and only if it is not detected should it continue on autonomously.
+
+I want to log differently - have a folder for the conversation (meaning when Walbert is started for the day), but log the full prompt as one file and the full response as another, over and over again with timestamps. I want to be able to sort by time, so put the timestamp at the beginning, and I should be able to see each prompt and response in order.
+
+Also, get rid of the console clearing stuff. Instead, just output to the console the parsed console response from Walbert, and show a new user prompt.
+
+Also, make sure the feedback from any SQL execution or Python execution, as well as the running conversation history (user requests and summarization of agent activity) is preserved for the next round. Right now, I think it doesn't always make it. Turn it into injected content rather than using a walbert block for the python or SQL results, for example.
