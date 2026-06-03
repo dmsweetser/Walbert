@@ -1,10 +1,3 @@
-Consolidate the redundant "examples" and available blocks into one list for the System prompt.
-Make it clear to the bot that it should assume it has access to its hardware.
+Get rid of the current implementation for turning internet on or off. Instead, have the python execution process externally block any IP access.
 
-Also, make it so that the bot can return control to the user at its discretion. If it is stuck or there is an issue, it should be able to stop processing, ask the user for help, and then continue after getting help.
-
-Also, if the bot finds that the model is unresponsive, I want the llama.cpp server instance to be able to restart.
-
-****
-
-You did this, but I don't see where the process actually returns control to the user to wait.
+Also, have the console clear when starting, when a user provides a request, and when a console response comes from the agent. I want it to be a clean interface.

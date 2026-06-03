@@ -57,6 +57,10 @@ def load_config() -> Config:
         logger.error(f"Error loading config: {e}")
         sys.exit(1)
 
+def clear_console():
+    """Clear the console screen"""
+    print("\033[2J\033[H", end='')
+
 def main():
     """Main entry point"""
     config = load_config()
@@ -89,6 +93,8 @@ def main():
     agent_thread.start()
 
     # Main console loop
+    # Clear console before starting
+    clear_console()
     print("""
           
  ___            ___      
@@ -127,6 +133,8 @@ def main():
 
     try:
         while True:
+            # Clear console before getting user input
+            clear_console()
             user_input = input("> ")
             if user_input.strip():
                 # Handle commands
@@ -143,21 +151,36 @@ def main():
                     package = user_input[12:].strip()
                     if package:
                         agent._install_python_package(package)
+                        # Clear console after command execution
+                        clear_console()
+                        print("Package installation command executed.")
+                        print("Type 'continue' to resume, or enter a new request.")
+                        continue
                 elif user_input.lower() == 'tts on':
                     tts_enabled = True
+                    # Clear console after command execution
+                    clear_console()
                     print("Text-to-speech enabled.")
                 elif user_input.lower() == 'tts off':
                     tts_enabled = False
+                    # Clear console after command execution
+                    clear_console()
                     print("Text-to-speech disabled.")
                 elif user_input.lower() == 'stt on':
                     stt_enabled = True
                     stt.resume_listening()
+                    # Clear console after command execution
+                    clear_console()
                     print("Speech-to-text enabled.")
                 elif user_input.lower() == 'stt off':
                     stt_enabled = False
                     stt.pause_listening()
+                    # Clear console after command execution
+                    clear_console()
                     print("Speech-to-text disabled.")
                 elif user_input.lower() == 'continue':
+                    # Clear console after command execution
+                    clear_console()
                     print("Resuming autonomous processing...")
                     input_queue.put(("user_input", "[walbert_continue_processing]Resuming processing after user input[/walbert_continue_processing]"))
                 else:
@@ -170,7 +193,9 @@ def main():
 
                     # Check if agent requested user control and wait for continuation
                     if "[walbert_user_control]" in agent.last_response:
-                        print(f"{chr(10)}Walbert has requested user guidance. Please provide input when ready.")
+                        # Clear console for user control prompt
+                        clear_console()
+                        print("Walbert has requested user guidance. Please provide input when ready.")
                         print("Type 'continue' when you want Walbert to resume processing.")
                         while True:
                             continuation_input = input("> ")
@@ -187,6 +212,6 @@ def main():
     finally:
         agent.shutdown()
         stt.stop()
-            
+
 if __name__ == "__main__":
     main()

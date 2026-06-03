@@ -95,11 +95,15 @@ Start the agent with:
 
 Available commands:
 - `exit`/`quit`: Exit the program
-- `auto`: Enter autonomous mode (any input returns to normal mode)
 - `inet on`: Enable internet access for Python execution
 - `inet off`: Disable internet access for Python execution
 - `pip_install <package>`: Install a Python package in the main environment
-- Any other input returns from autonomous mode
+- `tts on`: Enable text-to-speech
+- `tts off`: Disable text-to-speech
+- `stt on`: Enable speech-to-text
+- `stt off`: Disable speech-to-text
+- `continue`: Resume autonomous processing after user control
+- Any other input will be treated as a request to Walbert
 
 ## Testing (there are no tests)
 

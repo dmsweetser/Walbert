@@ -149,18 +149,20 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
 
     def write_output(self, text: str, stream: bool = False) -> None:
         """Write output to console with streaming support"""
+        # Clear console before displaying output
+        print("\033[2J\033[H", end='')
         if text.startswith("[walbert_console_response]"):
             # Extract content from console response block
             match = re.search(r'\[walbert_console_response\](.*?)\[/walbert_console_response\]', text, re.DOTALL)
             if match:
                 content = match.group(1).strip()
-                print(f"{chr(10)}{chr(10)}=== WALBERT RESPONSE ==={chr(10)}")
+                print(f"=== WALBERT RESPONSE ===")
                 if stream:
                     for char in content:
                         print(char, end='', flush=True)
                 else:
                     print(content)
-                print(f"{chr(10)}======================={chr(10)}")
+                print("=======================")
                 # Store last response for TTS
                 self.last_response = content
             else:
@@ -367,24 +369,24 @@ Execution Results:
         with open(script_file, 'w') as f:
             f.write(code)
 
-        # Set up environment for internet access
-        env = os.environ.copy()
-        if not self.internet_access:
-            # Apply restrictive firewall rules if internet is disabled
-            try:
-                subprocess.run(["user_utilities/inet_lock.sh"], check=True)
-            except subprocess.CalledProcessError as e:
-                self.logger.error(f"Failed to apply internet restrictions: {e}")
-                return f"[walbert_error]Failed to apply internet restrictions: {str(e)}[/walbert_error]"
 
+        if not self.internet_access:
+            # Ensure unshare exists
+            unshare_path = shutil.which("unshare")
+            if not unshare_path:
+                raise RuntimeError("internet_access=False but 'unshare' is not available on this system")
+
+            python_cmd = [unshare_path, "-n", sys.executable, script_file]
+        else:
+            python_cmd = [sys.executable, script_file]
         # Execute script using the main application's Python interpreter
         try:
             result = subprocess.run(
-                [sys.executable, script_file],
+                python_cmd,
                 capture_output=True,
                 text=True,
                 timeout=self.config.python_execution_timeout,
-                env=env
+                env=os.environ.copy()
             )
 
             output = ""
@@ -410,13 +412,6 @@ Execution Results:
             error_msg = f"[walbert_error]{chr(10)}Python execution error: {str(e)}[/walbert_error]"
             self.logger.error(error_msg)
             return error_msg
-        finally:
-            # Always restore internet access if it was disabled
-            if not self.internet_access:
-                try:
-                    subprocess.run(["user_utilities/inet_unlock.sh"], check=True)
-                except subprocess.CalledProcessError as e:
-                    self.logger.error(f"Failed to restore internet access: {e}")
 
     def _parse_response(self, content: str) -> dict:
         """Parse response with enhanced block detection for multiple blocks"""
