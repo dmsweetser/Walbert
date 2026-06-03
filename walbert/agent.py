@@ -633,7 +633,7 @@ Execution Results:
 
                 # Handle console response if present
                 if "console_response" in last_parsed_response:
-                    self.write_output(f"[walbert_console_response]{last_parsed_response['console_response']}[/walbert_console_response]")
+                    self.write_output(f"[walbert_console_response]{chr(10)}{last_parsed_response['console_response']}{chr(10)}[/walbert_console_response]")
 
                 # Small delay to prevent CPU overload
                 time.sleep(0.5)

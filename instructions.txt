@@ -1,5 +1,6 @@
-There are some issues. I want the summary to be provided and included as chat history even if it is something Walbert did autonomously.
+Consolidate the redundant "examples" and available blocks into one list for the System prompt.
+Make it clear to the bot that it should assume it has access to its hardware.
 
-Also, make it so when I send user input, it interrupts the autonomous operation and has Walbert process my request immediately.
+Also, make it so that the bot can return control to the user at its discretion. If it is stuck or there is an issue, it should be able to stop processing, ask the user for help, and then continue after getting help.
 
-Fix this and any other issues you see so that during autonomous operation, Walbert has sufficient context to actually progress with something, rather than just doing the same thing over and over again.
+Also, if the bot finds that the model is unresponsive, I want the llama.cpp server instance to be able to restart.

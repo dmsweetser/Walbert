@@ -49,13 +49,13 @@ class DatabaseManager:
             WHERE type='table' AND name NOT LIKE 'sqlite_%'
         """).fetchall()
 
-        schema_str = "Current Database Schema:\n\n"
+        schema_str = f"Current Database Schema:{chr(10)}{chr(10)}"
         for table in tables:
             table_name = table[0]
-            schema_str += f"Table: {table_name}\n"
+            schema_str += f"Table: {table_name}{chr(10)}"
 
             columns = self.cursor.execute(f"PRAGMA table_info({table_name})").fetchall()
-            schema_str += "Columns:\n"
+            schema_str += f"Columns:{chr(10)}"
             for col in columns:
                 col_name = col[1]
                 col_type = col[2]
@@ -67,20 +67,20 @@ class DatabaseManager:
                     schema_str += " NOT NULL"
                 if col[4] is not None:  # default value
                     schema_str += f" DEFAULT {col[4]}"
-                schema_str += "\n"
+                schema_str += f"{chr(10)}"
 
             fks = self.cursor.execute(f"PRAGMA foreign_key_list({table_name})").fetchall()
             if fks:
-                schema_str += "Foreign Keys:\n"
+                schema_str += f"Foreign Keys:{chr(10)}"
                 for fk in fks:
                     schema_str += f"  - {fk[3]} REFERENCES {fk[2]}({fk[4]})"
                     if fk[6] != 'NO ACTION':
                         schema_str += f" ON DELETE {fk[6]}"
                     if fk[5] != 'NO ACTION':
                         schema_str += f" ON UPDATE {fk[5]}"
-                    schema_str += "\n"
+                    schema_str += chr(10)
 
-            schema_str += "\n"
+            schema_str += f"{chr(10)}"
 
         return schema_str
 
@@ -106,21 +106,21 @@ class DatabaseManager:
 
                     output = []
                     columns = [desc[0] for desc in result.description]
-                    output.append("\t".join(columns))
+                    output.append(f"{chr(9)}".join(columns))
                     output.append("-" * (sum(len(col) for col in columns) + len(columns) * 3))
 
                     for row in rows:
                         output_row = []
                         for val in row:
                             output_row.append(str(val) if val is not None else "NULL")
-                        output.append("\t".join(output_row))
+                        output.append(f"{chr(9)}".join(output_row))
 
-                    results.append("\n".join(output))
+                    results.append(f"{chr(10)}".join(output))
                 else:
                     results.append(f"SQL executed successfully. Rows affected: {self.cursor.rowcount}")
 
             self.conn.commit()
-            return "\n\n".join(results)
+            return f"{chr(10)}{chr(10)}".join(results)
         except Exception as e:
             self.logger.error(f"SQL execution error: {e}")
             return f"Error executing SQL: {e}"
