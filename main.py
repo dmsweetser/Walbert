@@ -116,6 +116,7 @@ def main():
     print("- tts off: Disable text-to-speech")
     print("- stt on: Enable speech-to-text")
     print("- stt off: Disable speech-to-text")
+    print("- continue: Resume autonomous processing after user control")
     print("- Any other input will be treated as a request to Walbert")
     print("")
     print("Say 'Hey Walbert' to activate voice input, and 'Thanks' to end voice input.")
@@ -156,6 +157,9 @@ def main():
                     stt_enabled = False
                     stt.pause_listening()
                     print("Speech-to-text disabled.")
+                elif user_input.lower() == 'continue':
+                    print("Resuming autonomous processing...")
+                    input_queue.put(("user_input", "[walbert_continue_processing]Resuming processing after user input[/walbert_continue_processing]"))
                 else:
                     # Put user input into queue for agent
                     input_queue.put(("user_input", user_input))
@@ -163,6 +167,18 @@ def main():
                     # If TTS is enabled, speak the response
                     if tts_enabled and agent.last_response:
                         tts.speak(agent.last_response)
+
+                    # Check if agent requested user control and wait for continuation
+                    if "[walbert_user_control]" in agent.last_response:
+                        print(f"{chr(10)}Walbert has requested user guidance. Please provide input when ready.")
+                        print("Type 'continue' when you want Walbert to resume processing.")
+                        while True:
+                            continuation_input = input("> ")
+                            if continuation_input.lower() == 'continue':
+                                input_queue.put(("user_input", f"[walbert_continue_processing]{chr(10)}Resuming processing after user guidance{chr(10)}[/walbert_continue_processing]"))
+                                break
+                            else:
+                                input_queue.put(("user_input", continuation_input))
     except KeyboardInterrupt:
         print(f"{chr(10)}Goodbye!")
         input_queue.put(("exit",))
@@ -171,6 +187,6 @@ def main():
     finally:
         agent.shutdown()
         stt.stop()
-
+            
 if __name__ == "__main__":
     main()

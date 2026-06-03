@@ -4,3 +4,7 @@ Make it clear to the bot that it should assume it has access to its hardware.
 Also, make it so that the bot can return control to the user at its discretion. If it is stuck or there is an issue, it should be able to stop processing, ask the user for help, and then continue after getting help.
 
 Also, if the bot finds that the model is unresponsive, I want the llama.cpp server instance to be able to restart.
+
+****
+
+You did this, but I don't see where the process actually returns control to the user to wait.
