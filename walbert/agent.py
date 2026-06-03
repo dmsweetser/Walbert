@@ -264,8 +264,13 @@ Execution Results:
                 "content": summary,
                 "timestamp": time.time()
             })
-            # Reset context after processing to ensure fresh prompt for next interaction
-            self._reset_conversation_context()
+            # Always add summary to context for next cycle
+            summary_block = f"""
+[walbert_summary]
+{summary}
+[/walbert_summary]
+"""
+            self.conversation_context += summary_block + chr(10)
 
         return parsed
 
@@ -286,13 +291,25 @@ Execution Results:
                     break
             recent_history.insert(0, item)
 
-        # Build context from recent history
+        # Build context from recent history including autonomous summaries
         history_context = f"## Recent Conversation History{chr(10)}{chr(10)}"
         for item in recent_history:
             if item["type"] == "question":
                 history_context += f"User Question:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
             elif item["type"] == "summary":
                 history_context += f"Assistant Summary:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
+
+        # Add autonomous operation context
+        history_context += f"## Autonomous Operation Context{chr(10)}{chr(10)}"
+        history_context += f"You have been operating autonomously. Recent autonomous activities include:{chr(10)}"
+
+        # Add recent autonomous summaries
+        autonomous_summaries = [item for item in self.conversation_history if item["type"] == "summary"]
+        if autonomous_summaries:
+            for summary in autonomous_summaries[-3:]:  # Last 3 summaries
+                history_context += f"- {summary['content']}{chr(10)}"
+        else:
+            history_context += "- No recent autonomous activities recorded{chr(10)}"
 
         # Reset context with fresh system prompt and recent history
         db_schema = self.db.get_schema()
@@ -305,6 +322,11 @@ Execution Results:
         # Add internet access status to system prompt
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
         system_prompt += f"{chr(10)}{chr(10)}## Internet Access Status{chr(10)}Internet access for Python execution is currently {internet_status}.{chr(10)}"
+
+        # Add current processing state
+        system_prompt += f"{chr(10)}{chr(10)}## Current Processing State{chr(10)}"
+        system_prompt += f"Processing Cycle: {self.processing_cycle}{chr(10)}"
+        system_prompt += f"You should continue where you left off or make progress on your objectives.{chr(10)}"
 
         self.conversation_context = system_prompt + chr(10) + chr(10) + history_context
         self.processing_cycle = 0
@@ -418,15 +440,29 @@ Execution Results:
         # Determine if control should return to user automatically
         has_pending_sql = 'sql_execute' in result
         has_pending_python = 'python_execute' in result
-        result['has_pending_tasks'] = has_pending_sql or has_pending_python
+        has_pending_tasks = has_pending_sql or has_pending_python
 
         # Check for Python execution results that indicate pending tasks
         if 'python_stdout' in result or 'python_stderr' in result:
             # If we have Python output, we might need to continue processing
-            result['has_pending_tasks'] = True
+            has_pending_tasks = True
+
+        # Check for error blocks that might require attention
+        if 'error' in result:
+            has_pending_tasks = True
+
+        result['has_pending_tasks'] = has_pending_tasks
 
         if result['has_pending_tasks']:
             self.logger.debug("CRITICAL: Internal processing not complete. Will continue processing.")
+
+        # Always include summary in history if present
+        if 'summary' in result:
+            self.conversation_history.append({
+                "type": "summary",
+                "content": result['summary'],
+                "timestamp": time.time()
+            })
 
         self.logger.debug(f"Parsed result: {result}")
         return result
@@ -513,7 +549,7 @@ Execution Results:
 
         while True:
             try:
-                # Check for new input in queue
+                # Check for new input in queue with immediate processing
                 try:
                     msg_type, msg = input_queue.get_nowait()
                     if msg_type == "exit":
@@ -522,26 +558,65 @@ Execution Results:
                         return
 
                     if msg_type == "user_input":
-                        # Log user input to conversation file and start fresh context
+                        # Log user input to conversation file and interrupt autonomous processing
                         self._log_to_conversation_file(msg, "user")
                         self.conversation_history.append({
                             "type": "question",
                             "content": msg,
                             "timestamp": time.time()
                         })
+
+                        # Reset context with fresh system prompt and recent history
+                        self._reset_conversation_context()
+
+                        # Add user input to context
                         self.conversation_context += f"User:{chr(10)}{msg}{chr(10)}{chr(10)}"
                         self.processing_cycle = 0
                         self.last_input_time = time.time()
+
+                        # Process user input immediately
+                        full_prompt = self.conversation_context
+                        full_prompt += chr(10) + "[walbert_input_channel]user[/walbert_input_channel]"
+                        full_prompt += chr(10) + "Please respond to the user's request immediately."
+
+                        def streaming_callback(chunk):
+                            pass
+
+                        # Log the full prompt to conversation file
+                        self._log_to_conversation_file(full_prompt, "assistant_prompt")
+
+                        model_response = self.model_manager.execute_model(full_prompt, streaming_callback)
+
+                        # Log the full response to conversation file
+                        self._log_to_conversation_file(model_response, "assistant")
+
+                        last_parsed_response = self.process_response(model_response)
+
+                        # Append to context
+                        self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
+
+                        # Handle console response if present
+                        if "console_response" in last_parsed_response:
+                            self.write_output(f"[walbert_console_response]{last_parsed_response['console_response']}[/walbert_console_response]")
+
+                        # Continue to next iteration to check for more input
+                        continue
+
                 except queue.Empty:
                     pass
 
-                # Autonomous processing loop
+                # Autonomous processing loop with improved context
                 full_prompt = self.conversation_context
                 full_prompt += chr(10) + "[walbert_input_channel]autonomous[/walbert_input_channel]"
-                full_prompt += chr(10) + "Continuing autonomous operation. Please perform any necessary tasks or reflections."
+                full_prompt += chr(10) + "You are operating autonomously. Please:"
+                full_prompt += chr(10) + "1. Review your recent actions and results"
+                full_prompt += chr(10) + "2. Identify any pending tasks or incomplete work"
+                full_prompt += chr(10) + "3. Make progress on your objectives"
+                full_prompt += chr(10) + "4. Maintain awareness of your database state"
+                full_prompt += chr(10) + "5. Provide a summary of your autonomous activities"
 
                 def streaming_callback(chunk):
-                    pass  # No longer streaming to file
+                    pass
 
                 # Log the full prompt to conversation file
                 self._log_to_conversation_file(full_prompt, "assistant_prompt")
@@ -560,13 +635,8 @@ Execution Results:
                 if "console_response" in last_parsed_response:
                     self.write_output(f"[walbert_console_response]{last_parsed_response['console_response']}[/walbert_console_response]")
 
-                # Continue processing if there are pending tasks
-                if last_parsed_response.get("has_pending_tasks", False):
-                    self.logger.debug("CRITICAL: Continuing internal processing cycle due to pending tasks. Will NOT respond to user until complete.")
-                    self.processing_cycle += 1
-
                 # Small delay to prevent CPU overload
-                time.sleep(0.1)
+                time.sleep(0.5)
 
             except KeyboardInterrupt:
                 print(f"{chr(10)}Goodbye!")

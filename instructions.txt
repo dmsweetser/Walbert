@@ -1,23 +1,5 @@
-I get these errors when I try to run Walbert:
+There are some issues. I want the summary to be provided and included as chat history even if it is something Walbert did autonomously.
 
-2026-06-02 12:26:57,804 - walbert.database - DEBUG - Retrieving database schema
-2026-06-02 12:26:57,805 - walbert.agent - ERROR - Error starting conversation: SQLite objects created in a thread can only be used in that same thread. The object was created in thread id 140000988229696 and this is thread id 139999934432960.
-Exception in thread Thread-2 (run_autonomous):
-Traceback (most recent call last):
-  File "/usr/lib/python3.11/threading.py", line 1038, in _bootstrap_inner
-    self.run()
-  File "/usr/lib/python3.11/threading.py", line 975, in run
-    self._target(*self._args, **self._kwargs)
-  File "/home/daniel/Walbert/walbert/agent.py", line 505, in run_autonomous
-    self.start_conversation()
-  File "/home/daniel/Walbert/walbert/agent.py", line 454, in start_conversation
-    db_schema = self.db.get_schema()
-                ^^^^^^^^^^^^^^^^^^^^
-  File "/home/daniel/Walbert/walbert/database/manager.py", line 46, in get_schema
-    tables = self.cursor.execute("""
-             ^^^^^^^^^^^^^^^^^^^^^^^
-sqlite3.ProgrammingError: SQLite objects created in a thread can only be used in that same thread. The object was created in thread id 140000988229696 and this is thread id 139999934432960.
-2026-06-02 12:26:57,868 - walbert.stt - ERROR - Error in speech-to-text listening: initializer for ctype 'char *' must be a cdata pointer, not _cffi_backend.buffer
-2026-06-02 12:26:57,868 - walbert.stt - INFO - Speech-to-text listening stopped
+Also, make it so when I send user input, it interrupts the autonomous operation and has Walbert process my request immediately.
 
-Fix these and any other errors you see.
+Fix this and any other issues you see so that during autonomous operation, Walbert has sufficient context to actually progress with something, rather than just doing the same thing over and over again.
