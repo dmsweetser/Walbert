@@ -1,0 +1,9 @@
+Whenever the user enters input, I want the model to be immediately restarted so that it can begin processing the user input, rather than having to wait for autonomous processing to continue.
+
+Formalize the conversation history included in the prompt, using a structured object that includes the last X entries, which will either be the user input or the summary walbert block from the agent.
+
+Fix this error as well:
+
+Expression 'paInvalidSampleRate' failed in 'src/hostapi/alsa/pa_linux_alsa.c', line: 2048
+Expression 'PaAlsaStreamComponent_InitialConfigure( &self->capture, inParams, self->primeBuffers, hwParamsCapture, &realSr )' failed in 'src/hostapi/alsa/pa_linux_alsa.c', line: 2718
+Expression 'PaAlsaStream_Configure( stream, inputParameters, outputParameters, sampleRate, framesPerBuffer, &inputLatency, &outputLatency, &hostBufferSizeMode )' failed in 'src/hostapi/alsa/pa_linux_alsa.c', line: 2842

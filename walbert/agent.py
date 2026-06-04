@@ -129,22 +129,11 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
 
     def write_output(self, text: str, stream: bool = False) -> None:
         """Write output to console with streaming support"""
-        if "[walbert_console_response]" in text:
-            # Extract content from console response block
-            match = re.search(r'\[walbert_console_response\](.*?)\[/walbert_console_response\]', text, re.DOTALL)
-            if match:
-                content = match.group(1).strip()
-                print(content)
-                # Store last response for TTS
-                self.last_response = content
-            else:
-                print(text)
+        if stream:
+            for char in text:
+                print(char, end='', flush=True)
         else:
-            if stream:
-                for char in text:
-                    print(char, end='', flush=True)
-            else:
-                print(text)
+            print(text)
 
     def process_response(self, response_text: str) -> dict:
         """Process model response with enhanced diagnostics for multiple blocks"""
@@ -161,15 +150,8 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         if parsed.get("user_control"):
             reason = parsed["user_control"]
             self.logger.info(f"User control requested: {reason}")
-            control_block = f"""
-[walbert_console_response]
-I need to return control to you for the following reason:
-{reason}
-
-Please provide guidance or input, then type 'continue' when you want me to resume processing.
-[/walbert_console_response]
-"""
-            self.write_output(control_block)
+            control_msg = f"[walbert_user_control]I need to return control to you for the following reason:{chr(10)}" + reason + f"{chr(10)}Please provide guidance or input, then type 'continue' when you want me to resume processing.{chr(10)}[walbert_user_control]"
+            self.write_output(control_msg)
             # Mark that we're waiting for user control
             parsed["waiting_for_user_control"] = True
             self.user_control_start_time = time.time()
@@ -183,19 +165,11 @@ Please provide guidance or input, then type 'continue' when you want me to resum
             time.sleep(2)
             self.model_manager.start_server_thread()
             if not self.model_manager.wait_for_server():
-                error_block = f"""
-Error Type: System Error
-Model server failed to restart after request. Reason: {reason}
-"""
-                self.conversation_context += error_block + chr(10)
+                error_msg = f"{chr(10)}Error: Model server failed to restart after request. Reason: {reason}{chr(10)}"
+                self.conversation_context += error_msg + chr(10)
                 return parsed
-            restart_block = f"""
-[walbert_console_response]
-Model server has been restarted. Reason: {reason}
-Continuing processing...
-[/walbert_console_response]
-"""
-            self.write_output(restart_block)
+            restart_msg = "{chr(10)}Model server has been restarted. Reason: " + reason + f"{chr(10)}Continuing processing...{chr(10)}"
+            self.conversation_context += restart_msg + chr(10)
 
         # Handle multiple SQL executions
         if parsed.get("sql_execute"):
@@ -210,17 +184,12 @@ Continuing processing...
                     result = self.db.execute_sql(sql)
                     self.logger.debug(f"SQL execution result: {result}")
                     # Inject SQL execution results directly into context
-                    self.conversation_context += f"""
-SQL execution results:
-{result}
-"""
+                    self.conversation_context += f"{chr(10)}SQL execution results:{chr(10)}{result}{chr(10)}"
                 except Exception as e:
                     self.logger.error(f"SQL execution error: {e}")
                     error_msg = f"SQL Error: {str(e)}"
                     # Inject error directly into context
-                    self.conversation_context += f"""
-SQL Error: {error_msg}
-"""
+                    self.conversation_context += f"{chr(10)}SQL Error: {error_msg}{chr(10)}"
 
         # Handle multiple Python executions
         if parsed.get("python_execute"):
@@ -237,10 +206,7 @@ SQL Error: {error_msg}
                 self.logger.debug(f"Executing Python code")
                 result = self._execute_python_code(code)
                 # Inject Python execution results directly into context
-                self.conversation_context += f"""
-Python execution results:
-{result}
-"""
+                self.conversation_context += f"""{chr(10)}Python execution results:{chr(10)}{result}{chr(10)}"""
 
         # Extract summary if present
         if parsed.get("summary"):
@@ -251,12 +217,8 @@ Python execution results:
                 "timestamp": time.time()
             })
             # Always add summary to context for next cycle
-            summary_block = f"""
-[walbert_summary]
-{summary}
-[/walbert_summary]
-"""
-            self.conversation_context += summary_block + chr(10)
+            summary_line = "Summary: " + summary
+            self.conversation_context += summary_line + chr(10)
 
         return parsed
 
@@ -346,12 +308,12 @@ Python execution results:
 
             output = ""
             if result.stdout:
-                output += f"[walbert_python_stdout]{chr(10)}{result.stdout}[/walbert_python_stdout]{chr(10)}"
+                output += f"Python stdout:{chr(10)}{result.stdout}{chr(10)}"
             if result.stderr:
-                output += f"[walbert_python_stderr]{chr(10)}{result.stderr}[/walbert_python_stderr]{chr(10)}"
+                output += f"Python stderr:{chr(10)}{result.stderr}{chr(10)}"
 
             # Always include return code information
-            output += f"[walbert_python_return_code]{chr(10)}{result.returncode}[/walbert_python_return_code]{chr(10)}"
+            output += f"Python return code: {result.returncode}{chr(10)}"
 
             # Log the execution details
             self.logger.debug(f"Python execution completed with return code {result.returncode}")
@@ -416,13 +378,10 @@ Python execution error: {str(e)}
             elif block_type == 'restart_model':
                 result[block_type] = block_content
 
-            # Handle Python execution result blocks
-            elif block_type in ['python_stdout', 'python_stderr', 'python_return_code', 'python_result', 'error']:
-                result[block_type] = block_content
-
             # Handle other block types
             else:
-                result[block_type] = block_content
+                # Ignore any other walbert blocks
+                continue
 
         # Store multiple blocks if found
         if sql_blocks:
@@ -434,15 +393,6 @@ Python execution error: {str(e)}
         has_pending_sql = 'sql_execute' in result
         has_pending_python = 'python_execute' in result
         has_pending_tasks = has_pending_sql or has_pending_python
-
-        # Check for Python execution results that indicate pending tasks
-        if 'python_stdout' in result or 'python_stderr' in result:
-            # If we have Python output, we might need to continue processing
-            has_pending_tasks = True
-
-        # Check for error blocks that might require attention
-        if 'error' in result:
-            has_pending_tasks = True
 
         result['has_pending_tasks'] = has_pending_tasks
 
@@ -564,6 +514,12 @@ Python execution error: {str(e)}
                         return
 
                     if msg_type == "user_input":
+                        self.model_manager.shutdown()
+                        time.sleep(2)
+                        self.model_manager.start_server_thread()
+                        if not self.model_manager.wait_for_server():
+                            error_msg = f"{chr(10)}Error: Model server failed to restart for user input"
+                            self.conversation_context += error_msg + chr(10)
                         # Check if we're waiting for user control
                         if self.user_control_start_time > 0 and time.time() - self.user_control_start_time < self.user_control_timeout:
                             # User input received while waiting for control
@@ -614,7 +570,7 @@ Python execution error: {str(e)}
 
                         # Handle console response if present
                         if "console_response" in last_parsed_response:
-                            self.write_output(f"[walbert_console_response]{chr(10)}{last_parsed_response['console_response']}{chr(10)}[/walbert_console_response]")
+                            self.write_output(last_parsed_response['console_response'])
                             # Show user prompt after response
                             print(">>>>> ", end='', flush=True)
 
@@ -639,13 +595,12 @@ Python execution error: {str(e)}
 
                 # Autonomous processing loop with improved context
                 full_prompt = self.conversation_context
-                full_prompt += chr(10) + f"[walbert_input_channel]{chr(10)}autonomous{chr(10)}[/walbert_input_channel]"
-                full_prompt += chr(10) + "You are operating autonomously. Please:"
-                full_prompt += chr(10) + "1. Review your recent actions and results"
-                full_prompt += chr(10) + "2. Identify any pending tasks or incomplete work"
-                full_prompt += chr(10) + "3. Make progress on your objectives"
-                full_prompt += chr(10) + "4. Maintain awareness of your database state"
-                full_prompt += chr(10) + "5. Provide a summary of your autonomous activities"
+                full_prompt += f"{chr(10)}Input channel: autonomous{chr(10)}You are operating autonomously. Please:"
+                full_prompt += f"{chr(10)}1. Review your recent actions and results"
+                full_prompt += f"{chr(10)}2. Identify any pending tasks or incomplete work"
+                full_prompt += f"{chr(10)}3. Make progress on your objectives"
+                full_prompt += f"{chr(10)}4. Maintain awareness of your database state"
+                full_prompt += f"{chr(10)}5. Provide a summary of your autonomous activities"
 
                 def streaming_callback(chunk):
                     pass
@@ -660,8 +615,6 @@ Python execution error: {str(e)}
 
                 last_parsed_response = self.process_response(model_response)
 
-                # Append to context
-                self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
 
                 # Handle console response if present
                 if "console_response" in last_parsed_response:
