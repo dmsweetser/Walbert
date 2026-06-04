@@ -1,1 +1,7 @@
-Instead of logging all prompts to one file and all responses to one file, I want to log each one individually, with the ticks as the start of the file name, under the session so that you see in chronological order each prompt and response in its own file.
+I want the [walbert...] blocks to ONLY be for things I want the model to output.
+
+Refactor the app to not use walbert blocks for other things.
+
+Restore the walbert block for model restart as well.
+
+Make any necessary fixes so walbert blocks are used as intended (as model outputs) and parsed properly.

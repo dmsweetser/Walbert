@@ -116,7 +116,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
     def read_input(self) -> str:
         """Read input from console"""
         try:
-            input_text = input("> ")
+            input_text = input(">>>>> ")
             self.logger.debug(f"Received input: {input_text}")
             if input_text.strip():
                 # Reset conversation context when new user input is received
@@ -516,7 +516,7 @@ Python execution error: {str(e)}
 
     def _log_to_conversation_file(self, content: str, sender: str = "user"):
         """Log full content to individual files with timestamps in chronological order"""
-        timestamp = time.strftime("%Y%m%d_%H%M%S_%f")
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
 
         if not self.session_dir:
             return
@@ -593,7 +593,7 @@ Python execution error: {str(e)}
 
                         # Process user input immediately
                         full_prompt = self.conversation_context
-                        full_prompt += chr(10) + "[walbert_input_channel]user[/walbert_input_channel]"
+                        full_prompt += chr(10) + f"[walbert_input_channel]{chr(10)}user{chr(10)}[/walbert_input_channel]"
                         full_prompt += chr(10) + "Please respond to the user's request immediately."
 
                         def streaming_callback(chunk):
@@ -614,7 +614,7 @@ Python execution error: {str(e)}
 
                         # Handle console response if present
                         if "console_response" in last_parsed_response:
-                            self.write_output(f"[walbert_console_response]{last_parsed_response['console_response']}[/walbert_console_response]")
+                            self.write_output(f"[walbert_console_response]{chr(10)}{last_parsed_response['console_response']}{chr(10)}[/walbert_console_response]")
                             # Show user prompt after response
                             print(">>>>> ", end='', flush=True)
 
@@ -639,7 +639,7 @@ Python execution error: {str(e)}
 
                 # Autonomous processing loop with improved context
                 full_prompt = self.conversation_context
-                full_prompt += chr(10) + "[walbert_input_channel]autonomous[/walbert_input_channel]"
+                full_prompt += chr(10) + f"[walbert_input_channel]{chr(10)}autonomous{chr(10)}[/walbert_input_channel]"
                 full_prompt += chr(10) + "You are operating autonomously. Please:"
                 full_prompt += chr(10) + "1. Review your recent actions and results"
                 full_prompt += chr(10) + "2. Identify any pending tasks or incomplete work"
@@ -667,7 +667,7 @@ Python execution error: {str(e)}
                 if "console_response" in last_parsed_response:
                     self.write_output(f"[walbert_console_response]{chr(10)}{last_parsed_response['console_response']}{chr(10)}[/walbert_console_response]")
                     # Show user prompt after response
-                    print("> ", end='', flush=True)
+                    print(">>>>> ", end='', flush=True)
 
                 # Small delay to prevent CPU overload
                 time.sleep(0.5)

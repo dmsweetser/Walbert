@@ -176,7 +176,7 @@ def main():
                         print("Walbert has requested user guidance. Please provide input when ready.")
                         print("Type 'continue' when you want Walbert to resume processing.")
                         while True:
-                            continuation_input = input("> ")
+                            continuation_input = input(">>>>> ")
                             if continuation_input.lower() == 'continue':
                                 input_queue.put(("user_input", f"[walbert_continue_processing]{chr(10)}Resuming processing after user guidance{chr(10)}[/walbert_continue_processing]"))
                                 break
