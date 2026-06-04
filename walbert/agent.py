@@ -129,7 +129,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
 
     def write_output(self, text: str, stream: bool = False) -> None:
         """Write output to console with streaming support"""
-        if text.startswith("[walbert_console_response]"):
+        if "[walbert_console_response]" in text:
             # Extract content from console response block
             match = re.search(r'\[walbert_console_response\](.*?)\[/walbert_console_response\]', text, re.DOTALL)
             if match:

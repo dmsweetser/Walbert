@@ -1,7 +1,0 @@
-I want the [walbert...] blocks to ONLY be for things I want the model to output.
-
-Refactor the app to not use walbert blocks for other things.
-
-Restore the walbert block for model restart as well.
-
-Make any necessary fixes so walbert blocks are used as intended (as model outputs) and parsed properly.
