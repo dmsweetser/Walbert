@@ -628,7 +628,7 @@ Python execution results:
                         if "console_response" in last_parsed_response:
                             self.write_output(f"[walbert_console_response]{last_parsed_response['console_response']}[/walbert_console_response]")
                             # Show user prompt after response
-                            print(">>>> ", end='', flush=True)
+                            print(">>>>> ", end='', flush=True)
 
                         # Continue to next iteration to check for more input
                         continue
