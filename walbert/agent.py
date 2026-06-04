@@ -464,7 +464,7 @@ Python execution error: {str(e)}
         """Start a new conversation session"""
         try:
             # Create new conversation directory with timestamp
-            timestamp = str(time.time()).split('.')[0]
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
             session_dir = os.path.join(
                 self.config.conversation_log_dir,
                 f"session_{timestamp}"
@@ -516,7 +516,7 @@ Python execution error: {str(e)}
 
     def _log_to_conversation_file(self, content: str, sender: str = "user"):
         """Log full content to individual files with timestamps in chronological order"""
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        timestamp = str(time.time()).split('.')[0]
 
         if not self.session_dir:
             return
