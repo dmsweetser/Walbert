@@ -471,9 +471,8 @@ Python execution error: {str(e)}
             )
             os.makedirs(session_dir, exist_ok=True)
 
-            # Create separate files for prompts and responses
-            self.prompt_file = os.path.join(session_dir, "prompts.txt")
-            self.response_file = os.path.join(session_dir, "responses.txt")
+            # Store session directory for individual prompt/response files
+            self.session_dir = session_dir
             self.conversation_context = ""
             self.conversation_history = []
 
@@ -507,7 +506,7 @@ Python execution error: {str(e)}
 
     def end_conversation(self):
         """End current conversation"""
-        self.current_conversation_file = None
+        self.session_dir = None
         self.conversation_context = ""
         self.conversation_history = []
         # Clean up Python execution environment
@@ -516,25 +515,31 @@ Python execution error: {str(e)}
             self.python_temp_dir = None
 
     def _log_to_conversation_file(self, content: str, sender: str = "user"):
-        """Log full content to separate prompt/response files with timestamps"""
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        """Log full content to individual files with timestamps in chronological order"""
+        timestamp = time.strftime("%Y%m%d_%H%M%S_%f")
+
+        if not self.session_dir:
+            return
 
         try:
             if sender == "assistant_prompt":
-                with open(self.prompt_file, 'a') as f:
-                    f.write(f"[{timestamp}] {content}{chr(10)}{chr(10)}")
+                file_name = f"{timestamp}_prompt.txt"
+                file_path = os.path.join(self.session_dir, file_name)
             elif sender == "assistant":
-                with open(self.response_file, 'a') as f:
-                    f.write(f"[{timestamp}] {content}{chr(10)}{chr(10)}")
+                file_name = f"{timestamp}_response.txt"
+                file_path = os.path.join(self.session_dir, file_name)
             elif sender == "system":
-                with open(self.prompt_file, 'a') as f:
-                    f.write(f"[{timestamp}] SYSTEM PROMPT:{chr(10)}{content}{chr(10)}{chr(10)}")
+                file_name = f"{timestamp}_system.txt"
+                file_path = os.path.join(self.session_dir, file_name)
             elif sender == "user":
-                with open(self.prompt_file, 'a') as f:
-                    f.write(f"[{timestamp}] USER INPUT:{chr(10)}{content}{chr(10)}{chr(10)}")
+                file_name = f"{timestamp}_user_input.txt"
+                file_path = os.path.join(self.session_dir, file_name)
             else:
-                with open(self.prompt_file, 'a') as f:
-                    f.write(f"[{timestamp}] {sender.upper()}:{chr(10)}{content}{chr(10)}")
+                file_name = f"{timestamp}_other.txt"
+                file_path = os.path.join(self.session_dir, file_name)
+
+            with open(file_path, 'w') as f:
+                f.write(content)
         except Exception as e:
             self.logger.error(f"Error logging to conversation file: {e}")
 
