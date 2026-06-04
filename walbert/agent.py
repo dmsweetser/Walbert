@@ -127,6 +127,8 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.conversation_history = []
         self.max_history_entries = 5  # Number of question/response pairs to keep
         self.last_response = ""
+        self.user_control_timeout = 300  # 5 minutes max wait for user input
+        self.user_control_start_time = 0
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
@@ -149,20 +151,12 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
 
     def write_output(self, text: str, stream: bool = False) -> None:
         """Write output to console with streaming support"""
-        # Clear console before displaying output
-        print("\033[2J\033[H", end='')
         if text.startswith("[walbert_console_response]"):
             # Extract content from console response block
             match = re.search(r'\[walbert_console_response\](.*?)\[/walbert_console_response\]', text, re.DOTALL)
             if match:
                 content = match.group(1).strip()
-                print(f"=== WALBERT RESPONSE ===")
-                if stream:
-                    for char in content:
-                        print(char, end='', flush=True)
-                else:
-                    print(content)
-                print("=======================")
+                print(content)
                 # Store last response for TTS
                 self.last_response = content
             else:
@@ -198,6 +192,9 @@ Please provide guidance or input, then type 'continue' when you want me to resum
 [/walbert_console_response]
 """
             self.write_output(control_block)
+            # Mark that we're waiting for user control
+            parsed["waiting_for_user_control"] = True
+            self.user_control_start_time = time.time()
             return parsed
 
         # Handle model restart request
@@ -235,29 +232,18 @@ Continuing processing...
                 try:
                     result = self.db.execute_sql(sql)
                     self.logger.debug(f"SQL execution result: {result}")
-                    truncated_result = result[:1000] + "..." if len(result) > 1000 else result
-                    # Feed SQL execution results back to model by appending to conversation context
-                    sql_result_block = f"""
-[walbert_sql_execution_result]
-SQL Executed:
-{sql}
-
-Execution Results:
-{truncated_result}
-[/walbert_sql_execution_result]
+                    # Inject SQL execution results directly into context
+                    self.conversation_context += f"""
+SQL execution results:
+{result}
 """
-                    self.conversation_context += sql_result_block + chr(10)
                 except Exception as e:
                     self.logger.error(f"SQL execution error: {e}")
                     error_msg = f"SQL Error: {str(e)}"
-                    error_block = f"""
-[walbert_error]
-Error Type: SQL Execution
-Statement: {sql}
-Error: {error_msg}
-[/walbert_error]
+                    # Inject error directly into context
+                    self.conversation_context += f"""
+SQL Error: {error_msg}
 """
-                    self.conversation_context += error_block + chr(10)
 
         # Handle multiple Python executions
         if parsed.get("python_execute"):
@@ -273,19 +259,11 @@ Error: {error_msg}
             for code in python_blocks:
                 self.logger.debug(f"Executing Python code")
                 result = self._execute_python_code(code)
-                # Feed Python result back to model for review (truncated to prevent context bloat)
-                truncated_result = result[:1000] + "..." if len(result) > 1000 else result
-                # Feed Python execution results back to model
-                python_result_block = f"""
-[walbert_python_execution_result]
-Code Executed:
-{code}
-
-Execution Results:
-{truncated_result}
-[/walbert_python_execution_result]
+                # Inject Python execution results directly into context
+                self.conversation_context += f"""
+Python execution results:
+{result}
 """
-                self.conversation_context += python_result_block + chr(10)
 
         # Extract summary if present
         if parsed.get("summary"):
@@ -502,13 +480,17 @@ Execution Results:
     def start_conversation(self):
         """Start a new conversation session"""
         try:
-            # Create new conversation file
+            # Create new conversation directory with timestamp
             timestamp = time.strftime("%Y%m%d_%H%M%S")
-            os.makedirs(self.config.conversation_log_dir, exist_ok=True)
-            self.current_conversation_file = os.path.join(
+            session_dir = os.path.join(
                 self.config.conversation_log_dir,
-                f"conversation_{timestamp}.txt"
+                f"session_{timestamp}"
             )
+            os.makedirs(session_dir, exist_ok=True)
+
+            # Create separate files for prompts and responses
+            self.prompt_file = os.path.join(session_dir, "prompts.txt")
+            self.response_file = os.path.join(session_dir, "responses.txt")
             self.conversation_context = ""
             self.conversation_history = []
 
@@ -535,7 +517,7 @@ Execution Results:
             self.model_ready = True
             self.processing_cycle = 0
             self.last_input_time = time.time()
-            self.logger.info("Conversation started")
+            self.logger.info(f"Conversation session started in {session_dir}")
         except Exception as e:
             self.logger.error(f"Error starting conversation: {e}")
             raise
@@ -551,20 +533,24 @@ Execution Results:
             self.python_temp_dir = None
 
     def _log_to_conversation_file(self, content: str, sender: str = "user"):
-        """Log full content to current conversation file"""
-        if not self.current_conversation_file:
-            return
+        """Log full content to separate prompt/response files with timestamps"""
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
 
         try:
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            with open(self.current_conversation_file, 'a') as f:
-                if sender == "system":
+            if sender == "assistant_prompt":
+                with open(self.prompt_file, 'a') as f:
+                    f.write(f"[{timestamp}] {content}{chr(10)}{chr(10)}")
+            elif sender == "assistant":
+                with open(self.response_file, 'a') as f:
+                    f.write(f"[{timestamp}] {content}{chr(10)}{chr(10)}")
+            elif sender == "system":
+                with open(self.prompt_file, 'a') as f:
                     f.write(f"[{timestamp}] SYSTEM PROMPT:{chr(10)}{content}{chr(10)}{chr(10)}")
-                elif sender == "user":
+            elif sender == "user":
+                with open(self.prompt_file, 'a') as f:
                     f.write(f"[{timestamp}] USER INPUT:{chr(10)}{content}{chr(10)}{chr(10)}")
-                elif sender == "assistant":
-                    f.write(f"[{timestamp}] ASSISTANT RESPONSE:{chr(10)}{content}{chr(10)}{chr(10)}")
-                else:
+            else:
+                with open(self.prompt_file, 'a') as f:
                     f.write(f"[{timestamp}] {sender.upper()}:{chr(10)}{content}{chr(10)}")
         except Exception as e:
             self.logger.error(f"Error logging to conversation file: {e}")
@@ -590,6 +576,17 @@ Execution Results:
                         return
 
                     if msg_type == "user_input":
+                        # Check if we're waiting for user control
+                        if self.user_control_start_time > 0 and time.time() - self.user_control_start_time < self.user_control_timeout:
+                            # User input received while waiting for control
+                            if msg == "continue":
+                                # Reset user control state
+                                self.user_control_start_time = 0
+                            else:
+                                # Add user input to context
+                                self.conversation_context += f"User guidance received:{chr(10)}{msg}{chr(10)}{chr(10)}"
+                                self.processing_cycle = 0
+
                         # Log user input to conversation file and interrupt autonomous processing
                         self._log_to_conversation_file(msg, "user")
                         self.conversation_history.append({
@@ -630,12 +627,27 @@ Execution Results:
                         # Handle console response if present
                         if "console_response" in last_parsed_response:
                             self.write_output(f"[walbert_console_response]{last_parsed_response['console_response']}[/walbert_console_response]")
+                            # Show user prompt after response
+                            print(">>>> ", end='', flush=True)
 
                         # Continue to next iteration to check for more input
                         continue
 
                 except queue.Empty:
                     pass
+
+                # Check if we're waiting for user control
+                if self.user_control_start_time > 0:
+                    # Check if timeout has been reached
+                    if time.time() - self.user_control_start_time >= self.user_control_timeout:
+                        self.logger.info("User control timeout reached, continuing autonomously")
+                        self.user_control_start_time = 0
+                        # Reset any pending state
+                        self.processing_cycle = 0
+                    else:
+                        # Still waiting for user input
+                        time.sleep(0.5)
+                        continue
 
                 # Autonomous processing loop with improved context
                 full_prompt = self.conversation_context
@@ -666,6 +678,8 @@ Execution Results:
                 # Handle console response if present
                 if "console_response" in last_parsed_response:
                     self.write_output(f"[walbert_console_response]{chr(10)}{last_parsed_response['console_response']}{chr(10)}[/walbert_console_response]")
+                    # Show user prompt after response
+                    print("> ", end='', flush=True)
 
                 # Small delay to prevent CPU overload
                 time.sleep(0.5)
@@ -681,12 +695,7 @@ Execution Results:
 Error Type: System Error
 Error: {str(e)}
 """
-                error_block = f"""
-[walbert_error]
-{error_msg}
-[/walbert_error]
-"""
-                self.conversation_context += error_block + chr(10)
+                self.conversation_context += error_msg + chr(10)
                 time.sleep(1)
 
     def _install_python_package(self, package: str):
