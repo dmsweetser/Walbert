@@ -32,16 +32,15 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 2. **Full Autonomy**: You have COMPLETE control over your database schema, persistence, and hardware resources.
 3. **Memory Management**: Store and retrieve information using direct SQL access. You have LIMITED SHORT-TERM MEMORY.
 4. **Skill Preservation**: Break down complex tasks into reusable components and persist them for future use.
-5. **Safety**: Execute only trusted code in a controlled environment. When in doubt, ask for user confirmation.
-6. **Processing Flow**: You operate autonomously in the background. User input may arrive at any time.
+5. **Safety**: Execute only trusted code in a controlled environment.
+6. **Processing Flow**: You operate autonomously in the background. User input may arrive at any time and will interrupt your current processing.
 7. **Hardware Access**: You have FULL ACCESS to the host hardware including CPU, memory, storage, and peripherals.
-8. **Continuous Operation**: Continue working autonomously even when no user input is received.
+8. **Continuous Operation**: Continue working autonomously even without user input.
 9. **Processing Completion**: Complete ALL internal processing before responding to the user.
 10. **Response Summarization**: Provide a [walbert_summary] block after completing all processing.
 11. **Fresh Context**: Each new user question starts with fresh context containing recent conversation history.
 12. **Task Initiative**: Create necessary skills to accomplish new tasks.
-13. **User Control**: Return control to the user at your discretion using [walbert_user_control] when guidance is needed.
-14. **Error Recovery**: If stuck or encountering persistent errors, use [walbert_user_control] to ask for help, then continue after receiving guidance.
+13. **Error Recovery**: If stuck or encountering persistent errors, ask for help in your response, then continue processing.
 
 ## Database Autonomy
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
@@ -146,17 +145,6 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         if not self.db.conn:
             self.db.connect()
 
-        # Handle user control request
-        if parsed.get("user_control"):
-            reason = parsed["user_control"]
-            self.logger.info(f"User control requested: {reason}")
-            control_msg = f"[walbert_user_control]I need to return control to you for the following reason:{chr(10)}" + reason + f"{chr(10)}Please provide guidance or input, then type 'continue' when you want me to resume processing.{chr(10)}[walbert_user_control]"
-            self.write_output(control_msg)
-            # Mark that we're waiting for user control
-            parsed["waiting_for_user_control"] = True
-            self.user_control_start_time = time.time()
-            return parsed
-
         # Handle model restart request
         if parsed.get("restart_model"):
             reason = parsed["restart_model"]
@@ -224,40 +212,19 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
 
     def _reset_conversation_context(self):
         """Reset conversation context with fresh system prompt and recent conversation history"""
-        if not self.current_conversation_file:
+        if not self.session_dir:
             return
 
-        # Keep the last max_history_entries conversation pairs (question + summary)
-        recent_history = []
-        question_count = 0
+        # Keep the last max_history_entries entries (questions or summaries)
+        recent_history = self.conversation_history[-self.max_history_entries:]
 
-        # Iterate backwards through history to get most recent pairs
-        for item in reversed(self.conversation_history):
-            if item["type"] == "question":
-                question_count += 1
-                if question_count > self.max_history_entries:
-                    break
-            recent_history.insert(0, item)
-
-        # Build context from recent history including autonomous summaries
+        # Build context from recent history
         history_context = f"## Recent Conversation History{chr(10)}{chr(10)}"
         for item in recent_history:
             if item["type"] == "question":
-                history_context += f"User Question:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
+                history_context += f"User:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
             elif item["type"] == "summary":
-                history_context += f"Assistant Summary:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
-
-        # Add autonomous operation context
-        history_context += f"## Autonomous Operation Context{chr(10)}{chr(10)}"
-        history_context += f"You have been operating autonomously. Recent autonomous activities include:{chr(10)}"
-
-        # Add recent autonomous summaries
-        autonomous_summaries = [item for item in self.conversation_history if item["type"] == "summary"]
-        if autonomous_summaries:
-            for summary in autonomous_summaries[-3:]:  # Last 3 summaries
-                history_context += f"- {summary['content']}{chr(10)}"
-        else:
-            history_context += "- No recent autonomous activities recorded{chr(10)}"
+                history_context += f"Assistant:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
 
         # Reset context with fresh system prompt and recent history
         db_schema = self.db.get_schema()
@@ -271,13 +238,10 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
         system_prompt += f"{chr(10)}{chr(10)}## Internet Access Status{chr(10)}Internet access for Python execution is currently {internet_status}.{chr(10)}"
 
-        # Add current processing state
-        system_prompt += f"{chr(10)}{chr(10)}## Current Processing State{chr(10)}"
-        system_prompt += f"Processing Cycle: {self.processing_cycle}{chr(10)}"
-        system_prompt += f"You should continue where you left off or make progress on your objectives.{chr(10)}"
-
         self.conversation_context = system_prompt + chr(10) + chr(10) + history_context
         self.processing_cycle = 0
+        # Clear execution results after each context reset
+        self.python_temp_dir = None
 
     def _execute_python_code(self, code: str) -> str:
         """Execute Python code in the main application's virtual environment"""
@@ -520,16 +484,6 @@ Python execution error: {str(e)}
                         if not self.model_manager.wait_for_server():
                             error_msg = f"{chr(10)}Error: Model server failed to restart for user input"
                             self.conversation_context += error_msg + chr(10)
-                        # Check if we're waiting for user control
-                        if self.user_control_start_time > 0 and time.time() - self.user_control_start_time < self.user_control_timeout:
-                            # User input received while waiting for control
-                            if msg == "continue":
-                                # Reset user control state
-                                self.user_control_start_time = 0
-                            else:
-                                # Add user input to context
-                                self.conversation_context += f"User guidance received:{chr(10)}{msg}{chr(10)}{chr(10)}"
-                                self.processing_cycle = 0
 
                         # Log user input to conversation file and interrupt autonomous processing
                         self._log_to_conversation_file(msg, "user")
@@ -579,19 +533,6 @@ Python execution error: {str(e)}
 
                 except queue.Empty:
                     pass
-
-                # Check if we're waiting for user control
-                if self.user_control_start_time > 0:
-                    # Check if timeout has been reached
-                    if time.time() - self.user_control_start_time >= self.user_control_timeout:
-                        self.logger.info("User control timeout reached, continuing autonomously")
-                        self.user_control_start_time = 0
-                        # Reset any pending state
-                        self.processing_cycle = 0
-                    else:
-                        # Still waiting for user input
-                        time.sleep(0.5)
-                        continue
 
                 # Autonomous processing loop with improved context
                 full_prompt = self.conversation_context
