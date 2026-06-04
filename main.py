@@ -162,7 +162,7 @@ def main():
                     print("Speech-to-text disabled.")
                 elif user_input.lower() == 'continue':
                     print("Resuming autonomous processing...")
-                    input_queue.put(("user_input", "[walbert_continue_processing]Resuming processing after user input[/walbert_continue_processing]"))
+                    input_queue.put(("user_input", f"[walbert_continue_processing]{chr(10)}Resuming processing after user input{chr(10)}[/walbert_continue_processing]"))
                 else:
                     # Put user input into queue for agent
                     input_queue.put(("user_input", user_input))

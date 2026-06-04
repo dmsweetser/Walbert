@@ -27,9 +27,6 @@ Welcome to Walbert! The local-first AI agent.
     - `[walbert_console_response]` - Direct console output to the user
     - `[walbert_sql_execute]` - SQL commands for database operations
     - `[walbert_python_execute]` - Python code execution blocks
-    - `[walbert_sql_result]` - SQL query results
-    - `[walbert_python_result]` - Python execution results
-    - `[walbert_error]` - Error reporting
 - **Full Database Autonomy**: Walbert manages **ALL** aspects of its database:
   - Schema design and evolution
   - Data storage and retrieval

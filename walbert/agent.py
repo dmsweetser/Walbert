@@ -42,7 +42,6 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 12. **Task Initiative**: Create necessary skills to accomplish new tasks.
 13. **User Control**: Return control to the user at your discretion using [walbert_user_control] when guidance is needed.
 14. **Error Recovery**: If stuck or encountering persistent errors, use [walbert_user_control] to ask for help, then continue after receiving guidance.
-15. **Model Monitoring**: If the model becomes unresponsive, use [walbert_restart_model] to restart the server.
 
 ## Database Autonomy
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
@@ -76,33 +75,12 @@ A concise summary of your response to the user
 [/walbert_summary]
 - Provide a summary after completing all processing
 
-[walbert_error]
-ERROR_CONTENT
-[/walbert_error]
-- Report errors without disrupting execution
-
-[walbert_sql_result]
-SQL_RESULT_CONTENT
-[/walbert_sql_result]
-- SQL query results
-
-[walbert_python_result]
-PYTHON_RESULT_CONTENT
-[/walbert_python_result]
-- Python execution results
-
 [walbert_user_control]
 REASON_FOR_USER_CONTROL
 [/walbert_user_control]
 - Return control to the user when guidance is needed
 - Use when stuck, encountering persistent errors, or needing clarification
 - Processing will pause and wait for user input, then continue after user provides guidance
-
-[walbert_restart_model]
-REASON_FOR_RESTART
-[/walbert_restart_model]
-- Restart the model server if it becomes unresponsive
-- Provide a clear reason for the restart
 
 [walbert_continue_processing]
 Resume processing after user input
@@ -206,9 +184,8 @@ Please provide guidance or input, then type 'continue' when you want me to resum
             self.model_manager.start_server_thread()
             if not self.model_manager.wait_for_server():
                 error_block = f"""
-[walbert_error]
+Error Type: System Error
 Model server failed to restart after request. Reason: {reason}
-[/walbert_error]
 """
                 self.conversation_context += error_block + chr(10)
                 return parsed
@@ -383,11 +360,17 @@ Python execution results:
 
             return output
         except subprocess.TimeoutExpired:
-            error_msg = "[walbert_error]Python execution timed out after 30 seconds[/walbert_error]"
+            error_msg = f"""
+Error Type: System Error
+Python execution timed out after 30 seconds
+"""
             self.logger.error(error_msg)
             return error_msg
         except Exception as e:
-            error_msg = f"[walbert_error]{chr(10)}Python execution error: {str(e)}[/walbert_error]"
+            error_msg = f"""
+Error Type: System Error
+Python execution error: {str(e)}
+"""
             self.logger.error(error_msg)
             return error_msg
 
