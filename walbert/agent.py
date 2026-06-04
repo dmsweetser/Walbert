@@ -610,7 +610,7 @@ Python execution error: {str(e)}
                         last_parsed_response = self.process_response(model_response)
 
                         # Append to context
-                        self.conversation_context += f"Assistant:{chr(10)}{model_response}{chr(10)}{chr(10)}"
+                        self.conversation_context += f"Assistant:{chr(10)}{last_parsed_response.get('summary', 'Continuing autonomous processing')}{chr(10)}{chr(10)}"
 
                         # Handle console response if present
                         if "console_response" in last_parsed_response:
