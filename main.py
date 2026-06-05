@@ -165,8 +165,6 @@ def main():
                     print(f"{chr(10)}Walbert processing interrupted. Waiting for your input...{chr(10)}")
                     agent.model_manager.shutdown()
                     agent.model_manager.start_server_thread()
-                    if not agent.model_manager.wait_for_server():
-                        print(f"{chr(10)}Error: Model server failed to restart after interruption{chr(10)}")
                 else:
                     # Put user input into queue for agent
                     print(f"{chr(10)}Walbert has received your request and will process it momentarily.{chr(10)}")
