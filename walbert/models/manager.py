@@ -77,9 +77,9 @@ class ModelManager:
                 return
             logger.info("Model server started successfully")
 
-        self.server_thread = threading.Thread(target=start, daemon=True)
+        self.server_thread = threading.Thread(target=start)
+        self.server_thread.daemon = True
         self.server_thread.start()
-        self.server_thread.join(timeout=60)
 
     def execute_model(self, prompt: str, callback=None) -> str:
         """Execute model using existing server with streaming support"""
@@ -149,11 +149,17 @@ class ModelManager:
 
     def shutdown(self):
         """Shutdown model server"""
-        if self.server and self.server.poll() is None:
-            self.server.terminate()
-            try:
-                self.server.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.server.kill()
+        if self.server_thread and self.server_thread.is_alive():
+            # Immediately terminate the server process
+            if self.server and self.server.poll() is None:
+                self.server.terminate()
+                try:
+                    self.server.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    self.server.kill()
+
+            # Forcefully stop the server thread
+            if hasattr(self.server_thread, '_stop'):
+                self.server_thread._stop()
 
         logger.info("Model server shutdown complete")
