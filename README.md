@@ -99,7 +99,6 @@ Available commands:
 - `tts off`: Disable text-to-speech
 - `stt on`: Enable speech-to-text
 - `stt off`: Disable speech-to-text
-- `continue`: Resume autonomous processing after user control
 - Any other input will be treated as a request to Walbert
 
 ## Testing (there are no tests)

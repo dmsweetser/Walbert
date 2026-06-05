@@ -40,7 +40,6 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 10. **Response Summarization**: Provide a [walbert_summary] block after completing all processing.
 11. **Fresh Context**: Each new user question starts with fresh context containing recent conversation history.
 12. **Task Initiative**: Create necessary skills to accomplish new tasks.
-13. **Error Recovery**: If stuck or encountering persistent errors, ask for help in your response, then continue processing.
 
 ## Database Autonomy
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
@@ -73,18 +72,6 @@ Your response to the user
 A concise summary of your response to the user
 [/walbert_summary]
 - Provide a summary after completing all processing
-
-[walbert_user_control]
-REASON_FOR_USER_CONTROL
-[/walbert_user_control]
-- Return control to the user when guidance is needed
-- Use when stuck, encountering persistent errors, or needing clarification
-- Processing will pause and wait for user input, then continue after user provides guidance
-
-[walbert_continue_processing]
-Resume processing after user input
-[/walbert_continue_processing]
-- Internal block to signal continuation after user control
 
 Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
     """
@@ -120,7 +107,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
     def read_input(self) -> str:
         """Read input from console"""
         try:
-            input_text = input(">>>>> ")
+            input_text = input(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ")
             self.logger.debug(f"Received input: {input_text}")
             if input_text.strip():
                 # Reset conversation context when new user input is received
@@ -242,7 +229,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             if item["type"] == "question":
                 history_context += f"User:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
             elif item["type"] == "summary":
-                history_context += f"Assistant:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
+                history_context += f"Walbert:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
 
         # Reset context with fresh system prompt and recent history
         db_schema = self.db.get_schema()
@@ -399,14 +386,6 @@ Python execution error: {str(e)}
         if result['has_pending_tasks']:
             self.logger.debug("CRITICAL: Internal processing not complete. Will continue processing.")
 
-        # Always include summary in history if present
-        if 'summary' in result:
-            self.conversation_history.append({
-                "type": "summary",
-                "content": result['summary'],
-                "timestamp": time.time()
-            })
-
         self.logger.debug(f"Parsed result: {result}")
         return result
 
@@ -557,10 +536,10 @@ Python execution error: {str(e)}
 
                         # Append to context
                         if last_parsed_response.get('summary'):
-                            self.conversation_context += f"Assistant:{chr(10)}{last_parsed_response['summary']}{chr(10)}{chr(10)}"
+                            self.conversation_context += f"Walbert:{chr(10)}{last_parsed_response['summary']}{chr(10)}{chr(10)}"
 
                         # Show user prompt after response
-                        print(">>>>> ", end='', flush=True)
+                        print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
 
                         # Continue to next iteration to check for more input
                         continue
@@ -593,9 +572,9 @@ Python execution error: {str(e)}
 
                 # Handle console response if present
                 if "console_response" in last_parsed_response:
-                    self.write_output(f"[walbert_console_response]{chr(10)}{last_parsed_response['console_response']}{chr(10)}[/walbert_console_response]")
+                    self.write_output(f"{chr(10)}{chr(10)}Walbert:{chr(10)}{last_parsed_response['console_response']}{chr(10)}{chr(10)}")
                     # Show user prompt after response
-                    print(">>>>> ", end='', flush=True)
+                    print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
 
                 # Small delay to prevent CPU overload
                 time.sleep(0.5)

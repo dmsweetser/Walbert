@@ -116,7 +116,6 @@ def main():
     print("- tts off: Disable text-to-speech")
     print("- stt on: Enable speech-to-text")
     print("- stt off: Disable speech-to-text")
-    print("- continue: Resume autonomous processing after user control")
     print("- Any other input will be treated as a request to Walbert")
     print("")
     print("Say 'Hey Walbert' to activate voice input, and 'Thanks' to end voice input.")
@@ -127,7 +126,7 @@ def main():
 
     try:
         while True:
-            user_input = input(">>>>> ")
+            user_input = input(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ")
             if user_input.strip():
                 # Handle commands
                 if user_input.lower() in ['exit', 'quit']:
@@ -144,7 +143,6 @@ def main():
                     if package:
                         agent._install_python_package(package)
                         print("Package installation command executed.")
-                        print("Type 'continue' to resume, or enter a new request.")
                         continue
                 elif user_input.lower() == 'tts on':
                     tts_enabled = True
