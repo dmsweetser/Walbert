@@ -106,6 +106,11 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.last_response = ""
         self.user_control_timeout = 300  # 5 minutes max wait for user input
         self.user_control_start_time = 0
+        self.last_execution_results = {
+            "python": "",
+            "sql": "",
+            "error": ""
+        }
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
@@ -145,6 +150,14 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         if not self.db.conn:
             self.db.connect()
 
+        # Initialize execution results tracking if not exists
+        if not hasattr(self, 'last_execution_results'):
+            self.last_execution_results = {
+                "python": "",
+                "sql": "",
+                "error": ""
+            }
+
         # Handle model restart request
         if parsed.get("restart_model"):
             reason = parsed["restart_model"]
@@ -154,10 +167,10 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             self.model_manager.start_server_thread()
             if not self.model_manager.wait_for_server():
                 error_msg = f"{chr(10)}Error: Model server failed to restart after request. Reason: {reason}{chr(10)}"
-                self.conversation_context += error_msg + chr(10)
+                self.last_execution_results["error"] = error_msg
                 return parsed
-            restart_msg = "{chr(10)}Model server has been restarted. Reason: " + reason + f"{chr(10)}Continuing processing...{chr(10)}"
-            self.conversation_context += restart_msg + chr(10)
+            restart_msg = f"{chr(10)}Model server has been restarted. Reason: {reason}{chr(10)}Continuing processing...{chr(10)}"
+            self.last_execution_results["error"] = restart_msg
 
         # Handle multiple SQL executions
         if parsed.get("sql_execute"):
@@ -166,18 +179,20 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             else:
                 sql_statements = [parsed["sql_execute"]]
 
+            sql_results = []
             for sql in sql_statements:
                 self.logger.debug(f"Executing SQL: {sql}")
                 try:
                     result = self.db.execute_sql(sql)
                     self.logger.debug(f"SQL execution result: {result}")
-                    # Inject SQL execution results directly into context
-                    self.conversation_context += f"{chr(10)}SQL execution results:{chr(10)}{result}{chr(10)}"
+                    sql_results.append(result)
                 except Exception as e:
                     self.logger.error(f"SQL execution error: {e}")
                     error_msg = f"SQL Error: {str(e)}"
-                    # Inject error directly into context
-                    self.conversation_context += f"{chr(10)}SQL Error: {error_msg}{chr(10)}"
+                    self.last_execution_results["error"] = error_msg
+
+            if sql_results:
+                self.last_execution_results["sql"] = f"{chr(10)}SQL execution results:{chr(10)}{chr(10).join(sql_results)}{chr(10)}"
 
         # Handle multiple Python executions
         if parsed.get("python_execute"):
@@ -190,11 +205,14 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             if not self.python_temp_dir:
                 self.python_temp_dir = tempfile.mkdtemp(prefix=self.config.temp_dir_prefix)
 
+            python_results = []
             for code in python_blocks:
                 self.logger.debug(f"Executing Python code")
                 result = self._execute_python_code(code)
-                # Inject Python execution results directly into context
-                self.conversation_context += f"""{chr(10)}Python execution results:{chr(10)}{result}{chr(10)}"""
+                python_results.append(result)
+
+            if python_results:
+                self.last_execution_results["python"] = f"{chr(10)}Python execution results:{chr(10)}{chr(10).join(python_results)}{chr(10)}"
 
         # Extract summary if present
         if parsed.get("summary"):
@@ -238,10 +256,28 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
         system_prompt += f"{chr(10)}{chr(10)}## Internet Access Status{chr(10)}Internet access for Python execution is currently {internet_status}.{chr(10)}"
 
+        # Add execution results if they exist
+        execution_results = ""
+        if hasattr(self, 'last_execution_results'):
+            if self.last_execution_results["python"]:
+                execution_results += self.last_execution_results["python"] + chr(10)
+            if self.last_execution_results["sql"]:
+                execution_results += self.last_execution_results["sql"] + chr(10)
+            if self.last_execution_results["error"]:
+                execution_results += f"Error:{chr(10)}{self.last_execution_results['error']}{chr(10)}"
+
         self.conversation_context = system_prompt + chr(10) + chr(10) + history_context
+        if execution_results:
+            self.conversation_context += f"{chr(10)}## Recent Execution Results{chr(10)}{chr(10)}{execution_results}"
+
         self.processing_cycle = 0
-        # Clear execution results after each context reset
+        # Clear temporary directory and execution results
         self.python_temp_dir = None
+        self.last_execution_results = {
+            "python": "",
+            "sql": "",
+            "error": ""
+        }
 
     def _execute_python_code(self, code: str) -> str:
         """Execute Python code in the main application's virtual environment"""

@@ -127,6 +127,19 @@ class ModelManager:
                                 continue
 
                 return full_response
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 400:
+                    logger.error(f"Bad request error executing model: {e}")
+                    logger.info("Attempting to restart model server...")
+                    self.shutdown()
+                    time.sleep(2)
+                    self.start_server_thread()
+                    if not self.wait_for_server():
+                        raise RuntimeError("Model server failed to restart after 400 error")
+                    logger.info("Model server restarted successfully")
+                    # Retry the request once after restart
+                    return self.execute_model(prompt, callback)
+                raise
             except Exception as e:
                 logger.error(f"Error executing model: {e}")
                 raise
