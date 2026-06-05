@@ -120,6 +120,8 @@ class ModelManager:
                                 if "choices" in chunk and len(chunk["choices"]) > 0:
                                     content = chunk["choices"][0].get("delta", {}).get("content", "")
                                     if content:
+                                        if full_response == "":
+                                            callback(f"{chr(10)}{chr(10)}[Walbert Output]{chr(10)}")
                                         full_response += content
                                         if callback:
                                             callback(content)

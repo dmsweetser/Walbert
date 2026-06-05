@@ -107,7 +107,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
     def read_input(self) -> str:
         """Read input from console"""
         try:
-            input_text = input(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ")
+            input_text = input(f"{chr(10)}{chr(10)}>>>>> ")
             self.logger.debug(f"Received input: {input_text}")
             if input_text.strip():
                 # Reset conversation context when new user input is received
@@ -539,7 +539,7 @@ Python execution error: {str(e)}
                             self.conversation_context += f"Walbert:{chr(10)}{last_parsed_response['summary']}{chr(10)}{chr(10)}"
 
                         # Show user prompt after response
-                        print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                        print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
 
                         # Continue to next iteration to check for more input
                         continue
@@ -574,7 +574,7 @@ Python execution error: {str(e)}
                 if "console_response" in last_parsed_response:
                     self.write_output(f"{chr(10)}{chr(10)}Walbert:{chr(10)}{last_parsed_response['console_response']}{chr(10)}{chr(10)}")
                     # Show user prompt after response
-                    print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                    print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
 
                 # Small delay to prevent CPU overload
                 time.sleep(0.5)

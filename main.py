@@ -128,7 +128,7 @@ def main():
 
     try:
         while True:
-            user_input = input(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ")
+            user_input = input(f"{chr(10)}{chr(10)}>>>>> ")
             if user_input.strip():
                 # Handle commands
                 if user_input.lower() in ['exit', 'quit']:

@@ -1,1 +1,1 @@
-I want the model manager to run on a separate thread. And to stop it, I want to immediately kill the thread.
+I still see that when a user submits a question, Walbert continues processing the prior autonomous input first. I need a user input to immediately kill the model and start it up again, not wait for processing of the prior request.
