@@ -68,11 +68,11 @@ def main():
     tts = TextToSpeech()
     stt = SpeechToText()
 
-        # Start STT in continuous listening mode
-        stt_start_event = threading.Event()
-        stt_thread = threading.Thread(target=stt.start_listening, args=(stt_start_event,))
-        stt_thread.daemon = True
-        stt_thread.start()
+    # Start STT in continuous listening mode
+    stt_start_event = threading.Event()
+    stt_thread = threading.Thread(target=stt.start_listening, args=(stt_start_event,))
+    stt_thread.daemon = True
+    stt_thread.start()
 
     # Give STT thread time to initialize
     time.sleep(2)
