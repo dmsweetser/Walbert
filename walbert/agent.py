@@ -493,14 +493,8 @@ Python execution error: {str(e)}
                         return
 
                     if msg_type == "user_input":
-                        # Immediately shutdown model and restart for user input
+                        # Immediately shutdown model to kill any ongoing processing
                         self.model_manager.shutdown()
-                        time.sleep(1)  # Reduced wait time
-                        self.model_manager.start_server_thread()
-                        if not self.model_manager.wait_for_server():
-                            error_msg = f"{chr(10)}Error: Model server failed to restart for user input"
-                            print(error_msg)
-                            continue
 
                         # Log user input to conversation file and interrupt autonomous processing
                         self._log_to_conversation_file(msg, "user")
@@ -517,6 +511,13 @@ Python execution error: {str(e)}
                         self.conversation_context += f"User:{chr(10)}{msg}{chr(10)}{chr(10)}"
                         self.processing_cycle = 0
                         self.last_input_time = time.time()
+
+                        # Start model server fresh for user input
+                        self.model_manager.start_server_thread()
+                        if not self.model_manager.wait_for_server():
+                            error_msg = f"{chr(10)}Error: Model server failed to restart for user input"
+                            print(error_msg)
+                            continue
 
                         # Process user input immediately
                         full_prompt = self.conversation_context
