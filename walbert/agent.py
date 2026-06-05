@@ -205,9 +205,6 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                 "content": summary,
                 "timestamp": time.time()
             })
-            # Always add summary to context for next cycle
-            summary_line = "Summary: " + summary
-            self.conversation_context += summary_line + chr(10)
 
         return parsed
 
@@ -221,7 +218,12 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
 
         # Build context from recent history
         history_context = f"## Recent Conversation History{chr(10)}{chr(10)}"
+        prior_message = ""
         for item in recent_history:
+            if prior_message == item['content']:
+                continue
+            else:
+                prior_message = item['content']
             if item["type"] == "question":
                 history_context += f"User:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
             elif item["type"] == "summary":

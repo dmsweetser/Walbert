@@ -160,8 +160,17 @@ def main():
                     stt_enabled = False
                     stt.pause_listening()
                     print("Speech-to-text disabled.")
+                elif user_input == "":
+                    # User pressed ENTER to interrupt Walbert
+                    print(f"{chr(10)}Walbert processing interrupted. Waiting for your input...{chr(10)}")
+                    agent.model_manager.shutdown()
+                    agent.model_manager.start_server_thread()
+                    if not agent.model_manager.wait_for_server():
+                        print(f"{chr(10)}Error: Model server failed to restart after interruption{chr(10)}")
                 else:
                     # Put user input into queue for agent
+                    print(f"{chr(10)}Walbert has received your request and will process it momentarily.{chr(10)}")
+                    print(f"Press ENTER to interrupt Walbert and provide new input.{chr(10)}")
                     input_queue.put(("user_input", user_input))
 
                     # If TTS is enabled, speak the response
