@@ -1,8 +1,95 @@
-There are a few issues:
+I see this kind of thing when I try to interrupt Walbert:
 
--If the user interrupts the model, it doesn't cancel right away
--Also, if the user interrupts the model, I want it to not switch back to autonomous mode - it should instead wait for the user input indefinitely
--I'm seeing that the python results are NOT being fed to the next system prompt successfully
-    -What I want is in a round, if SQL is executed, Python is executed, or errors occur, those should be stored temporarily
-    -When the next round begins and the system prompt is constructed, it should include those details
-    -THEN, after the system prompt has been fed to the model with those details, they should be reset so new results can be stored
+```
+daniel@minimob:~/Walbert$ sudo ./run.sh
+LOG (VoskAPI:ReadDataFiles():model.cc:213) Decoding params beam=10 max-active=3000 lattice-beam=2
+LOG (VoskAPI:ReadDataFiles():model.cc:216) Silence phones 1:2:3:4:5:6:7:8:9:10
+LOG (VoskAPI:RemoveOrphanNodes():nnet-nnet.cc:948) Removed 0 orphan nodes.
+LOG (VoskAPI:RemoveOrphanComponents():nnet-nnet.cc:847) Removing 0 orphan components.
+LOG (VoskAPI:ReadDataFiles():model.cc:248) Loading i-vector extractor from instance/models/vosk-model-small-en-us-0.15/ivector/final.ie
+LOG (VoskAPI:ComputeDerivedVars():ivector-extractor.cc:183) Computing derived variables for iVector extractor
+LOG (VoskAPI:ComputeDerivedVars():ivector-extractor.cc:204) Done.
+LOG (VoskAPI:ReadDataFiles():model.cc:282) Loading HCL and G from instance/models/vosk-model-small-en-us-0.15/graph/HCLr.fst instance/models/vosk-model-small-en-us-0.15/graph/Gr.fst
+LOG (VoskAPI:ReadDataFiles():model.cc:308) Loading winfo instance/models/vosk-model-small-en-us-0.15/graph/phones/word_boundary.int
+Expression 'paInvalidSampleRate' failed in 'src/hostapi/alsa/pa_linux_alsa.c', line: 2048
+Expression 'PaAlsaStreamComponent_InitialConfigure( &self->capture, inParams, self->primeBuffers, hwParamsCapture, &realSr )' failed in 'src/hostapi/alsa/pa_linux_alsa.c', line: 2718
+Expression 'PaAlsaStream_Configure( stream, inputParameters, outputParameters, sampleRate, framesPerBuffer, &inputLatency, &outputLatency, &hostBufferSizeMode )' failed in 'src/hostapi/alsa/pa_linux_alsa.c', line: 2842
+
+          
+ ___            ___      
+/   \          /   \    
+\_   \        /  __/    
+ _\   \      /  /__     
+ \___  \____/   __/     
+     \_       _/        
+       | @ @  \_        
+       |                
+     _/     /\          
+    /o)  (o/\ \_        
+    \_____/ /           
+      \____/            
+          
+              
+Welcome to Walbert! The local-first AI agent.
+Available commands:
+- exit/quit: Exit the program
+- inet on: Enable internet access for Python execution
+- inet off: Disable internet access for Python execution
+- pip_install <package>: Install a Python package in the main environment
+- tts on: Enable text-to-speech
+- tts off: Disable text-to-speech
+- stt on: Enable speech-to-text
+- stt off: Disable speech-to-text
+- Any other input will be treated as a request to Walbert
+
+Say 'Hey Walbert' to activate voice input, and 'Thanks' to end voice input.
+Press ENTER at any time to interrupt Walbert's current processing.
+
+
+
+Interrupting Walbert...
+
+Walbert processing interrupted. Waiting for your input...
+
+
+
+>>>>> I have an ESP32-Max-1.0 Arduino car that allows connection over bluetooth. Can you scan for it, connect to it, see the broadcast commands it provides and then control it? It should broadcast itself as ESP32-Car.
+
+Walbert has received your request.
+
+Press ENTER to interrupt Walbert at any time.
+
+
+
+>>>>> 
+
+[Walbert Output]
+[walbert_console_response]
+Understood. I am now operating autonomously. Let me review
+ my
+Interrupting Walbert...
+
+Walbert processing interrupted. Waiting for your input...
+
+
+
+>>>>>  current state and pending
+
+Interrupting Walbert...
+
+
+
+>>>>> Walbert processing interrupted. Waiting for your input...
+
+
+
+>>>>> 
+
+[Walbert Output]
+[walbert_console_response]
+I'll attempt to scan for and connect
+```
+
+I interrupt, and it will still try to proceed with the prior prompt, then I have to interrupt again a couple times to get to the point where I can give an actual input.
+
+Also, recent execution results never show up in the prompt for the next round.
