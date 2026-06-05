@@ -118,13 +118,9 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             self.logger.error(f"Error reading input: {e}")
             return ""
 
-    def write_output(self, text: str, stream: bool = False) -> None:
-        """Write output to console with streaming support"""
-        if stream:
-            for char in text:
-                print(char, end='', flush=True)
-        else:
-            print(text)
+    def write_output(self, text: str) -> None:
+        """Write output to console"""
+        print(text, end='', flush=True)
 
     def process_response(self, response_text: str) -> dict:
         """Process model response with enhanced diagnostics for multiple blocks"""
