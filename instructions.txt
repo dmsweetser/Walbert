@@ -1,1 +1,24 @@
-I still see that when a user submits a question, Walbert continues processing the prior autonomous input first. I need a user input to immediately kill the model and start it up again, not wait for processing of the prior request.
+I see this kind of console output when Walbert is streaming the output:
+
+.
+ Let
+ me
+ start
+ by
+ checking
+ available
+ Bluetooth
+ devices
+ and
+ then
+ attempt
+ to
+ connect
+ to
+ "
+ESP
+3
+2
+-C
+
+Can you fix the wonky newline-ness?

@@ -482,6 +482,9 @@ Python execution error: {str(e)}
         while not self.model_ready:
             time.sleep(0.1)
 
+        # Track last processed user input to prevent duplicates
+        last_user_input = None
+
         while True:
             try:
                 # Check for new input in queue with immediate processing
@@ -493,6 +496,11 @@ Python execution error: {str(e)}
                         return
 
                     if msg_type == "user_input":
+                        # Skip duplicate input
+                        if msg == last_user_input:
+                            print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                            continue
+
                         # Immediately shutdown model to kill any ongoing processing
                         self.model_manager.shutdown()
 
@@ -503,6 +511,9 @@ Python execution error: {str(e)}
                             "content": msg,
                             "timestamp": time.time()
                         })
+
+                        # Update last processed input
+                        last_user_input = msg
 
                         # Reset context with fresh system prompt and recent history
                         self._reset_conversation_context()
@@ -527,7 +538,6 @@ Python execution error: {str(e)}
                         # Log the full prompt to conversation file
                         self._log_to_conversation_file(full_prompt, "assistant_prompt")
 
-                        print("Walbert: ", end='', flush=True)
                         model_response = self.model_manager.execute_model(full_prompt, self.write_output)
 
                         # Log the full response to conversation file
