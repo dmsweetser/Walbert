@@ -470,8 +470,8 @@ Python execution error: {str(e)}
         except Exception as e:
             self.logger.error(f"Error logging to conversation file: {e}")
 
-    def run_autonomous(self, input_queue):
-        """Main agent execution loop running autonomously with input queue"""
+    def run_autonomous(self, input_queue, interrupt_event=None):
+        """Main agent execution loop running autonomously with input queue and interrupt capability"""
         # Connect to database in this thread before starting conversation
         self.db.connect()
         self.start_conversation()
@@ -498,6 +498,13 @@ Python execution error: {str(e)}
                         if msg == last_user_input:
                             print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                             continue
+
+                        # Set interrupt event to stop any ongoing model generation
+                        if interrupt_event:
+                            interrupt_event.set()
+                            # Wait briefly for interruption to complete
+                            time.sleep(0.5)
+                            interrupt_event.clear()
 
                         # Immediately shutdown model to kill any ongoing processing
                         self.model_manager.shutdown()
@@ -536,7 +543,7 @@ Python execution error: {str(e)}
                         # Log the full prompt to conversation file
                         self._log_to_conversation_file(full_prompt, "assistant_prompt")
 
-                        model_response = self.model_manager.execute_model(full_prompt, self.write_output)
+                        model_response = self.model_manager.execute_model(full_prompt, self.write_output, interrupt_event)
 
                         # Log the full response to conversation file
                         self._log_to_conversation_file(model_response, "assistant")
@@ -571,7 +578,7 @@ Python execution error: {str(e)}
                 # Log the full prompt to conversation file
                 self._log_to_conversation_file(full_prompt, "assistant_prompt")
 
-                model_response = self.model_manager.execute_model(full_prompt, streaming_callback)
+                model_response = self.model_manager.execute_model(full_prompt, streaming_callback, interrupt_event)
 
                 # Log the full response to conversation file
                 self._log_to_conversation_file(model_response, "assistant")

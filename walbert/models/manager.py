@@ -81,8 +81,8 @@ class ModelManager:
         self.server_thread.daemon = True
         self.server_thread.start()
 
-    def execute_model(self, prompt: str, callback=None) -> str:
-        """Execute model using existing server with streaming support"""
+    def execute_model(self, prompt: str, callback=None, interrupt_event=None) -> str:
+        """Execute model using existing server with streaming support and interrupt capability"""
         model_config = self.config.model_configs['model']
         payload = {
             "model": "default",
@@ -109,6 +109,10 @@ class ModelManager:
                 response.raise_for_status()
 
                 for line in response.iter_lines():
+                    if interrupt_event and interrupt_event.is_set():
+                        logger.info("Model execution interrupted by user")
+                        return full_response
+
                     if line:
                         line_str = line.decode('utf-8')
                         if line_str.startswith('data: '):
@@ -120,6 +124,9 @@ class ModelManager:
                                 if "choices" in chunk and len(chunk["choices"]) > 0:
                                     content = chunk["choices"][0].get("delta", {}).get("content", "")
                                     if content:
+                                        if interrupt_event and interrupt_event.is_set():
+                                            logger.info("Model execution interrupted by user")
+                                            return full_response
                                         if full_response == "":
                                             callback(f"{chr(10)}{chr(10)}[Walbert Output]{chr(10)}")
                                         full_response += content
@@ -140,7 +147,7 @@ class ModelManager:
                         raise RuntimeError("Model server failed to restart after 400 error")
                     logger.info("Model server restarted successfully")
                     # Retry the request once after restart
-                    return self.execute_model(prompt, callback)
+                    return self.execute_model(prompt, callback, interrupt_event)
                 raise
             except Exception as e:
                 logger.error(f"Error executing model: {e}")

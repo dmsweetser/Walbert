@@ -1,1 +1,1 @@
-When a user enters input, I want a disclaimer shown that explains to the user that Walbert received the request and will process it momentarily. I want the user to also have the option to press ENTER to interrupt Walbert - this specific user input should reset the model and wait for the user to provide further input.
+User input never interrupts the model generation after it has started. I need it to be interruptible right in the middle of generation.
