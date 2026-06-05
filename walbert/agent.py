@@ -478,6 +478,8 @@ Python execution error: {str(e)}
         last_user_input = None
         waiting_for_user_input = False
 
+        time.sleep(10)
+
         while True:
             try:
                 # Check for new input in queue with immediate processing
@@ -610,10 +612,10 @@ Python execution error: {str(e)}
                         print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
 
                     # Small delay to prevent CPU overload
-                    time.sleep(0.5)
+                    time.sleep(10)
                 else:
                     # Wait for user input
-                    time.sleep(0.1)
+                    time.sleep(10)
 
             except KeyboardInterrupt:
                 print(f"{chr(10)}Goodbye!")

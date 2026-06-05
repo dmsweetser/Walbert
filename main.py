@@ -129,6 +129,8 @@ def main():
     tts_enabled = True
     stt_enabled = True
 
+    print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+
     try:
         while True:
             # Check if there's input available without blocking
