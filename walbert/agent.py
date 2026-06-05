@@ -245,15 +245,15 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         execution_results = ""
         if hasattr(self, 'last_execution_results'):
             if self.last_execution_results["python"]:
-                execution_results += f"## Python Execution Results{chr(10)}{chr(10)}{self.last_execution_results['python']}{chr(10)}"
+                execution_results += self.last_execution_results["python"] + chr(10)
             if self.last_execution_results["sql"]:
-                execution_results += f"## SQL Execution Results{chr(10)}{chr(10)}{self.last_execution_results['sql']}{chr(10)}"
+                execution_results += self.last_execution_results["sql"] + chr(10)
             if self.last_execution_results["error"]:
-                execution_results += f"## Error Results{chr(10)}{chr(10)}{self.last_execution_results['error']}{chr(10)}"
+                execution_results += f"Error:{chr(10)}{self.last_execution_results['error']}{chr(10)}"
 
         self.conversation_context = system_prompt + chr(10) + chr(10) + history_context
         if execution_results:
-            self.conversation_context += f"{chr(10)}{execution_results}"
+            self.conversation_context += f"{chr(10)}## Recent Execution Results{chr(10)}{chr(10)}{execution_results}"
 
         self.processing_cycle = 0
         # Clear temporary directory
@@ -478,7 +478,6 @@ Python execution error: {str(e)}
         # Track last processed user input to prevent duplicates
         last_user_input = None
         waiting_for_user_input = False
-        processing_active = False
 
         while True:
             try:
@@ -499,7 +498,9 @@ Python execution error: {str(e)}
                         # Set interrupt event to stop any ongoing model generation
                         if interrupt_event:
                             interrupt_event.set()
-                            processing_active = False
+                            # Wait briefly for interruption to complete
+                            time.sleep(0.5)
+                            interrupt_event.clear()
 
                         # Immediately shutdown model to kill any ongoing processing
                         self.model_manager.shutdown()
@@ -515,7 +516,6 @@ Python execution error: {str(e)}
                         # Update last processed input
                         last_user_input = msg
                         waiting_for_user_input = False
-                        processing_active = False
 
                         # Reset context with fresh system prompt and recent history
                         self._reset_conversation_context()
@@ -567,8 +567,8 @@ Python execution error: {str(e)}
                 except queue.Empty:
                     pass
 
-                # Only process autonomously if not waiting for user input and not processing active
-                if not waiting_for_user_input and not processing_active:
+                # Only process autonomously if not waiting for user input
+                if not waiting_for_user_input:
                     # Autonomous processing loop with improved context
                     full_prompt = self.conversation_context
                     full_prompt += f"{chr(10)}Input channel: autonomous{chr(10)}You are operating autonomously. Please:"
@@ -590,7 +590,6 @@ Python execution error: {str(e)}
                     if interrupt_event and interrupt_event.is_set():
                         waiting_for_user_input = True
                         interrupt_event.clear()
-                        processing_active = False
                         print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                         continue
 
