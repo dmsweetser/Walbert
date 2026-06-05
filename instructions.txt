@@ -1,0 +1,13 @@
+I have a few issues - first, I see these outputs in the console and I don't want them there:
+
+LOG (VoskAPI:ReadDataFiles():model.cc:213) Decoding params beam=10 max-active=3000 lattice-beam=2
+
+Also, I get this error:
+
+Expression 'paInvalidSampleRate' failed in 'src/hostapi/alsa/pa_linux_alsa.c', line: 2048
+Expression 'PaAlsaStreamComponent_InitialConfigure( &self->capture, inParams, self->primeBuffers, hwParamsCapture, &realSr )' failed in 'src/hostapi/alsa/pa_linux_alsa.c', line: 2718
+Expression 'PaAlsaStream_Configure( stream, inputParameters, outputParameters, sampleRate, framesPerBuffer, &inputLatency, &outputLatency, &hostBufferSizeMode )' failed in 'src/hostapi/alsa/pa_linux_alsa.c', line: 2842
+
+Also, I keep seeing that when I enter user input, the agent still responds to a prior input to the model rather than immediately tearing down the model, re-instantiating it and replying directly to me. This causes an awful loop where the model is always still working on the prior question when I ask my next one.
+
+Also, I want the streamed output from the model to show in the console to help with impatience for the user.

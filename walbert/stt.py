@@ -34,6 +34,8 @@ class SpeechToText:
                 logger.error(f"Vosk model not found at {model_path}")
                 return False
 
+            # Suppress Vosk logging
+            os.environ['GLOG_minloglevel'] = '2'
             self.model = Model(model_path)
             self.recognizer = KaldiRecognizer(self.model, 16000)
             logger.info("Speech-to-text engine initialized")
@@ -62,7 +64,7 @@ class SpeechToText:
 
         try:
             with sd.RawInputStream(samplerate=16000, dtype='int16',
-                                   channels=1, callback=self.callback):
+                                   channels=1, callback=self.callback, blocksize=8000):
                 while self.listening:
                     if self.buffer.qsize() > 0:
                         data = self.buffer.get_nowait()

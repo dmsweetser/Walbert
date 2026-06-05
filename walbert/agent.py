@@ -514,12 +514,14 @@ Python execution error: {str(e)}
                         return
 
                     if msg_type == "user_input":
+                        # Immediately shutdown model and restart for user input
                         self.model_manager.shutdown()
-                        time.sleep(2)
+                        time.sleep(1)  # Reduced wait time
                         self.model_manager.start_server_thread()
                         if not self.model_manager.wait_for_server():
                             error_msg = f"{chr(10)}Error: Model server failed to restart for user input"
-                            self.conversation_context += error_msg + chr(10)
+                            print(error_msg)
+                            continue
 
                         # Log user input to conversation file and interrupt autonomous processing
                         self._log_to_conversation_file(msg, "user")
@@ -540,15 +542,13 @@ Python execution error: {str(e)}
                         # Process user input immediately
                         full_prompt = self.conversation_context
                         full_prompt += chr(10) + f"[walbert_input_channel]{chr(10)}user{chr(10)}[/walbert_input_channel]"
-                        full_prompt += chr(10) + "Please respond to the user's request immediately."
-
-                        def streaming_callback(chunk):
-                            pass
+                        full_prompt += chr(10) + "Please respond to the user's request immediately. Provide a concise response in [walbert_console_response] block first, then continue with any additional processing."
 
                         # Log the full prompt to conversation file
                         self._log_to_conversation_file(full_prompt, "assistant_prompt")
 
-                        model_response = self.model_manager.execute_model(full_prompt, streaming_callback)
+                        print("Walbert: ", end='', flush=True)
+                        model_response = self.model_manager.execute_model(full_prompt, self.write_output)
 
                         # Log the full response to conversation file
                         self._log_to_conversation_file(model_response, "assistant")
@@ -556,13 +556,11 @@ Python execution error: {str(e)}
                         last_parsed_response = self.process_response(model_response)
 
                         # Append to context
-                        self.conversation_context += f"Assistant:{chr(10)}{last_parsed_response.get('summary', 'Continuing autonomous processing')}{chr(10)}{chr(10)}"
+                        if last_parsed_response.get('summary'):
+                            self.conversation_context += f"Assistant:{chr(10)}{last_parsed_response['summary']}{chr(10)}{chr(10)}"
 
-                        # Handle console response if present
-                        if "console_response" in last_parsed_response:
-                            self.write_output(last_parsed_response['console_response'])
-                            # Show user prompt after response
-                            print(">>>>> ", end='', flush=True)
+                        # Show user prompt after response
+                        print(">>>>> ", end='', flush=True)
 
                         # Continue to next iteration to check for more input
                         continue
@@ -580,7 +578,7 @@ Python execution error: {str(e)}
                 full_prompt += f"{chr(10)}5. Provide a summary of your autonomous activities"
 
                 def streaming_callback(chunk):
-                    pass
+                    print(chunk, end='', flush=True)
 
                 # Log the full prompt to conversation file
                 self._log_to_conversation_file(full_prompt, "assistant_prompt")
