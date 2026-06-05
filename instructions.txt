@@ -1,1 +1,8 @@
-User input never interrupts the model generation after it has started. I need it to be interruptible right in the middle of generation.
+There are a few issues:
+
+-If the user interrupts the model, it doesn't cancel right away
+-Also, if the user interrupts the model, I want it to not switch back to autonomous mode - it should instead wait for the user input indefinitely
+-I'm seeing that the python results are NOT being fed to the next system prompt successfully
+    -What I want is in a round, if SQL is executed, Python is executed, or errors occur, those should be stored temporarily
+    -When the next round begins and the system prompt is constructed, it should include those details
+    -THEN, after the system prompt has been fed to the model with those details, they should be reset so new results can be stored

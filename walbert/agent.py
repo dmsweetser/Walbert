@@ -241,7 +241,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
         system_prompt += f"{chr(10)}{chr(10)}## Internet Access Status{chr(10)}Internet access for Python execution is currently {internet_status}.{chr(10)}"
 
-        # Add execution results if they exist
+        # Store execution results to be included in context
         execution_results = ""
         if hasattr(self, 'last_execution_results'):
             if self.last_execution_results["python"]:
@@ -256,13 +256,8 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             self.conversation_context += f"{chr(10)}## Recent Execution Results{chr(10)}{chr(10)}{execution_results}"
 
         self.processing_cycle = 0
-        # Clear temporary directory and execution results
+        # Clear temporary directory
         self.python_temp_dir = None
-        self.last_execution_results = {
-            "python": "",
-            "sql": "",
-            "error": ""
-        }
 
     def _execute_python_code(self, code: str) -> str:
         """Execute Python code in the main application's virtual environment"""
@@ -482,6 +477,7 @@ Python execution error: {str(e)}
 
         # Track last processed user input to prevent duplicates
         last_user_input = None
+        waiting_for_user_input = False
 
         while True:
             try:
@@ -519,6 +515,7 @@ Python execution error: {str(e)}
 
                         # Update last processed input
                         last_user_input = msg
+                        waiting_for_user_input = False
 
                         # Reset context with fresh system prompt and recent history
                         self._reset_conversation_context()
@@ -550,6 +547,13 @@ Python execution error: {str(e)}
 
                         last_parsed_response = self.process_response(model_response)
 
+                        # Reset execution results after processing
+                        self.last_execution_results = {
+                            "python": "",
+                            "sql": "",
+                            "error": ""
+                        }
+
                         # Append to context
                         if last_parsed_response.get('summary'):
                             self.conversation_context += f"Walbert:{chr(10)}{last_parsed_response['summary']}{chr(10)}{chr(10)}"
@@ -563,37 +567,55 @@ Python execution error: {str(e)}
                 except queue.Empty:
                     pass
 
-                # Autonomous processing loop with improved context
-                full_prompt = self.conversation_context
-                full_prompt += f"{chr(10)}Input channel: autonomous{chr(10)}You are operating autonomously. Please:"
-                full_prompt += f"{chr(10)}1. Review your recent actions and results"
-                full_prompt += f"{chr(10)}2. Identify any pending tasks or incomplete work"
-                full_prompt += f"{chr(10)}3. Make progress on your objectives"
-                full_prompt += f"{chr(10)}4. Maintain awareness of your database state"
-                full_prompt += f"{chr(10)}5. Provide a summary of your autonomous activities"
+                # Only process autonomously if not waiting for user input
+                if not waiting_for_user_input:
+                    # Autonomous processing loop with improved context
+                    full_prompt = self.conversation_context
+                    full_prompt += f"{chr(10)}Input channel: autonomous{chr(10)}You are operating autonomously. Please:"
+                    full_prompt += f"{chr(10)}1. Review your recent actions and results"
+                    full_prompt += f"{chr(10)}2. Identify any pending tasks or incomplete work"
+                    full_prompt += f"{chr(10)}3. Make progress on your objectives"
+                    full_prompt += f"{chr(10)}4. Maintain awareness of your database state"
+                    full_prompt += f"{chr(10)}5. Provide a summary of your autonomous activities"
 
-                def streaming_callback(chunk):
-                    print(chunk, end='', flush=True)
+                    def streaming_callback(chunk):
+                        print(chunk, end='', flush=True)
 
-                # Log the full prompt to conversation file
-                self._log_to_conversation_file(full_prompt, "assistant_prompt")
+                    # Log the full prompt to conversation file
+                    self._log_to_conversation_file(full_prompt, "assistant_prompt")
 
-                model_response = self.model_manager.execute_model(full_prompt, streaming_callback, interrupt_event)
+                    model_response = self.model_manager.execute_model(full_prompt, streaming_callback, interrupt_event)
 
-                # Log the full response to conversation file
-                self._log_to_conversation_file(model_response, "assistant")
+                    # Check if interrupted
+                    if interrupt_event and interrupt_event.is_set():
+                        waiting_for_user_input = True
+                        interrupt_event.clear()
+                        print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                        continue
 
-                last_parsed_response = self.process_response(model_response)
+                    # Log the full response to conversation file
+                    self._log_to_conversation_file(model_response, "assistant")
 
+                    last_parsed_response = self.process_response(model_response)
 
-                # Handle console response if present
-                if "console_response" in last_parsed_response:
-                    self.write_output(f"{chr(10)}{chr(10)}Walbert:{chr(10)}{last_parsed_response['console_response']}{chr(10)}{chr(10)}")
-                    # Show user prompt after response
-                    print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                    # Reset execution results after processing
+                    self.last_execution_results = {
+                        "python": "",
+                        "sql": "",
+                        "error": ""
+                    }
 
-                # Small delay to prevent CPU overload
-                time.sleep(0.5)
+                    # Handle console response if present
+                    if "console_response" in last_parsed_response:
+                        self.write_output(f"{chr(10)}{chr(10)}Walbert:{chr(10)}{last_parsed_response['console_response']}{chr(10)}{chr(10)}")
+                        # Show user prompt after response
+                        print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+
+                    # Small delay to prevent CPU overload
+                    time.sleep(0.5)
+                else:
+                    # Wait for user input
+                    time.sleep(0.1)
 
             except KeyboardInterrupt:
                 print(f"{chr(10)}Goodbye!")
