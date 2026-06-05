@@ -243,13 +243,12 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
 
         # Store execution results to be included in context
         execution_results = ""
-        if hasattr(self, 'last_execution_results'):
-            if self.last_execution_results["python"]:
-                execution_results += self.last_execution_results["python"] + chr(10)
-            if self.last_execution_results["sql"]:
-                execution_results += self.last_execution_results["sql"] + chr(10)
-            if self.last_execution_results["error"]:
-                execution_results += f"Error:{chr(10)}{self.last_execution_results['error']}{chr(10)}"
+        if self.last_execution_results["python"]:
+            execution_results += self.last_execution_results["python"] + chr(10)
+        if self.last_execution_results["sql"]:
+            execution_results += self.last_execution_results["sql"] + chr(10)
+        if self.last_execution_results["error"]:
+            execution_results += f"Error:{chr(10)}{self.last_execution_results['error']}{chr(10)}"
 
         self.conversation_context = system_prompt + chr(10) + chr(10) + history_context
         if execution_results:
@@ -495,15 +494,21 @@ Python execution error: {str(e)}
                             print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                             continue
 
+                        # Immediately shutdown model to kill any ongoing processing
+                        self.model_manager.shutdown()
+
+                        # Clear any pending output
+                        time.sleep(5)
+
                         # Set interrupt event to stop any ongoing model generation
                         if interrupt_event:
                             interrupt_event.set()
                             # Wait briefly for interruption to complete
-                            time.sleep(0.5)
+                            time.sleep(5)
                             interrupt_event.clear()
 
-                        # Immediately shutdown model to kill any ongoing processing
-                        self.model_manager.shutdown()
+                        # Clear the queue to prevent stale inputs
+                        input_queue.queue.clear()
 
                         # Log user input to conversation file and interrupt autonomous processing
                         self._log_to_conversation_file(msg, "user")
@@ -546,13 +551,6 @@ Python execution error: {str(e)}
                         self._log_to_conversation_file(model_response, "assistant")
 
                         last_parsed_response = self.process_response(model_response)
-
-                        # Reset execution results after processing
-                        self.last_execution_results = {
-                            "python": "",
-                            "sql": "",
-                            "error": ""
-                        }
 
                         # Append to context
                         if last_parsed_response.get('summary'):
