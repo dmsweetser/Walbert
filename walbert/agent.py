@@ -133,6 +133,13 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         if not self.db.conn:
             self.db.connect()
 
+        # Reset execution results for this cycle
+        self.last_execution_results = {
+            "python": "",
+            "sql": "",
+            "error": ""
+        }
+
         # Handle model restart request
         if parsed.get("restart_model"):
             reason = parsed["restart_model"]
@@ -160,11 +167,10 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                 try:
                     result = self.db.execute_sql(sql)
                     self.logger.debug(f"SQL execution result: {result}")
-                    sql_results.append(result)
+                    sql_results.append(str(result))
                 except Exception as e:
                     self.logger.error(f"SQL execution error: {e}")
-                    error_msg = f"SQL Error: {str(e)}"
-                    self.last_execution_results["error"] = error_msg
+                    self.last_execution_results["error"] += f"SQL Error: {str(e)}{chr(10)}"
 
             if sql_results:
                 self.last_execution_results["sql"] = f"{chr(10)}SQL execution results:{chr(10)}{chr(10).join(sql_results)}{chr(10)}"
