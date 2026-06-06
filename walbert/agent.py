@@ -579,13 +579,6 @@ Python execution error: {str(e)}
 
                     last_parsed_response = self.process_response(model_response)
 
-                    # Reset execution results after processing
-                    self.last_execution_results = {
-                        "python": "",
-                        "sql": "",
-                        "error": ""
-                    }
-
                     # Handle console response if present
                     if "console_response" in last_parsed_response:
                         self.write_output(f"{chr(10)}{chr(10)}Walbert:{chr(10)}{last_parsed_response['console_response']}{chr(10)}{chr(10)}")
