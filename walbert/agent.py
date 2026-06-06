@@ -233,7 +233,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
         system_prompt += f"{chr(10)}{chr(10)}## Internet Access Status{chr(10)}Internet access for Python execution is currently {internet_status}.{chr(10)}"
 
-        self.conversation_context = system_prompt + chr(10) + chr(10) + history_context + chr(10) + "## Last Execution Results ##" + chr(10) + json.dumps(self.last_execution_results) + chr(10) + chr(10)
+        self.conversation_context = system_prompt + chr(10) + chr(10) + "## Last Execution Results ##" + chr(10) + json.dumps(self.last_execution_results) + chr(10) + history_context + chr(10) + chr(10)
 
         self.processing_cycle = 0
         # Clear temporary directory
@@ -508,8 +508,6 @@ Python execution error: {str(e)}
                         # Reset context with fresh system prompt and recent history
                         self._reset_conversation_context()
 
-                        # Add user input to context
-                        self.conversation_context += f"User:{chr(10)}{msg}{chr(10)}{chr(10)}"
                         self.processing_cycle = 0
                         self.last_input_time = time.time()
 
@@ -522,7 +520,6 @@ Python execution error: {str(e)}
 
                         # Process user input immediately
                         full_prompt = self.conversation_context
-                        full_prompt += chr(10) + f"[walbert_input_channel]{chr(10)}user{chr(10)}[/walbert_input_channel]"
                         full_prompt += chr(10) + "Please respond to the user's request immediately. Provide a concise response in [walbert_console_response] block first, then continue with any additional processing."
 
                         # Log the full prompt to conversation file
