@@ -98,6 +98,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             "sql": "",
             "error": ""
         }
+        self.session_dir = None  # Initialize session_dir
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
@@ -204,6 +205,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                 "timestamp": time.time()
             })
 
+        self.logger.debug(f"Last execution results: {self.last_execution_results}")
         return parsed
 
     def _reset_conversation_context(self):
@@ -239,8 +241,11 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
         system_prompt += f"{chr(10)}{chr(10)}## Internet Access Status{chr(10)}Internet access for Python execution is currently {internet_status}.{chr(10)}"
 
-        self.conversation_context = system_prompt + chr(10) + chr(10) + "## Last Execution Results ##" + chr(10) + json.dumps(self.last_execution_results) + chr(10) + history_context + chr(10) + chr(10)
+        # Only include the last execution results if they exist and are non-empty
+        if any(self.last_execution_results.values()):
+            system_prompt += f"{chr(10)}## Last Execution Results ##{chr(10)}{json.dumps(self.last_execution_results)}{chr(10)}"
 
+        self.conversation_context = system_prompt + chr(10) + chr(10) + history_context + chr(10) + chr(10)
         self.processing_cycle = 0
         # Clear temporary directory
         self.python_temp_dir = None
@@ -278,9 +283,9 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
 
             output = ""
             if result.stdout:
-                output += f"Python stdout:{chr(10)}{result.stdout}{chr(10)}"
+                output += f"Python stdout:{chr(10)}{result.stdout.strip()}{chr(10)}"
             if result.stderr:
-                output += f"Python stderr:{chr(10)}{result.stderr}{chr(10)}"
+                output += f"Python stderr:{chr(10)}{result.stderr.strip()}{chr(10)}"
 
             # Always include return code information
             output += f"Python return code: {result.returncode}{chr(10)}"
@@ -290,19 +295,13 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             self.logger.debug(f"Python stdout: {result.stdout}")
             self.logger.debug(f"Python stderr: {result.stderr}")
 
-            return output
+            return output if output else "Python execution completed with no output."
         except subprocess.TimeoutExpired:
-            error_msg = f"""
-Error Type: System Error
-Python execution timed out after {self.config.python_execution_timeout} seconds
-"""
+            error_msg = f"Python execution timed out after {self.config.python_execution_timeout} seconds"
             self.logger.error(error_msg)
             return error_msg
         except Exception as e:
-            error_msg = f"""
-Error Type: System Error
-Python execution error: {str(e)}
-"""
+            error_msg = f"Python execution error: {str(e)}"
             self.logger.error(error_msg)
             return error_msg
 
@@ -585,6 +584,7 @@ Python execution error: {str(e)}
                     self._log_to_conversation_file(model_response, "assistant")
 
                     last_parsed_response = self.process_response(model_response)
+                    self.logger.debug(f"Last execution results: {self.last_execution_results}")  # Debug log
 
                     # Handle console response if present
                     if "console_response" in last_parsed_response:
