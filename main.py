@@ -181,7 +181,7 @@ def main():
                 print(f"{chr(10)}Interrupting Walbert...{chr(10)}")
                 interrupt_event.set()
                 # Wait briefly for interruption to complete
-                time.sleep(0.5)
+                time.sleep(5)
                 interrupt_event.clear()
                 print(f"Walbert processing interrupted. Waiting for your input...{chr(10)}")
                 print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)

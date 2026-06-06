@@ -133,14 +133,6 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         if not self.db.conn:
             self.db.connect()
 
-        # Initialize execution results tracking if not exists
-        if not hasattr(self, 'last_execution_results'):
-            self.last_execution_results = {
-                "python": "",
-                "sql": "",
-                "error": ""
-            }
-
         # Handle model restart request
         if parsed.get("restart_model"):
             reason = parsed["restart_model"]
@@ -597,13 +589,6 @@ Python execution error: {str(e)}
                     self._log_to_conversation_file(model_response, "assistant")
 
                     last_parsed_response = self.process_response(model_response)
-
-                    # Reset execution results after processing
-                    self.last_execution_results = {
-                        "python": "",
-                        "sql": "",
-                        "error": ""
-                    }
 
                     # Handle console response if present
                     if "console_response" in last_parsed_response:
