@@ -233,18 +233,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
         system_prompt += f"{chr(10)}{chr(10)}## Internet Access Status{chr(10)}Internet access for Python execution is currently {internet_status}.{chr(10)}"
 
-        # Store execution results to be included in context
-        execution_results = ""
-        if self.last_execution_results["python"]:
-            execution_results += self.last_execution_results["python"] + chr(10)
-        if self.last_execution_results["sql"]:
-            execution_results += self.last_execution_results["sql"] + chr(10)
-        if self.last_execution_results["error"]:
-            execution_results += f"Error:{chr(10)}{self.last_execution_results['error']}{chr(10)}"
-
-        self.conversation_context = system_prompt + chr(10) + chr(10) + history_context
-        if execution_results:
-            self.conversation_context += f"{chr(10)}## Recent Execution Results{chr(10)}{chr(10)}{execution_results}"
+        self.conversation_context = system_prompt + chr(10) + chr(10) + history_context + chr(10) + "## Last Execution Results ##" + chr(10) + json.dumps(self.last_execution_results)
 
         self.processing_cycle = 0
         # Clear temporary directory
@@ -589,6 +578,13 @@ Python execution error: {str(e)}
                     self._log_to_conversation_file(model_response, "assistant")
 
                     last_parsed_response = self.process_response(model_response)
+
+                    # Reset execution results after processing
+                    self.last_execution_results = {
+                        "python": "",
+                        "sql": "",
+                        "error": ""
+                    }
 
                     # Handle console response if present
                     if "console_response" in last_parsed_response:
