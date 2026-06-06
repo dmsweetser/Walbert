@@ -242,10 +242,12 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
     def _execute_python_code(self, code: str) -> str:
         """Execute Python code in the main application's virtual environment"""
         # Create temporary Python script
+        if not self.python_temp_dir:
+            self.python_temp_dir = tempfile.mkdtemp(prefix=self.config.temp_dir_prefix)
+
         script_file = os.path.join(self.python_temp_dir, "script.py")
         with open(script_file, 'w') as f:
             f.write(code)
-
 
         if not self.internet_access:
             # Ensure unshare exists
@@ -256,14 +258,16 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             python_cmd = [unshare_path, "-n", sys.executable, script_file]
         else:
             python_cmd = [sys.executable, script_file]
-        # Execute script using the main application's Python interpreter
+
         try:
+            # Execute script using the main application's Python interpreter
             result = subprocess.run(
                 python_cmd,
                 capture_output=True,
                 text=True,
                 timeout=self.config.python_execution_timeout,
-                env=os.environ.copy()
+                env=os.environ.copy(),
+                cwd=self.python_temp_dir
             )
 
             output = ""
@@ -284,7 +288,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         except subprocess.TimeoutExpired:
             error_msg = f"""
 Error Type: System Error
-Python execution timed out after 30 seconds
+Python execution timed out after {self.config.python_execution_timeout} seconds
 """
             self.logger.error(error_msg)
             return error_msg
