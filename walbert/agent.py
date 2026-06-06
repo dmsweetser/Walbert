@@ -233,7 +233,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
         system_prompt += f"{chr(10)}{chr(10)}## Internet Access Status{chr(10)}Internet access for Python execution is currently {internet_status}.{chr(10)}"
 
-        self.conversation_context = system_prompt + chr(10) + chr(10) + history_context + chr(10) + "## Last Execution Results ##" + chr(10) + json.dumps(self.last_execution_results)
+        self.conversation_context = system_prompt + chr(10) + chr(10) + history_context + chr(10) + "## Last Execution Results ##" + chr(10) + json.dumps(self.last_execution_results) + chr(10) + chr(10)
 
         self.processing_cycle = 0
         # Clear temporary directory
