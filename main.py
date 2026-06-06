@@ -189,6 +189,9 @@ def main():
                 # Put user input into queue for agent
                 print(f"{chr(10)}Walbert has received your request.{chr(10)}")
                 print(f"Press ENTER to interrupt Walbert at any time.{chr(10)}")
+                interrupt_event.set()
+                # Wait briefly for interruption to complete
+                time.sleep(5)
                 interrupt_event.clear()
                 input_queue.put(("user_input", user_input))
 
