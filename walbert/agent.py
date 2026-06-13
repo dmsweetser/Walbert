@@ -457,7 +457,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         except Exception as e:
             self.logger.error(f"Error logging to conversation file: {e}")
 
-    def run_autonomous(self, input_queue, interrupt_event=None):
+    def run_autonomous(self, input_queue, interrupt_event=None, test_mode=False):
         """Main agent execution loop running autonomously with input queue and interrupt capability"""
         # Connect to database in this thread before starting conversation
         self.db.connect()
@@ -471,7 +471,8 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         last_user_input = None
         waiting_for_user_input = False
 
-        time.sleep(10)
+        if not test_mode:
+            time.sleep(10)
 
         while True:
             try:
