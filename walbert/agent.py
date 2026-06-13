@@ -20,7 +20,7 @@ from .database.manager import DatabaseManager
 
 logger = logging.getLogger('walbert')
 
-class WalbertAgent:
+class WalbertAgent():
     """Main Walbert agent class"""
 
     SYSTEM_PROMPT = """
@@ -76,9 +76,12 @@ A concise summary of your response to the user
 Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
     """
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, model_manager: ModelManager = None):
         self.config = config
-        self.model_manager = ModelManager(config)
+        if model_manager is None:
+            self.model_manager = ModelManager(config)
+        else:
+            self.model_manager = model_manager
         self.db = DatabaseManager(self.config.database_path)
         self.current_conversation_file = None
         self.model_ready = False

@@ -4,3 +4,4 @@ pyttsx3
 vosk
 sounddevice
 numpy
+unittest2

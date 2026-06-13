@@ -4,4 +4,8 @@
 mkdir -p instance/conversations
 
 source venv/bin/activate
-python3 main.py
+if [ "$1" = "test" ]; then
+    python3 -m unittest discover
+else
+    python3 main.py
+fi
