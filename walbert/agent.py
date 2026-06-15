@@ -471,9 +471,6 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         last_user_input = None
         waiting_for_user_input = False
 
-        if not test_mode:
-            time.sleep(10)
-
         while True:
             try:
                 # Check for new input in queue with immediate processing
@@ -558,8 +555,8 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                 except queue.Empty:
                     pass
 
-                # Only process autonomously if not waiting for user input
-                if not waiting_for_user_input:
+                # Only process autonomously if not waiting for user input and not in test mode
+                if not waiting_for_user_input and not test_mode:
                     # Autonomous processing loop with improved context
                     full_prompt = self.conversation_context
                     full_prompt += f"{chr(10)}Input channel: autonomous{chr(10)}You are operating autonomously. Please:"
@@ -599,8 +596,8 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                     # Small delay to prevent CPU overload
                     time.sleep(10)
                 else:
-                    # Wait for user input
-                    time.sleep(10)
+                    # In test mode, don't wait for user input - just continue processing
+                    time.sleep(0.1)
 
             except KeyboardInterrupt:
                 print(f"{chr(10)}Goodbye!")

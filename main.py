@@ -90,8 +90,6 @@ def main():
     agent_thread.daemon = True
     agent_thread.start()
 
-    time.sleep(5)
-
     # Main console loop
     print("""
           
