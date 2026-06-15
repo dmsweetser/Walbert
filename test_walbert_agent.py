@@ -337,6 +337,10 @@ Validated context and execution history
         """Test handling of multiple execution blocks"""
         self.agent.start_conversation()
 
+        # Process response that creates the table
+        response1 = self.mock_manager.responses[1]
+        self.agent.process_response(response1)
+
         # Process response with multiple SQL statements
         response = self.mock_manager.responses[4]
         parsed = self.agent.process_response(response)

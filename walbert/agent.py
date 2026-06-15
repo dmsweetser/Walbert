@@ -208,6 +208,14 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                 "timestamp": time.time()
             })
 
+        # Extract console response if present
+        if parsed.get("console_response"):
+            self.conversation_history.append({
+                "type": "summary",
+                "content": parsed["console_response"],
+                "timestamp": time.time()
+            })
+
         self.logger.debug(f"Last execution results: {self.last_execution_results}")
         return parsed
 
