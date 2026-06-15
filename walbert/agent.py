@@ -171,13 +171,13 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                 try:
                     result = self.db.execute_sql(sql)
                     self.logger.debug(f"SQL execution result: {result}")
-                    sql_results.append(str(result))
+                    sql_results.append(f"SQL: {sql}{chr(10)}Result: {result}{chr(10)}")
                 except Exception as e:
                     self.logger.error(f"SQL execution error: {e}")
-                    self.last_execution_results["error"] += f"SQL Error: {str(e)}{chr(10)}"
+                    sql_results.append(f"SQL: {sql}{chr(10)}Error: {str(e)}{chr(10)}")
 
             if sql_results:
-                self.last_execution_results["sql"] = f"{chr(10)}SQL execution results:{chr(10)}{chr(10).join(sql_results)}{chr(10)}"
+                self.last_execution_results["sql"] = f"{chr(10)}".join(sql_results)
 
         # Handle multiple Python executions
         if parsed.get("python_execute"):
@@ -197,7 +197,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                 python_results.append(result)
 
             if python_results:
-                self.last_execution_results["python"] = f"{chr(10)}Python execution results:{chr(10)}{chr(10).join(python_results)}{chr(10)}"
+                self.last_execution_results["python"] = f"{chr(10)}".join(python_results)
 
         # Extract summary if present
         if parsed.get("summary"):
@@ -220,7 +220,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         return parsed
 
     def _reset_conversation_context(self):
-        """Reset conversation context with fresh system prompt and recent conversation history"""
+        """Reset conversation context with fresh system prompt and recent history"""
         if not self.session_dir:
             return
 
@@ -252,9 +252,15 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
         system_prompt += f"{chr(10)}{chr(10)}## Internet Access Status{chr(10)}Internet access for Python execution is currently {internet_status}.{chr(10)}"
 
-        # Only include the last execution results if they exist and are non-empty
+        # Include last execution results if they exist and are non-empty
         if any(self.last_execution_results.values()):
-            system_prompt += f"{chr(10)}## Last Execution Results ##{chr(10)}{json.dumps(self.last_execution_results)}{chr(10)}"
+            system_prompt += f"{chr(10)}## Last Execution Results{chr(10)}"
+            if self.last_execution_results.get("python"):
+                system_prompt += f"{chr(10)}### Python Execution{chr(10)}{self.last_execution_results['python']}{chr(10)}"
+            if self.last_execution_results.get("sql"):
+                system_prompt += f"{chr(10)}### SQL Execution{chr(10)}{self.last_execution_results['sql']}{chr(10)}"
+            if self.last_execution_results.get("error"):
+                system_prompt += f"{chr(10)}### Errors{chr(10)}{self.last_execution_results['error']}{chr(10)}"
 
         self.conversation_context = system_prompt + chr(10) + chr(10) + history_context + chr(10) + chr(10)
         self.processing_cycle = 0
@@ -292,21 +298,23 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                 cwd=self.python_temp_dir
             )
 
-            output = ""
+            # Format output for storage
+            output_parts = []
             if result.stdout:
-                output += f"Python stdout:{chr(10)}{result.stdout.strip()}{chr(10)}"
+                output_parts.append(f"Python stdout:{chr(10)}{result.stdout.strip()}")
             if result.stderr:
-                output += f"Python stderr:{chr(10)}{result.stderr.strip()}{chr(10)}"
+                output_parts.append(f"Python stderr:{chr(10)}{result.stderr.strip()}")
+            output_parts.append(f"Python return code: {result.returncode}")
 
-            # Always include return code information
-            output += f"Python return code: {result.returncode}{chr(10)}"
+            formatted_output = f"{chr(10)}".join(output_parts) + f"{chr(10)}"
 
             # Log the execution details
             self.logger.debug(f"Python execution completed with return code {result.returncode}")
             self.logger.debug(f"Python stdout: {result.stdout}")
             self.logger.debug(f"Python stderr: {result.stderr}")
 
-            return output if output else "Python execution completed with no output."
+            return formatted_output
+
         except subprocess.TimeoutExpired:
             error_msg = f"Python execution timed out after {self.config.python_execution_timeout} seconds"
             self.logger.error(error_msg)
@@ -593,7 +601,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                     self._log_to_conversation_file(model_response, "assistant")
 
                     last_parsed_response = self.process_response(model_response)
-                    self.logger.debug(f"Last execution results: {self.last_execution_results}")  # Debug log
+                    self.logger.debug(f"Last execution results: {self.last_execution_results}")
 
                     # Handle console response if present
                     if "console_response" in last_parsed_response:

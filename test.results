@@ -1,15 +1,21 @@
 test_context_validation (test_walbert_agent.TestWalbertAgent.test_context_validation)
 Test that context includes execution results and history ... ok
+test_error_capture (test_walbert_agent.TestWalbertAgent.test_error_capture)
+Test that Python errors are captured and included in context ... ok
 test_history_preservation (test_walbert_agent.TestWalbertAgent.test_history_preservation)
 Test that conversation history is properly preserved ... ok
 test_internet_access_context (test_walbert_agent.TestWalbertAgent.test_internet_access_context)
 Test that internet access status is included in context ... ok
 test_multiple_block_execution (test_walbert_agent.TestWalbertAgent.test_multiple_block_execution)
 Test handling of multiple execution blocks ... ok
+test_python_execution_capture (test_walbert_agent.TestWalbertAgent.test_python_execution_capture)
+Test that Python stdout/stderr are captured and included in context ... ok
 test_schema_updates (test_walbert_agent.TestWalbertAgent.test_schema_updates)
 Test that schema updates are reflected in context ... ok
+test_sql_execution_capture (test_walbert_agent.TestWalbertAgent.test_sql_execution_capture)
+Test that SQL execution results are captured and included in context ... ok
 
 ----------------------------------------------------------------------
-Ran 5 tests in 0.023s
+Ran 8 tests in 0.107s
 
 OK

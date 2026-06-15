@@ -137,19 +137,20 @@ Created test_table with id, name, and value columns
 [/walbert_summary]
 """)
 
-        # Response 3: Python execution
+        # Response 3: Python execution with stdout and stderr
         self.mock_manager.responses.append("""
 [walbert_python_execute]
-import os
-print(f"Current directory: {os.getcwd()}")
+import sys
+print("Hello, stdout!")
+print("Hello, stderr!", file=sys.stderr)
 [/walbert_python_execute]
 
 [walbert_console_response]
-Executed Python code to show current directory.
+Executed Python code to show stdout and stderr.
 [/walbert_console_response]
 
 [walbert_summary]
-Executed Python code to display working directory
+Executed Python code to display stdout and stderr
 [/walbert_summary]
 """)
 
@@ -220,8 +221,8 @@ Validated context and execution history
 
         # Check that context includes the execution results
         self.assertIn("Last Execution Results", self.agent.conversation_context)
-        self.assertIn("SQL execution results", self.agent.conversation_context)
-        self.assertIn("Created test table in database", self.agent.conversation_context)
+        self.assertIn("SQL Execution", self.agent.conversation_context)
+        self.assertIn("test_table", self.agent.conversation_context)
 
         # Process Python execution response
         response = self.mock_manager.responses[2]
@@ -236,7 +237,9 @@ Validated context and execution history
 
         # Check that context includes Python execution results
         self.assertIn("Last Execution Results", self.agent.conversation_context)
-        self.assertIn("Python execution results", self.agent.conversation_context)
+        self.assertIn("Python Execution", self.agent.conversation_context)
+        self.assertIn("Hello, stdout!", self.agent.conversation_context)
+        self.assertIn("Hello, stderr!", self.agent.conversation_context)
 
         # Process error response
         response = self.mock_manager.responses[3]
@@ -250,7 +253,64 @@ Validated context and execution history
 
         # Check that context includes error information
         self.assertIn("Last Execution Results", self.agent.conversation_context)
-        self.assertIn("Python execution results", self.agent.conversation_context)
+        self.assertIn("Python Execution", self.agent.conversation_context)
+        self.assertIn("nonexistent_module", self.agent.conversation_context)
+
+    def test_python_execution_capture(self):
+        """Test that Python stdout/stderr are captured and included in context"""
+        self.agent.start_conversation()
+
+        # Process Python execution response
+        response = self.mock_manager.responses[2]
+        parsed = self.agent.process_response(response)
+
+        # Check that Python was executed
+        self.assertIn("python_execute", parsed)
+
+        # Check that stdout and stderr are captured in last_execution_results
+        self.assertIn("Hello, stdout!", self.agent.last_execution_results["python"])
+        self.assertIn("Hello, stderr!", self.agent.last_execution_results["python"])
+
+        # Reset context and check that results are included
+        self.agent._reset_conversation_context()
+        self.assertIn("Hello, stdout!", self.agent.conversation_context)
+        self.assertIn("Hello, stderr!", self.agent.conversation_context)
+
+    def test_sql_execution_capture(self):
+        """Test that SQL execution results are captured and included in context"""
+        self.agent.start_conversation()
+
+        # Process SQL execution response
+        response = self.mock_manager.responses[1]
+        parsed = self.agent.process_response(response)
+
+        # Check that SQL was executed
+        self.assertIn("sql_execute", parsed)
+
+        # Check that SQL result is captured
+        self.assertIn("test_table", self.agent.last_execution_results["sql"])
+
+        # Reset context and check that results are included
+        self.agent._reset_conversation_context()
+        self.assertIn("test_table", self.agent.conversation_context)
+
+    def test_error_capture(self):
+        """Test that Python errors are captured and included in context"""
+        self.agent.start_conversation()
+
+        # Process error response
+        response = self.mock_manager.responses[3]
+        parsed = self.agent.process_response(response)
+
+        # Check that Python was executed
+        self.assertIn("python_execute", parsed)
+
+        # Check that error is captured
+        self.assertIn("nonexistent_module", self.agent.last_execution_results["python"])
+
+        # Reset context and check that error is included
+        self.agent._reset_conversation_context()
+        self.assertIn("nonexistent_module", self.agent.conversation_context)
 
     def test_history_preservation(self):
         """Test that conversation history is properly preserved"""
