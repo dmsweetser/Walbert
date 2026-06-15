@@ -90,6 +90,9 @@ def main():
     agent_thread.daemon = True
     agent_thread.start()
 
+    # This is necessary to allow TTS/STT to initialize before you see the prompt
+    time.sleep(5)
+
     # Main console loop
     print("""
           
