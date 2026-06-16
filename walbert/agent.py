@@ -45,31 +45,30 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
 Define and manage ALL tables and schema elements through SQL commands. Design for reusability.
 
-```
-~db_schema~
-```
-
 ## Available Blocks
-
-Use these execution blocks:
-
 [walbert_sql_execute]
 SQL_STATEMENT
 [/walbert_sql_execute]
+- Execute SQL commands for database operations
+- You have full autonomy over schema design and data management
+
 [walbert_python_execute]
 # Python code to execute
 import os
 print("Hello from Python!")
 [/walbert_python_execute]
-
-When you are done with execution, use these response blocks:
+- Execute Python code in the main application's virtual environment
+- Full hardware access is available through Python
 
 [walbert_console_response]
 Your response to the user
 [/walbert_console_response]
+- Direct console output to the user
+
 [walbert_summary]
-A concise summary of your most recent actions
+A concise summary of your response to the user
 [/walbert_summary]
+- Provide a summary after completing all processing
 
 Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
     """
@@ -90,7 +89,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.conversation_context = ""
         self.internet_access = False
         self.conversation_history = []
-        self.max_history_entries = 10  # Number of question/response pairs to keep
+        self.max_history_entries = 5  # Number of question/response pairs to keep
         self.last_response = ""
         self.user_control_timeout = 300  # 5 minutes max wait for user input
         self.user_control_start_time = 0
@@ -613,7 +612,7 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                     time.sleep(10)
                 else:
                     # In test mode, don't wait for user input - just continue processing
-                    time.sleep(30)
+                    time.sleep(0.1)
 
             except KeyboardInterrupt:
                 print(f"{chr(10)}Goodbye!")

@@ -22,11 +22,11 @@ class Config:
     model_configs: Dict[str, ModelConfig]
     llama_binary_path: str
     mmproj_path: str = ""
-    log_level: str = "INFO"
+    log_level: str = "DEBUG"
     server_port: int = 8080
     server_health_check_timeout: int = 2
     server_startup_timeout: int = 60
-    python_execution_timeout: int = 30
+    python_execution_timeout: int = 60
     autonomous_operation_timeout: int = 120
     conversation_log_dir: str = "instance/conversations"
     database_path: str = "instance/walbert.db"
