@@ -12,6 +12,7 @@ echo "Select a model to install:"
 echo "1) Devstral 24B"
 echo "2) Ministral 14B"
 echo "3) Mistral 7B"
+echo "4) Gemma 4 12B"
 read -p "Enter choice: " model_choice
 
 case $model_choice in
@@ -32,6 +33,12 @@ case $model_choice in
         MMPROJ_NAME=""
         MODEL_URL="https://huggingface.co/MaziyarPanahi/Mistral-7B-Instruct-v0.3-GGUF/resolve/main/Mistral-7B-Instruct-v0.3.IQ4_XS.gguf?download=true"
         MMPROJ_URL=""
+        ;;
+    4)
+        MODEL_NAME="gemma-4-12B-it-qat-UD-Q4_K_XL.gguf"
+        MMPROJ_NAME="gemma-4-12B-it-qat-UD-Q4_K_XL-mmproj-F32.gguf"
+        MODEL_URL="https://huggingface.co/unsloth/gemma-4-12B-it-qat-GGUF/resolve/main/gemma-4-12B-it-qat-UD-Q4_K_XL.gguf?download=true"
+        MMPROJ_URL="https://huggingface.co/unsloth/gemma-4-12B-it-qat-GGUF/resolve/main/mmproj-F32.gguf?download=true"
         ;;
     *)
         echo "Invalid choice"
