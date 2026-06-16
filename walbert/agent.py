@@ -45,6 +45,10 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
 Define and manage ALL tables and schema elements through SQL commands. Design for reusability.
 
+```
+~db_schema~
+```
+
 ## Available Blocks
 [walbert_sql_execute]
 SQL_STATEMENT
@@ -168,10 +172,10 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                 try:
                     result = self.db.execute_sql(sql)
                     self.logger.debug(f"SQL execution result: {result}")
-                    sql_results.append(f"SQL: {sql}{chr(10)}Result: {result}{chr(10)}")
+                    sql_results.append(f"SQL execution result: {result}{chr(10)}")
                 except Exception as e:
                     self.logger.error(f"SQL execution error: {e}")
-                    sql_results.append(f"SQL: {sql}{chr(10)}Error: {str(e)}{chr(10)}")
+                    sql_results.append(f"SQL execution error: {str(e)}{chr(10)}")
 
             if sql_results:
                 self.last_execution_results["sql"] = f"{chr(10)}".join(sql_results)
@@ -249,15 +253,8 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
         system_prompt += f"{chr(10)}{chr(10)}## Internet Access Status{chr(10)}Internet access for Python execution is currently {internet_status}.{chr(10)}"
 
-        # Include last execution results if they exist and are non-empty
-        if any(self.last_execution_results.values()):
-            system_prompt += f"{chr(10)}## Last Execution Results{chr(10)}"
-            if self.last_execution_results.get("python"):
-                system_prompt += f"{chr(10)}### Python Execution{chr(10)}{self.last_execution_results['python']}{chr(10)}"
-            if self.last_execution_results.get("sql"):
-                system_prompt += f"{chr(10)}### SQL Execution{chr(10)}{self.last_execution_results['sql']}{chr(10)}"
-            if self.last_execution_results.get("error"):
-                system_prompt += f"{chr(10)}### Errors{chr(10)}{self.last_execution_results['error']}{chr(10)}"
+        # Include last execution results
+        system_prompt += f"{chr(10)}## Last Execution Results{chr(10)}{json.dumps(self.last_execution_results)}{chr(10)}{chr(10)}"            
 
         self.conversation_context = system_prompt + chr(10) + chr(10) + history_context + chr(10) + chr(10)
         self.processing_cycle = 0
