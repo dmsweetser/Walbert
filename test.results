@@ -1,21 +1,31 @@
-test_context_validation (test_walbert_agent.TestWalbertAgent.test_context_validation)
-Test that context includes execution results and history ... ok
-test_error_capture (test_walbert_agent.TestWalbertAgent.test_error_capture)
-Test that Python errors are captured and included in context ... ok
-test_history_preservation (test_walbert_agent.TestWalbertAgent.test_history_preservation)
-Test that conversation history is properly preserved ... ok
+test_autonomous_instruction (test_walbert_agent.TestWalbertAgent.test_autonomous_instruction)
+Test that autonomous instructions are parsed and appended ... ok
+test_block_execution_order (test_walbert_agent.TestWalbertAgent.test_block_execution_order)
+Test that blocks are executed in the order they are appended ... ok
+test_block_parsing (test_walbert_agent.TestWalbertAgent.test_block_parsing)
+Test that blocks are parsed correctly ... ok
+test_context_as_text (test_walbert_agent.TestWalbertAgent.test_context_as_text)
+Test that _get_context_as_text returns all blocks in order ... ok
+test_context_blocks_persistence (test_walbert_agent.TestWalbertAgent.test_context_blocks_persistence)
+Test that context_blocks persists all blocks in order ... ok
+test_conversation_file_logging (test_walbert_agent.TestWalbertAgent.test_conversation_file_logging)
+Test that blocks are logged to conversation files ... [walbert_console_response_start] Hello! How can I help you today? [walbert_console_response_end] [walbert_summary_start] Provided greeting to user [walbert_summary_end] ok
+test_error_handling (test_walbert_agent.TestWalbertAgent.test_error_handling)
+Test that errors in Python execution are captured in result blocks ... ok
 test_internet_access_context (test_walbert_agent.TestWalbertAgent.test_internet_access_context)
-Test that internet access status is included in context ... ok
-test_multiple_block_execution (test_walbert_agent.TestWalbertAgent.test_multiple_block_execution)
-Test handling of multiple execution blocks ... ok
-test_python_execution_capture (test_walbert_agent.TestWalbertAgent.test_python_execution_capture)
-Test that Python stdout/stderr are captured and included in context ... ok
-test_schema_updates (test_walbert_agent.TestWalbertAgent.test_schema_updates)
-Test that schema updates are reflected in context ... ok
-test_sql_execution_capture (test_walbert_agent.TestWalbertAgent.test_sql_execution_capture)
-Test that SQL execution results are captured and included in context ... ok
+Test that internet access status is included in system prompt ... ok
+test_multiple_sql_blocks (test_walbert_agent.TestWalbertAgent.test_multiple_sql_blocks)
+Test handling of multiple SQL execution blocks ... ok
+test_python_execution_and_result (test_walbert_agent.TestWalbertAgent.test_python_execution_and_result)
+Test that Python blocks are executed and results are appended ... ok
+test_schema_updates_in_context (test_walbert_agent.TestWalbertAgent.test_schema_updates_in_context)
+Test that schema updates are reflected in context_blocks ... ok
+test_sql_execution_and_result (test_walbert_agent.TestWalbertAgent.test_sql_execution_and_result)
+Test that SQL blocks are executed and results are appended ... ok
+test_user_input_block (test_walbert_agent.TestWalbertAgent.test_user_input_block)
+Test that user input is appended as a block ... ok
 
 ----------------------------------------------------------------------
-Ran 8 tests in 0.107s
+Ran 13 tests in 0.169s
 
 OK

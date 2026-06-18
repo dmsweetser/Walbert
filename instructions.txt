@@ -1,1 +1,33 @@
-Can you fix the issues you see in test.results?
+I want to change how dialogue behaves in this - a reimagining of it. Here is what I am picturing:
+
+-System prompt
+-Walbert block for user input
+-Walbert block for bot response
+-Walbert block for SQL input
+-Another for SQL response
+
+Right now, the context resets every time. Instead, what I want is an auditable, granular, block-by block chain that persists as part of the context.
+
+[walbert_system_prompt_start]
+System prompt
+[walbert_system_prompt_end]
+[walbert_user_input_start]
+How are you today?
+[walbert_user_input_end]
+[walbert_console_response_start]
+I'm fine how are you?
+[walbert_console_response_end]
+
+So when I run it, I will see things in terms of parsed blocks, and they will execute sequentially.
+So I would expect a SQL block to be returned, be run, then have the result in its own block
+Then Walbert would decide next how to respond.
+
+For now, don't worry about maxing the available context. We'll worry about that later.
+
+But I want to think of EVERYTHING in walbert blocks. No cruft, sequential, easily auditable.
+
+I should see the Python result after the block where the Python code runs. Everything should make sense.
+
+The autonomous mode would be an instruction in sequence too, so you could see what is being done at every step.
+
+Can you generally revise the app to align with this vision?
