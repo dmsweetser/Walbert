@@ -39,6 +39,7 @@ class ModelManager:
             self.config.llama_binary_path,
             "-m", model_config.model_path,
             "--ctx-size", str(model_config.context_size),
+            "--jinja",
             "--temp", str(model_config.temperature),
             "--top-p", str(model_config.top_p),
             "--top-k", str(model_config.top_k),

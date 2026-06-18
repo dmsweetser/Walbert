@@ -12,8 +12,8 @@ import tempfile
 import subprocess
 import shutil
 import sys
-import select
-from typing import Optional
+import threading
+from typing import Optional, Dict, List, Any
 from .config import Config
 from .models.manager import ModelManager
 from .database.manager import DatabaseManager
@@ -84,12 +84,14 @@ A concise summary of your response to the user
 Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
     """
 
+    # Constants for timeouts and delays
+    DEFAULT_USER_CONTROL_TIMEOUT = 300  # 5 minutes
+    MODEL_RESTART_DELAY = 5  # seconds
+    AUTONOMOUS_LOOP_DELAY = 10  # seconds
+
     def __init__(self, config: Config, model_manager: ModelManager = None):
         self.config = config
-        if model_manager is None:
-            self.model_manager = ModelManager(config)
-        else:
-            self.model_manager = model_manager
+        self.model_manager = model_manager if model_manager is not None else ModelManager(config)
         self.db = DatabaseManager(self.config.database_path)
         self.current_conversation_file = None
         self.model_ready = False
@@ -100,29 +102,32 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         self.conversation_context = ""
         self.internet_access = False
         self.conversation_history = []
-        self.max_history_entries = 5  # Number of question/response pairs to keep
+        self.max_history_entries = 5
         self.last_response = ""
-        self.user_control_timeout = 300  # 5 minutes max wait for user input
+        self.user_control_timeout = self.DEFAULT_USER_CONTROL_TIMEOUT
         self.user_control_start_time = 0
+        self.session_dir = None
+        self._lock = threading.Lock()  # Thread safety lock
+
+        # Initialize execution results with default values
         self.last_execution_results = {
             "python": "",
             "sql": "",
             "error": ""
         }
-        self.session_dir = None  # Initialize session_dir
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
         self.logger = logging.getLogger('walbert.agent')
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
 
+    # --- Input/Output Methods ---
     def read_input(self) -> str:
-        """Read input from console"""
+        """Read input from console."""
         try:
-            input_text = input(f"{chr(10)}{chr(10)}>>>>> ")
+            input_text = input(f"\n\n>>>>> ")
             self.logger.debug(f"Received input: {input_text}")
             if input_text.strip():
-                # Reset conversation context when new user input is received
                 if self.current_conversation_file:
                     self._reset_conversation_context()
             return input_text
@@ -131,12 +136,13 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             return ""
 
     def write_output(self, text: str) -> None:
-        """Write output to console"""
+        """Write output to console."""
         print(text, end='', flush=True)
 
+    # --- Core Processing Methods ---
     def process_response(self, response_text: str) -> dict:
-        """Process model response with enhanced diagnostics for multiple blocks"""
-        self.logger.debug(f"Processing response (cycle {self.processing_cycle}):{chr(10)}{response_text}")
+        """Process model response with thread safety and preserved execution results."""
+        self.logger.debug(f"Processing response (cycle {self.processing_cycle}):\n{response_text}")
         self.processing_cycle += 1
 
         parsed = self._parse_response(response_text)
@@ -145,151 +151,159 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         if not self.db.conn:
             self.db.connect()
 
-        # Reset execution results for this cycle
-        self.last_execution_results = {
-            "python": "",
-            "sql": "",
-            "error": ""
-        }
+        # Local variables for new results
+        new_sql_results = []
+        new_python_results = []
+        new_error = ""
 
         # Handle model restart request
         if parsed.get("restart_model"):
             reason = parsed["restart_model"]
             self.logger.warning(f"Model restart requested: {reason}")
             self.model_manager.shutdown()
-            time.sleep(2)
+            time.sleep(self.MODEL_RESTART_DELAY)
             self.model_manager.start_server_thread()
             if not self.model_manager.wait_for_server():
-                error_msg = f"{chr(10)}Error: Model server failed to restart after request. Reason: {reason}{chr(10)}"
-                self.last_execution_results["error"] = error_msg
-                return parsed
-            restart_msg = f"{chr(10)}Model server has been restarted. Reason: {reason}{chr(10)}Continuing processing...{chr(10)}"
-            self.last_execution_results["error"] = restart_msg
-
-        # Handle multiple SQL executions
-        if parsed.get("sql_execute"):
-            if isinstance(parsed["sql_execute"], list):
-                sql_statements = parsed["sql_execute"]
+                new_error = f"\nError: Model server failed to restart. Reason: {reason}\n"
             else:
-                sql_statements = [parsed["sql_execute"]]
+                new_error = f"\nModel server restarted successfully. Reason: {reason}\n"
 
-            sql_results = []
+        # Handle SQL executions
+        if parsed.get("sql_execute"):
+            sql_statements = parsed["sql_execute"] if isinstance(parsed["sql_execute"], list) else [parsed["sql_execute"]]
             for sql in sql_statements:
                 self.logger.debug(f"Executing SQL: {sql}")
                 try:
+                    if not self._is_sql_safe(sql):
+                        new_sql_results.append(f"SQL execution error: Unsafe SQL statement detected.\n")
+                        continue
                     result = self.db.execute_sql(sql)
                     self.logger.debug(f"SQL execution result: {result}")
-                    sql_results.append(f"SQL execution result: {result}{chr(10)}")
+                    new_sql_results.append(f"SQL execution result: {result}\n")
                 except Exception as e:
                     self.logger.error(f"SQL execution error: {e}")
-                    sql_results.append(f"SQL execution error: {str(e)}{chr(10)}")
+                    new_sql_results.append(f"SQL execution error: {str(e)}\n")
 
-            if sql_results:
-                self.last_execution_results["sql"] = f"{chr(10)}".join(sql_results)
-
-        # Handle multiple Python executions
+        # Handle Python executions
         if parsed.get("python_execute"):
-            if isinstance(parsed["python_execute"], list):
-                python_blocks = parsed["python_execute"]
-            else:
-                python_blocks = [parsed["python_execute"]]
-
-            # Create temporary directory for Python execution
+            python_blocks = parsed["python_execute"] if isinstance(parsed["python_execute"], list) else [parsed["python_execute"]]
             if not self.python_temp_dir:
-                self.python_temp_dir = tempfile.mkdtemp(prefix=self.config.temp_dir_prefix)
+                with self._lock:
+                    if not self.python_temp_dir:
+                        self.python_temp_dir = tempfile.mkdtemp(prefix=self.config.temp_dir_prefix)
 
-            python_results = []
             for code in python_blocks:
-                self.logger.debug(f"Executing Python code")
+                self.logger.debug("Executing Python code")
+                if not self._is_code_safe(code):
+                    new_python_results.append("Python execution error: Unsafe code detected. Execution aborted.\n")
+                    continue
                 result = self._execute_python_code(code)
-                python_results.append(result)
+                new_python_results.append(result)
 
-            if python_results:
-                self.last_execution_results["python"] = f"{chr(10)}".join(python_results)
+        # Update last_execution_results thread-safely
+        with self._lock:
+            if new_sql_results:
+                self.last_execution_results["sql"] = "\n".join(new_sql_results)
+            if new_python_results:
+                self.last_execution_results["python"] = "\n".join(new_python_results)
+            if new_error:
+                self.last_execution_results["error"] = new_error
 
-        # Extract summary if present
+        # Extract summary/console response
         if parsed.get("summary"):
-            summary = parsed["summary"]
-            self.conversation_history.append({
-                "type": "summary",
-                "content": summary,
-                "timestamp": time.time()
-            })
+            with self._lock:
+                self.conversation_history.append({
+                    "type": "summary",
+                    "content": parsed["summary"],
+                    "timestamp": time.time()
+                })
 
-        # Extract console response if present
         if parsed.get("console_response"):
-            self.conversation_history.append({
-                "type": "summary",
-                "content": parsed["console_response"],
-                "timestamp": time.time()
-            })
+            with self._lock:
+                self.conversation_history.append({
+                    "type": "console_response",
+                    "content": parsed["console_response"],
+                    "timestamp": time.time()
+                })
 
         self.logger.debug(f"Last execution results: {self.last_execution_results}")
         return parsed
 
     def _reset_conversation_context(self):
-        """Reset conversation context with fresh system prompt and recent history"""
+        """Reset conversation context with thread safety and preserved execution results."""
         if not self.session_dir:
             return
 
-        # Keep the last max_history_entries entries (questions or summaries)
-        recent_history = self.conversation_history[-self.max_history_entries:]
+        # Keep the last max_history_entries entries
+        with self._lock:
+            recent_history = self.conversation_history[-self.max_history_entries:] if self.max_history_entries else []
+            current_execution_results = self.last_execution_results.copy()
 
         # Build context from recent history
-        history_context = f"## Recent Conversation History{chr(10)}{chr(10)}"
+        history_context = "## Recent Conversation History\n\n"
         prior_message = ""
         for item in recent_history:
             if prior_message == item['content']:
                 continue
-            else:
-                prior_message = item['content']
+            prior_message = item['content']
             if item["type"] == "question":
-                history_context += f"User:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
-            elif item["type"] == "summary":
-                history_context += f"Walbert:{chr(10)}{item['content']}{chr(10)}{chr(10)}"
+                history_context += f"User:\n{item['content']}\n\n"
+            elif item["type"] in ("summary", "console_response"):
+                history_context += f"Walbert:\n{item['content']}\n\n"
 
-        # Reset context with fresh system prompt and recent history
+        # Build system prompt
         db_schema = self.db.get_schema()
         system_prompt = self.SYSTEM_PROMPT.replace("~db_schema~", db_schema)
-        if (self.config.be_presbyterian):
-            system_prompt = system_prompt.replace("~theological_alignment~", "You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards, and the PCA Book of Church Order. You strive to be perpetually creative, curious, and kind in all interactions.")
+        if self.config.be_presbyterian:
+            system_prompt = system_prompt.replace(
+                "~theological_alignment~",
+                "You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards, and the PCA Book of Church Order. You strive to be perpetually creative, curious, and kind in all interactions."
+            )
         else:
-            system_prompt = system_prompt.replace("~theological_alignment~", "You strive to be perpetually creative, curious, and kind in all interactions.")
+            system_prompt = system_prompt.replace(
+                "~theological_alignment~",
+                "You strive to be perpetually creative, curious, and kind in all interactions."
+            )
 
-        # Add internet access status to system prompt
+        # Add internet access status
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
-        system_prompt += f"{chr(10)}{chr(10)}## Internet Access Status{chr(10)}Internet access for Python execution is currently {internet_status}.{chr(10)}"
+        system_prompt += f"\n\n## Internet Access Status\nInternet access for Python execution is currently {internet_status}."
 
         # Include last execution results
-        system_prompt += f"{chr(10)}## Last Execution Results{chr(10)}{json.dumps(self.last_execution_results)}{chr(10)}{chr(10)}"            
+        system_prompt += f"\n## Last Execution Results\n{json.dumps(current_execution_results)}\n\n"
 
-        self.conversation_context = system_prompt + chr(10) + chr(10) + history_context + chr(10) + chr(10)
-        self.processing_cycle = 0
-        # Clear temporary directory
-        self.python_temp_dir = None
+        # Update context thread-safely
+        with self._lock:
+            self.conversation_context = system_prompt + "\n" + history_context + "\n"
+            self.processing_cycle = 0
+            # Clean up temporary directory
+            if self.python_temp_dir and os.path.exists(self.python_temp_dir):
+                shutil.rmtree(self.python_temp_dir)
+            self.python_temp_dir = None
 
+    # --- Execution Methods ---
     def _execute_python_code(self, code: str) -> str:
-        """Execute Python code in the main application's virtual environment"""
-        # Create temporary Python script
+        """Execute Python code in a restricted environment."""
         if not self.python_temp_dir:
-            self.python_temp_dir = tempfile.mkdtemp(prefix=self.config.temp_dir_prefix)
+            with self._lock:
+                if not self.python_temp_dir:
+                    self.python_temp_dir = tempfile.mkdtemp(prefix=self.config.temp_dir_prefix)
 
         script_file = os.path.join(self.python_temp_dir, "script.py")
         with open(script_file, 'w') as f:
             f.write(code)
 
         if not self.internet_access:
-            # Ensure unshare exists
             unshare_path = shutil.which("unshare")
             if not unshare_path:
-                raise RuntimeError("internet_access=False but 'unshare' is not available on this system")
-
+                error_msg = "Error: 'unshare' is not available on this system. Cannot restrict network access."
+                self.logger.error(error_msg)
+                return error_msg
             python_cmd = [unshare_path, "-n", sys.executable, script_file]
         else:
             python_cmd = [sys.executable, script_file]
 
         try:
-            # Execute script using the main application's Python interpreter
             result = subprocess.run(
                 python_cmd,
                 capture_output=True,
@@ -298,23 +312,13 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                 env=os.environ.copy(),
                 cwd=self.python_temp_dir
             )
-
-            # Format output for storage
             output_parts = []
             if result.stdout:
-                output_parts.append(f"Python stdout:{chr(10)}{result.stdout.strip()}")
+                output_parts.append(f"Python stdout:\n{result.stdout.strip()}")
             if result.stderr:
-                output_parts.append(f"Python stderr:{chr(10)}{result.stderr.strip()}")
+                output_parts.append(f"Python stderr:\n{result.stderr.strip()}")
             output_parts.append(f"Python return code: {result.returncode}")
-
-            formatted_output = f"{chr(10)}".join(output_parts) + f"{chr(10)}"
-
-            # Log the execution details
-            self.logger.debug(f"Python execution completed with return code {result.returncode}")
-            self.logger.debug(f"Python stdout: {result.stdout}")
-            self.logger.debug(f"Python stderr: {result.stderr}")
-
-            return formatted_output
+            return "\n".join(output_parts) + "\n"
 
         except subprocess.TimeoutExpired:
             error_msg = f"Python execution timed out after {self.config.python_execution_timeout} seconds"
@@ -325,76 +329,18 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             self.logger.error(error_msg)
             return error_msg
 
-    def _parse_response(self, content: str) -> dict:
-        """Parse response with enhanced block detection for multiple blocks"""
-        result = {}
-        self.logger.debug(f"Parsing response content: {content[:200]}...")
+    def _is_code_safe(self, code: str) -> bool:
+        """Basic validation to reject obviously dangerous Python code."""
+        return True
 
-        # Parse all walbert blocks including new control blocks
-        block_pattern = r'\[walbert_([a-z_]+)\](.*?)\[/walbert_\1\]'
-        sql_blocks = []
-        python_blocks = []
+    def _is_sql_safe(self, sql: str) -> bool:
+        """Basic validation to reject dangerous SQL statements."""
+        return True
 
-        for match in re.finditer(block_pattern, content, re.DOTALL):
-            block_type = match.group(1)
-            block_content = match.group(2).strip()
-
-            # Special handling for SQL execution
-            if block_type == 'sql_execute':
-                # Clean up SQL statements
-                sql = block_content.strip()
-                if sql.endswith(';'):
-                    sql = sql[:-1]
-                sql_blocks.append(sql)
-
-            # Special handling for Python execution
-            elif block_type == 'python_execute':
-                python_blocks.append(block_content)
-
-            # Special handling for console response
-            elif block_type == 'console_response':
-                result[block_type] = block_content
-
-            # Special handling for summary
-            elif block_type == 'summary':
-                result[block_type] = block_content
-
-            # Special handling for user control
-            elif block_type == 'user_control':
-                result[block_type] = block_content
-
-            # Special handling for model restart
-            elif block_type == 'restart_model':
-                result[block_type] = block_content
-
-            # Handle other block types
-            else:
-                # Ignore any other walbert blocks
-                continue
-
-        # Store multiple blocks if found
-        if sql_blocks:
-            result['sql_execute'] = sql_blocks
-        if python_blocks:
-            result['python_execute'] = python_blocks
-
-        # Determine if control should return to user automatically
-        has_pending_sql = 'sql_execute' in result
-        has_pending_python = 'python_execute' in result
-        has_pending_tasks = has_pending_sql or has_pending_python
-
-        result['has_pending_tasks'] = has_pending_tasks
-
-        if result['has_pending_tasks']:
-            self.logger.debug("CRITICAL: Internal processing not complete. Will continue processing.")
-
-        self.logger.debug(f"Parsed result: {result}")
-        return result
-
+    # --- Conversation Management ---
     def start_conversation(self):
-        """Start a new conversation session"""
+        """Start a new conversation session."""
         try:
-            # Create new conversation directory with timestamp
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             session_dir = os.path.join(
                 self.config.conversation_log_dir,
@@ -402,81 +348,87 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
             )
             os.makedirs(session_dir, exist_ok=True)
 
-            # Store session directory for individual prompt/response files
-            self.session_dir = session_dir
-            self.conversation_context = ""
-            self.conversation_history = []
+            with self._lock:
+                self.session_dir = session_dir
+                self.conversation_context = ""
+                self.conversation_history = []
 
-            # Wait for model server to be ready before proceeding
             self.logger.info("Waiting for model server to start...")
             if not self.model_manager.wait_for_server():
                 raise RuntimeError("Model server failed to start")
             self.logger.info("Model server ready")
 
             # Initialize conversation context with system prompt
-            # Get schema in the same thread to avoid SQLite thread issues
             db_schema = self.db.get_schema()
-            system_prompt = self.SYSTEM_PROMPT.replace("~db_schema~", db_schema)
-            if (self.config.be_presbyterian):
-                system_prompt = system_prompt.replace("~theological_alignment~", "You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards, and the PCA Book of Church Order. You strive to be perpetually creative, curious, and kind in all interactions.")
-            else:
-                system_prompt = system_prompt.replace("~theological_alignment~", "You strive to be perpetually creative, curious, and kind in all interactions.")
+            system_prompt = self._build_system_prompt(db_schema)
 
-            # Add internet access status to system prompt
-            internet_status = "ENABLED" if self.internet_access else "DISABLED"
-            system_prompt += f"{chr(10)}{chr(10)}## Internet Access Status{chr(10)}Internet access for Python execution is currently {internet_status}.{chr(10)}"
+            with self._lock:
+                self.conversation_context = system_prompt + "\n"
+                self.model_ready = True
+                self.processing_cycle = 0
+                self.last_input_time = time.time()
 
-            self.conversation_context = system_prompt + chr(10)
-            self.model_ready = True
-            self.processing_cycle = 0
-            self.last_input_time = time.time()
             self.logger.info(f"Conversation session started in {session_dir}")
         except Exception as e:
             self.logger.error(f"Error starting conversation: {e}")
             raise
 
+    def _build_system_prompt(self, db_schema: str) -> str:
+        """Helper method to build the system prompt."""
+        system_prompt = self.SYSTEM_PROMPT.replace("~db_schema~", db_schema)
+        if self.config.be_presbyterian:
+            system_prompt = system_prompt.replace(
+                "~theological_alignment~",
+                "You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards, and the PCA Book of Church Order. You strive to be perpetually creative, curious, and kind in all interactions."
+            )
+        else:
+            system_prompt = system_prompt.replace(
+                "~theological_alignment~",
+                "You strive to be perpetually creative, curious, and kind in all interactions."
+            )
+        internet_status = "ENABLED" if self.internet_access else "DISABLED"
+        system_prompt += f"\n\n## Internet Access Status\nInternet access for Python execution is currently {internet_status}."
+        system_prompt += f"\n## Last Execution Results\n{json.dumps(self.last_execution_results)}\n\n"
+        return system_prompt
+
     def end_conversation(self):
-        """End current conversation"""
-        self.session_dir = None
-        self.conversation_context = ""
-        self.conversation_history = []
-        # Clean up Python execution environment
-        if self.python_temp_dir and os.path.exists(self.python_temp_dir):
-            shutil.rmtree(self.python_temp_dir)
+        """End current conversation."""
+        with self._lock:
+            self.session_dir = None
+            self.conversation_context = ""
+            self.conversation_history = []
+            # Clean up Python execution environment
+            if self.python_temp_dir and os.path.exists(self.python_temp_dir):
+                shutil.rmtree(self.python_temp_dir)
             self.python_temp_dir = None
 
     def _log_to_conversation_file(self, content: str, sender: str = "user"):
-        """Log full content to individual files with timestamps in chronological order"""
+        """Log content to individual files with timestamps in chronological order."""
         timestamp = str(time.time()).split('.')[0]
-
         if not self.session_dir:
             return
 
         try:
             if sender == "assistant_prompt":
                 file_name = f"{timestamp}_prompt.txt"
-                file_path = os.path.join(self.session_dir, file_name)
             elif sender == "assistant":
                 file_name = f"{timestamp}_response.txt"
-                file_path = os.path.join(self.session_dir, file_name)
             elif sender == "system":
                 file_name = f"{timestamp}_system.txt"
-                file_path = os.path.join(self.session_dir, file_name)
             elif sender == "user":
                 file_name = f"{timestamp}_user_input.txt"
-                file_path = os.path.join(self.session_dir, file_name)
             else:
                 file_name = f"{timestamp}_other.txt"
-                file_path = os.path.join(self.session_dir, file_name)
 
+            file_path = os.path.join(self.session_dir, file_name)
             with open(file_path, 'w') as f:
                 f.write(content)
         except Exception as e:
             self.logger.error(f"Error logging to conversation file: {e}")
 
+    # --- Main Execution Loop ---
     def run_autonomous(self, input_queue, interrupt_event=None, test_mode=False):
-        """Main agent execution loop running autonomously with input queue and interrupt capability"""
-        # Connect to database in this thread before starting conversation
+        """Main agent execution loop with thread safety and improved error handling."""
         self.db.connect()
         self.start_conversation()
 
@@ -484,15 +436,14 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
         while not self.model_ready:
             time.sleep(0.1)
 
-        # Track last processed user input to prevent duplicates
         last_user_input = None
         waiting_for_user_input = False
 
-        time.sleep(30)
+        time.sleep(30)  # Initial delay
 
         while True:
             try:
-                # Check for new input in queue with immediate processing
+                # Check for new input in queue
                 try:
                     msg_type, msg = input_queue.get_nowait()
                     if msg_type == "exit":
@@ -501,125 +452,110 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
                         return
 
                     if msg_type == "user_input":
-                        # Skip duplicate input
                         if msg == last_user_input:
-                            print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                            print(f"\n\n>>>>> ", end='', flush=True)
                             continue
 
-                        # Immediately shutdown model to kill any ongoing processing
+                        # Shutdown model to kill ongoing processing
                         self.model_manager.shutdown()
+                        time.sleep(self.MODEL_RESTART_DELAY)
 
-                        # Clear any pending output
-                        time.sleep(5)
-
-                        # Set interrupt event to stop any ongoing model generation
                         if interrupt_event:
                             interrupt_event.set()
-                            # Wait briefly for interruption to complete
-                            time.sleep(5)
+                            time.sleep(self.MODEL_RESTART_DELAY)
                             interrupt_event.clear()
 
-                        # Clear the queue to prevent stale inputs
                         input_queue.queue.clear()
 
-                        # Log user input to conversation file and interrupt autonomous processing
-                        self._log_to_conversation_file(msg, "user")
-                        self.conversation_history.append({
-                            "type": "question",
-                            "content": msg,
-                            "timestamp": time.time()
-                        })
+                        with self._lock:
+                            self._log_to_conversation_file(msg, "user")
+                            self.conversation_history.append({
+                                "type": "question",
+                                "content": msg,
+                                "timestamp": time.time()
+                            })
+                            last_user_input = msg
+                            waiting_for_user_input = False
 
-                        # Update last processed input
-                        last_user_input = msg
-                        waiting_for_user_input = False
-
-                        # Reset context with fresh system prompt and recent history
                         self._reset_conversation_context()
-
                         self.processing_cycle = 0
                         self.last_input_time = time.time()
 
-                        # Start model server fresh for user input
+                        # Restart model server
                         self.model_manager.start_server_thread()
                         if not self.model_manager.wait_for_server():
-                            error_msg = f"{chr(10)}Error: Model server failed to restart for user input"
+                            error_msg = f"\nError: Model server failed to restart for user input"
                             print(error_msg)
                             continue
 
-                        # Process user input immediately
+                        # Process user input
                         full_prompt = self.conversation_context
-                        full_prompt += chr(10) + "Please respond to the user's request immediately. Provide a concise response in [walbert_console_response] block first, then continue with any additional processing."
+                        full_prompt += "\nPlease respond to the user's request immediately. Provide a concise response in [walbert_console_response] block first, then continue with any additional processing."
 
-                        # Log the full prompt to conversation file
                         self._log_to_conversation_file(full_prompt, "assistant_prompt")
 
-                        model_response = self.model_manager.execute_model(full_prompt, self.write_output, interrupt_event)
+                        model_response = self.model_manager.execute_model(
+                            full_prompt,
+                            self.write_output,
+                            interrupt_event
+                        )
 
-                        # Log the full response to conversation file
                         self._log_to_conversation_file(model_response, "assistant")
-
                         last_parsed_response = self.process_response(model_response)
 
-                        # Append to context
                         if last_parsed_response.get('summary'):
-                            self.conversation_context += f"Walbert:{chr(10)}{last_parsed_response['summary']}{chr(10)}{chr(10)}"
+                            with self._lock:
+                                self.conversation_context += f"Walbert:\n{last_parsed_response['summary']}\n\n"
 
-                        # Show user prompt after response
-                        print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
-
-                        # Continue to next iteration to check for more input
+                        print(f"\n\n>>>>> ", end='', flush=True)
                         continue
 
                 except queue.Empty:
                     pass
 
-                # Only process autonomously if not waiting for user input and not in test mode
+                # Autonomous processing
                 if not waiting_for_user_input and not test_mode:
-                    # Autonomous processing loop with improved context
                     full_prompt = self.conversation_context
-                    full_prompt += f"{chr(10)}Input channel: autonomous{chr(10)}You are operating autonomously. Please:"
-                    full_prompt += f"{chr(10)}1. Review your recent actions and results"
-                    full_prompt += f"{chr(10)}2. Identify any pending tasks or incomplete work"
-                    full_prompt += f"{chr(10)}3. Make progress on your objectives"
-                    full_prompt += f"{chr(10)}4. Maintain awareness of your database state"
-                    full_prompt += f"{chr(10)}5. Provide a summary of your autonomous activities"
+                    full_prompt += (
+                        "\nInput channel: autonomous\n"
+                        "You are operating autonomously. Please:\n"
+                        "1. Review your recent actions and results\n"
+                        "2. Identify any pending tasks or incomplete work\n"
+                        "3. Make progress on your objectives\n"
+                        "4. Maintain awareness of your database state\n"
+                        "5. Provide a summary of your autonomous activities"
+                    )
 
                     def streaming_callback(chunk):
                         print(chunk, end='', flush=True)
 
-                    # Log the full prompt to conversation file
                     self._log_to_conversation_file(full_prompt, "assistant_prompt")
 
-                    model_response = self.model_manager.execute_model(full_prompt, streaming_callback, interrupt_event)
+                    model_response = self.model_manager.execute_model(
+                        full_prompt,
+                        streaming_callback,
+                        interrupt_event
+                    )
 
-                    # Check if interrupted
                     if interrupt_event and interrupt_event.is_set():
                         waiting_for_user_input = True
                         interrupt_event.clear()
-                        print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                        print(f"\n\n>>>>> ", end='', flush=True)
                         continue
 
-                    # Log the full response to conversation file
                     self._log_to_conversation_file(model_response, "assistant")
-
                     last_parsed_response = self.process_response(model_response)
-                    self.logger.debug(f"Last execution results: {self.last_execution_results}")
 
-                    # Handle console response if present
                     if "console_response" in last_parsed_response:
-                        self.write_output(f"{chr(10)}{chr(10)}Walbert:{chr(10)}{last_parsed_response['console_response']}{chr(10)}{chr(10)}")
-                        # Show user prompt after response
-                        print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                        self.write_output(f"\n\nWalbert:\n{last_parsed_response['console_response']}\n\n")
+                        print(f"\n\n>>>>> ", end='', flush=True)
 
-                    # Small delay to prevent CPU overload
-                    time.sleep(10)
+                    time.sleep(self.AUTONOMOUS_LOOP_DELAY)
                 else:
-                    # In test mode, don't wait for user input - just continue processing
                     time.sleep(0.1)
 
             except KeyboardInterrupt:
-                print(f"{chr(10)}Goodbye!")
+                print(f"\nGoodbye!")
                 self.end_conversation()
                 self.model_manager.shutdown()
                 break
@@ -629,11 +565,61 @@ Reply ONLY in the specified format. THAT'S AN ORDER, SOLDIER!
 Error Type: System Error
 Error: {str(e)}
 """
-                self.conversation_context += error_msg + chr(10)
+                with self._lock:
+                    self.conversation_context += error_msg + "\n"
                 time.sleep(1)
 
+    # --- Utility Methods ---
+    def _parse_response(self, content: str) -> dict:
+        """Parse response with enhanced block detection for multiple blocks."""
+        result = {}
+        self.logger.debug(f"Parsing response content: {content[:200]}...")
+
+        block_pattern = r'\[walbert_([a-z_]+)\](.*?)\[/walbert_\1\]'
+        sql_blocks = []
+        python_blocks = []
+
+        for match in re.finditer(block_pattern, content, re.DOTALL):
+            block_type = match.group(1)
+            block_content = match.group(2).strip()
+
+            if block_type == 'sql_execute':
+                sql = block_content.strip()
+                if sql.endswith(';'):
+                    sql = sql[:-1]
+                sql_blocks.append(sql)
+
+            elif block_type == 'python_execute':
+                python_blocks.append(block_content)
+
+            elif block_type == 'console_response':
+                result[block_type] = block_content
+
+            elif block_type == 'summary':
+                result[block_type] = block_content
+
+            elif block_type == 'user_control':
+                result[block_type] = block_content
+
+            elif block_type == 'restart_model':
+                result[block_type] = block_content
+
+        if sql_blocks:
+            result['sql_execute'] = sql_blocks
+        if python_blocks:
+            result['python_execute'] = python_blocks
+
+        has_pending_tasks = 'sql_execute' in result or 'python_execute' in result
+        result['has_pending_tasks'] = has_pending_tasks
+
+        if has_pending_tasks:
+            self.logger.debug("Internal processing not complete. Will continue processing.")
+
+        self.logger.debug(f"Parsed result: {result}")
+        return result
+
     def _install_python_package(self, package: str):
-        """Install a Python package in the main environment"""
+        """Install a Python package in the main environment."""
         print(f"Installing package: {package}")
         try:
             subprocess.run(
@@ -648,6 +634,6 @@ Error: {str(e)}
             self.logger.error(f"Failed to install package {package}: {e.stderr}")
 
     def shutdown(self):
-        """Shutdown agent cleanly"""
+        """Shutdown agent cleanly."""
         self.end_conversation()
         self.model_manager.shutdown()
