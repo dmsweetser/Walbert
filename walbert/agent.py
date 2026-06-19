@@ -4,7 +4,7 @@ All operations are explicitly defined as blocks and executed sequentially.
 Fixed: Database connection is established before building the system prompt.
 """
 
-import datetime
+from datetime import datetime
 import json
 import logging
 import os
