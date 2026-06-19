@@ -419,7 +419,6 @@ Reply ONLY in the specified block format. NO CRUFT.
                         input_queue.queue.clear()
 
                         with self._lock:
-                            self._log_to_conversation_file(msg, "user")
                             last_user_input = msg
 
                         # Append user input block
