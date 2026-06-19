@@ -80,8 +80,6 @@ class DatabaseManager:
                         schema_str += f" ON UPDATE {fk[5]}"
                     schema_str += chr(10)
 
-            schema_str += f"{chr(10)}"
-
         return schema_str
 
     def execute_sql(self, sql: str) -> str:
