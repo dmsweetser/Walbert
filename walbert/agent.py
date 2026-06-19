@@ -82,14 +82,7 @@ Reply ONLY in the specified block format. NO CRUFT.
 
         # Context as a list of blocks (initialized as empty)
         self.context_blocks = []
-
-        # Initialize execution results
-        self.last_execution_results = {
-            "python": "",
-            "sql": "",
-            "error": ""
-        }
-
+        
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
         self.logger = logging.getLogger('walbert.agent')
@@ -198,7 +191,6 @@ Reply ONLY in the specified block format. NO CRUFT.
             )
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
         system_prompt += f"\n\n## Internet Access Status\nInternet access for Python execution is currently {internet_status}."
-        system_prompt += f"\n## Last Execution Results\n{json.dumps(self.last_execution_results)}\n\n"
         return system_prompt
 
     def _generate_response_block(self, user_input: str = None) -> str:
