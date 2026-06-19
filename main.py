@@ -195,10 +195,6 @@ def main():
                 time.sleep(5)
                 interrupt_event.clear()
                 input_queue.put(("user_input", user_input))
-
-                # If TTS is enabled, speak the response
-                if tts_enabled and agent.last_response:
-                    tts.speak(agent.last_response)
                 print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
     except KeyboardInterrupt:
         print(f"{chr(10)}Goodbye!")
