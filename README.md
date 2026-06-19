@@ -95,10 +95,6 @@ Available commands:
 - `inet on`: Enable internet access for Python execution
 - `inet off`: Disable internet access for Python execution
 - `pip_install <package>`: Install a Python package in the main environment
-- `tts on`: Enable text-to-speech
-- `tts off`: Disable text-to-speech
-- `stt on`: Enable speech-to-text
-- `stt off`: Disable speech-to-text
 - Any other input will be treated as a request to Walbert
 
 ## Testing (there are no tests)
