@@ -203,12 +203,10 @@ Reply ONLY in the specified block format. NO CRUFT.
 
     def _generate_response_block(self, user_input: str = None) -> str:
         """Generate a response block using the model."""
-        if user_input:
-            self._append_block("user_input", user_input)
 
         # Build prompt from context blocks
         prompt = self._get_context_as_text()
-        prompt += "\n\nPlease respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
+        prompt += "\nPlease respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
 
         self._log_to_conversation_file(prompt, "assistant_prompt")
 

@@ -462,8 +462,7 @@ Review the database schema and ensure all tables are properly indexed.
 
         # Check that files were created in the session directory
         files = os.listdir(self.agent.session_dir)
-        self.assertTrue(any("prompt" in f for f in files))
-        self.assertTrue(any("response" in f for f in files))
+        self.assertTrue(any("conversation" in f for f in files))
 
 
 if __name__ == "__main__":
