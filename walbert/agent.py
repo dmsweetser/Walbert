@@ -52,7 +52,6 @@ Define and manage ALL tables and schema elements through SQL commands.
 ---
 ## Block Types
 - [walbert_system_prompt_start]...[/walbert_system_prompt_end]: System instructions.
-- [walbert_user_input_start]...[/walbert_user_input_end]: User input.
 - [walbert_console_response_start]...[/walbert_console_response_end]: Bot response to user.
 - [walbert_sql_execute_start]...[/walbert_sql_execute_end]: SQL to execute.
 - [walbert_sql_result_start]...[/walbert_sql_result_end]: Result of SQL execution.
@@ -240,13 +239,13 @@ Reply ONLY in the specified block format. NO CRUFT.
         """Generate an autonomous instruction block."""
         prompt = self._get_context_as_text()
         prompt += (
-            "\nInput channel: autonomous\n"
+            "\n[walbert_autonomous_instruction_start]\n"
             "You are operating autonomously. Please:\n"
             "1. Review your recent actions and results\n"
             "2. Identify any pending tasks or incomplete work\n"
             "3. Make progress on your objectives\n"
             "4. Maintain awareness of your database state\n"
-            "5. Provide your next action as a [walbert_autonomous_instruction_start]...[/walbert_autonomous_instruction_end] block\n"
+            "\n[walbert_autonomous_instruction_end]\n"
         )
 
         self._log_to_conversation_file(prompt, "assistant_prompt")
@@ -379,26 +378,13 @@ Reply ONLY in the specified block format. NO CRUFT.
                 shutil.rmtree(self.python_temp_dir)
             self.python_temp_dir = None
 
-    def _log_to_conversation_file(self, content: str, sender: str = "user"):
-        """Log content to individual files with timestamps in chronological order."""
-        timestamp = str(time.time()).split('.')[0]
+    def _log_to_conversation_file(self, content: str, sender: str = "user"):        
         if not self.session_dir:
-            return
-
+            return        
         try:
-            if sender == "assistant_prompt":
-                file_name = f"{timestamp}_prompt.txt"
-            elif sender == "assistant":
-                file_name = f"{timestamp}_response.txt"
-            elif sender == "system":
-                file_name = f"{timestamp}_system.txt"
-            elif sender == "user":
-                file_name = f"{timestamp}_user_input.txt"
-            else:
-                file_name = f"{timestamp}_other.txt"
-
+            file_name = f"conversation_log.txt"
             file_path = os.path.join(self.session_dir, file_name)
-            with open(file_path, 'w') as f:
+            with open(file_path, 'a') as f:
                 f.write(content)
         except Exception as e:
             self.logger.error(f"Error logging to conversation file: {e}")
