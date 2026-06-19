@@ -4,6 +4,7 @@ All operations are explicitly defined as blocks and executed sequentially.
 Fixed: Database connection is established before building the system prompt.
 """
 
+import datetime
 import json
 import logging
 import os
@@ -375,6 +376,9 @@ Reply ONLY in the specified block format. NO CRUFT.
             file_name = f"conversation_log.txt"
             file_path = os.path.join(self.session_dir, file_name)
             with open(file_path, 'a') as f:
+                now = datetime.now()
+                date_string = now.strftime("%Y-%m-%d %H:%M:%S")
+                f.write(f"\n\n{date_string}\n")
                 f.write(content)
         except Exception as e:
             self.logger.error(f"Error logging to conversation file: {e}")
