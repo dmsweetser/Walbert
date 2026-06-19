@@ -94,6 +94,7 @@ Reply ONLY in the specified block format. NO CRUFT.
     # --- Block Management ---
     def _append_block(self, block_type: str, content: str):
         """Append a block to the context chain."""
+        formatted_content = f"[walbert_{block_type}_start]\n{content}\n[walbert_{block_type}_end]\n"
         with self._lock:
             self.context_blocks.append({
                 "type": block_type,
@@ -101,6 +102,7 @@ Reply ONLY in the specified block format. NO CRUFT.
                 "timestamp": time.time()
             })
             self.logger.debug(f"Appended block: {block_type}")
+            self._log_to_conversation_file(formatted_content)
 
     def _get_context_as_text(self) -> str:
         """Convert context blocks to a single string for model input, ensuring system prompt is only included once."""
@@ -200,15 +202,11 @@ Reply ONLY in the specified block format. NO CRUFT.
         prompt = self._get_context_as_text()
         prompt += "\nPlease respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
 
-        self._log_to_conversation_file(prompt, "assistant_prompt")
-
         model_response = self.model_manager.execute_model(
             prompt,
             self.write_output,
             None
         )
-
-        self._log_to_conversation_file(model_response, "assistant")
 
         response_blocks = self._parse_blocks(model_response)
         for block in response_blocks:
@@ -234,15 +232,11 @@ Reply ONLY in the specified block format. NO CRUFT.
             "\n[walbert_autonomous_instruction_end]\n"
         )
 
-        self._log_to_conversation_file(prompt, "assistant_prompt")
-
         model_response = self.model_manager.execute_model(
             prompt,
             self.write_output,
             None
         )
-
-        self._log_to_conversation_file(model_response, "assistant")
 
         blocks = self._parse_blocks(model_response)
         for block in blocks:
