@@ -1,7 +1,8 @@
 """
-Revised WalbertAgent implementation with granular, block-by-block, auditable chain.
-All operations are explicitly defined as blocks and executed sequentially.
-Fixed: Database connection is established before building the system prompt.
+Refactored WalbertAgent implementation with cached system prompt and continuous context building.
+- System prompt is appended only once at the start of the conversation.
+- Context is built incrementally, avoiding repetition of the system prompt.
+- Optimized for caching and sequential block execution.
 """
 
 from datetime import datetime
@@ -25,7 +26,7 @@ logger = logging.getLogger('walbert')
 
 
 class WalbertAgent:
-    """Revised Walbert agent with block-based, auditable context chain."""
+    """Refactored Walbert agent with cached system prompt and continuous context building."""
 
     SYSTEM_PROMPT = """
 You are Walbert, a local-first AI agent with FULL HARDWARE ACCESS and AUTONOMY over your database and system.
@@ -80,6 +81,7 @@ Reply ONLY in the specified block format. NO CRUFT.
         self.last_input_time = 0
         self.internet_access = False
         self._lock = threading.Lock()
+        self.system_prompt = None  # Cached system prompt
 
         # Context as a list of blocks (initialized as empty)
         self.context_blocks = []
@@ -88,8 +90,6 @@ Reply ONLY in the specified block format. NO CRUFT.
 
         self.logger = logging.getLogger('walbert.agent')
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
-
-        # Note: System prompt is NOT appended here. It will be appended in start_conversation.
 
     # --- Block Management ---
     def _append_block(self, block_type: str, content: str):
@@ -103,16 +103,21 @@ Reply ONLY in the specified block format. NO CRUFT.
             self.logger.debug(f"Appended block: {block_type}")
 
     def _get_context_as_text(self) -> str:
-        """Convert context blocks to a single string for model input."""
+        """Convert context blocks to a single string for model input, ensuring system prompt is only included once."""
         context_text = ""
+        system_prompt_added = False
         for block in self.context_blocks:
+            if block["type"] == "system_prompt":
+                if not system_prompt_added:
+                    context_text += f"[walbert_{block['type']}_start]\n{block['content']}\n[walbert_{block['type']}_end]\n\n"
+                    system_prompt_added = True
+                continue  # Skip additional system prompts
             context_text += f"[walbert_{block['type']}_start]\n{block['content']}\n[walbert_{block['type']}_end]\n\n"
         return context_text
 
     def _parse_blocks(self, text: str) -> List[Dict[str, str]]:
         """Parse text into a list of blocks."""
         blocks = []
-        # Regex to match all block types
         block_pattern = r'\[walbert_([a-z_]+)_start\](.*?)\[walbert_\1_end\]'
         for match in re.finditer(block_pattern, text, re.DOTALL):
             block_type = match.group(1)
@@ -148,11 +153,9 @@ Reply ONLY in the specified block format. NO CRUFT.
             return None
 
         elif block["type"] == "autonomous_instruction":
-            # Treat as a user input for autonomous processing
             return {"type": "user_input", "content": block["content"]}
 
         elif block["type"] in ("user_input", "system_prompt"):
-            # No execution needed for these block types
             return None
 
         else:
@@ -161,7 +164,6 @@ Reply ONLY in the specified block format. NO CRUFT.
 
     def _execute_pending_blocks(self):
         """Execute all pending blocks (SQL, Python, etc.) in order."""
-        # Find all executable blocks (sql_execute, python_execute, autonomous_instruction)
         executable_types = {"sql_execute", "python_execute", "autonomous_instruction"}
         pending_blocks = [
             b for b in self.context_blocks 
@@ -172,7 +174,6 @@ Reply ONLY in the specified block format. NO CRUFT.
             result_block = self._execute_block(block)
             if result_block:
                 self._append_block(result_block["type"], result_block["content"])
-            # Mark as executed
             block["executed"] = True
 
     # --- Core Methods ---
@@ -196,31 +197,25 @@ Reply ONLY in the specified block format. NO CRUFT.
 
     def _generate_response_block(self, user_input: str = None) -> str:
         """Generate a response block using the model."""
-
-        # Build prompt from context blocks
         prompt = self._get_context_as_text()
         prompt += "\nPlease respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
 
         self._log_to_conversation_file(prompt, "assistant_prompt")
 
-        # Get model response
         model_response = self.model_manager.execute_model(
             prompt,
             self.write_output,
-            None  # No interrupt event for now
+            None
         )
 
         self._log_to_conversation_file(model_response, "assistant")
 
-        # Parse and append response blocks
         response_blocks = self._parse_blocks(model_response)
         for block in response_blocks:
             self._append_block(block["type"], block["content"])
 
-        # Execute any pending blocks (SQL, Python, etc.)
         self._execute_pending_blocks()
 
-        # Return the first console_response block, if any
         for block in response_blocks:
             if block["type"] == "console_response":
                 return block["content"]
@@ -249,7 +244,6 @@ Reply ONLY in the specified block format. NO CRUFT.
 
         self._log_to_conversation_file(model_response, "assistant")
 
-        # Parse and return the first autonomous_instruction block
         blocks = self._parse_blocks(model_response)
         for block in blocks:
             if block["type"] == "autonomous_instruction":
@@ -345,9 +339,9 @@ Reply ONLY in the specified block format. NO CRUFT.
             # Connect to the database
             self.db.connect()
 
-            # Build and append system prompt
-            system_prompt = self._build_system_prompt()
-            self._append_block("system_prompt", system_prompt)
+            # Build and cache the system prompt
+            self.system_prompt = self._build_system_prompt()
+            self._append_block("system_prompt", self.system_prompt)
 
             self.logger.info("Waiting for model server to start...")
             if not self.model_manager.wait_for_server():
@@ -388,17 +382,14 @@ Reply ONLY in the specified block format. NO CRUFT.
         """Main agent execution loop with block-based context."""
         self.start_conversation()
 
-        # Wait until model is ready
         while not self.model_ready:
             time.sleep(0.1)
 
         last_user_input = None
-
         time.sleep(30)  # Initial delay
 
         while True:
             try:
-                # Check for new input in queue
                 try:
                     msg_type, msg = input_queue.get_nowait()
                     if msg_type == "exit":
@@ -411,7 +402,6 @@ Reply ONLY in the specified block format. NO CRUFT.
                             print(f"\n\n>>>>> ", end='', flush=True)
                             continue
 
-                        # Shutdown model to kill ongoing processing
                         self.model_manager.shutdown()
                         time.sleep(self.MODEL_RESTART_DELAY)
 
@@ -425,34 +415,25 @@ Reply ONLY in the specified block format. NO CRUFT.
                         with self._lock:
                             last_user_input = msg
 
-                        # Append user input block
                         self._append_block("user_input", msg)
 
-                        # Restart model server
                         self.model_manager.start_server_thread()
                         if not self.model_manager.wait_for_server():
                             error_msg = f"\nError: Model server failed to restart for user input"
                             print(error_msg)
                             continue
 
-                        # Generate and append response
                         self._generate_response_block(msg)
-
                         print(f"\n\n>>>>> ", end='', flush=True)
                         continue
 
                 except queue.Empty:
                     pass
 
-                # Autonomous processing
                 if not test_mode:
-                    # Generate autonomous instruction
                     autonomous_instruction = self._generate_autonomous_block()
                     self._append_block("autonomous_instruction", autonomous_instruction)
-
-                    # Execute pending blocks
                     self._execute_pending_blocks()
-
                     time.sleep(self.AUTONOMOUS_LOOP_DELAY)
                 else:
                     time.sleep(0.1)
