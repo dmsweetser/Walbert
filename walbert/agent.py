@@ -155,7 +155,7 @@ Reply ONLY in the specified block format. NO CRUFT.
             return None
 
         elif block["type"] == "autonomous_instruction":
-            return {"type": "user_input", "content": block["content"]}
+            return {"type": "autonomous_instruction", "content": block["content"]}
 
         elif block["type"] in ("user_input", "system_prompt"):
             return None
