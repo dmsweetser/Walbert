@@ -444,7 +444,17 @@ Error Type: System Error
 Error: {str(e)}
 """
                 self._append_block("error", error_msg)
-                time.sleep(1)
+
+                self.model_manager.shutdown()
+                time.sleep(self.MODEL_RESTART_DELAY)
+                if interrupt_event:
+                    interrupt_event.set()
+                    time.sleep(self.MODEL_RESTART_DELAY)
+                    interrupt_event.clear()
+                self.model_manager.start_server_thread()
+                if not self.model_manager.wait_for_server():
+                    error_msg = f"\nError: Model server failed to restart"
+                    print(error_msg)
 
     # --- Utility Methods ---
     def _install_python_package(self, package: str):
