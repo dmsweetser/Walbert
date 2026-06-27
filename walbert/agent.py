@@ -202,6 +202,9 @@ Reply ONLY in the specified block format. NO CRUFT.
         prompt = self._get_context_as_text()
         prompt += "\nPlease respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
 
+        # Log full prompt sent to the model for audit/integrity
+        self._log_to_conversation_file(f"--- PROMPT SENT TO MODEL ---\n{prompt}\n------------------------------")
+
         model_response = self.model_manager.execute_model(
             prompt,
             self.write_output,
@@ -231,6 +234,9 @@ Reply ONLY in the specified block format. NO CRUFT.
             "4. Maintain awareness of your database state\n"
             "\n[walbert_autonomous_instruction_end]\n"
         )
+
+        # Log full prompt sent to the model for audit/integrity
+        self._log_to_conversation_file(f"--- AUTONOMOUS PROMPT SENT TO MODEL ---\n{prompt}\n-------------------------------------------")
 
         model_response = self.model_manager.execute_model(
             prompt,

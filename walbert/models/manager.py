@@ -72,6 +72,10 @@ class ModelManager:
     def start_server_thread(self):
         """Start model server in background thread"""
         def start():
+            # Ensure old server is shut down before starting a new one to prevent multiple instances
+            if self.server and self.server.poll() is None:
+                self.shutdown()
+            
             self.server = self.start_server(self.config.mmproj_path)
             if not self.wait_for_server():
                 logger.error("Model server failed to start")
@@ -150,6 +154,16 @@ class ModelManager:
                     # Retry the request once after restart
                     return self.execute_model(prompt, callback, interrupt_event)
                 raise
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+                logger.error(f"Connection error executing model: {e}")
+                self.shutdown()
+                time.sleep(2)
+                self.start_server_thread()
+                if not self.wait_for_server():
+                    raise RuntimeError("Model server failed to restart after connection error")
+                logger.info("Model server restarted successfully")
+                # Retry the request once after restart
+                return self.execute_model(prompt, callback, interrupt_event)
             except Exception as e:
                 logger.error(f"Error executing model: {e}")
                 raise
