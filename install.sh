@@ -49,8 +49,8 @@ MIN_P=""
 
 if [ "$model_choice" == "2" ]; then
     echo "Downloading Qwen3.6-35B-A3B model..."
-    MODEL_PATH="instance/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
-    MMPROJ_PATH="instance/Qwen3.6-35B-A3B-UD-Q4_K_M-mmproj-BF16.gguf"
+    MODEL_PATH="instance/models/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
+    MMPROJ_PATH="instance/models/Qwen3.6-35B-A3B-UD-Q4_K_M-mmproj-BF16.gguf"
     curl -L "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf?download=true" -o "$MODEL_PATH"
     curl -L "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -o "$MMPROJ_PATH"
     CONTEXT_SIZE=262144
@@ -61,8 +61,8 @@ if [ "$model_choice" == "2" ]; then
     MIN_P=0.0
 else
     echo "Using Devstral-24B-Instruct-GGUF (Default)"
-    MODEL_PATH="instance/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
-    MMPROJ_PATH="instance/Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf"
+    MODEL_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
+    MMPROJ_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf"
     curl -L "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true" -o "$MODEL_PATH"
     curl -L "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -o "$MMPROJ_PATH"
     CONTEXT_SIZE=32768
