@@ -57,7 +57,6 @@ class ModelManager:
         """Wait for server to be ready"""
         if timeout is None:
             timeout = self.config.server_startup_timeout
-        """Wait for server to be ready"""
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:

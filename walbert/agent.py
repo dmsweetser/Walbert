@@ -155,7 +155,8 @@ Reply ONLY in the specified block format. NO CRUFT.
             return None
 
         elif block["type"] == "autonomous_instruction":
-            return {"type": "autonomous_instruction", "content": block["content"]}
+            self.logger.debug("Autonomous instruction received, skipping execution block duplication")
+            return None
 
         elif block["type"] in ("user_input", "system_prompt"):
             return None
@@ -167,10 +168,11 @@ Reply ONLY in the specified block format. NO CRUFT.
     def _execute_pending_blocks(self):
         """Execute all pending blocks (SQL, Python, etc.) in order."""
         executable_types = {"sql_execute", "python_execute", "autonomous_instruction"}
-        pending_blocks = [
-            b for b in self.context_blocks 
-            if b["type"] in executable_types and not b.get("executed", False)
-        ]
+        with self._lock:
+            pending_blocks = [
+                b for b in self.context_blocks 
+                if b["type"] in executable_types and not b.get("executed", False)
+            ]
 
         for block in pending_blocks:
             result_block = self._execute_block(block)
