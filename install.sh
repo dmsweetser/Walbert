@@ -106,7 +106,7 @@ cat > instance/config.json << EOF
         }
     },
     "llama_binary_path": "instance/llama.cpp/bin/llama-server",
-    "mmproj_path": "instance/models/$MMPROJ_NAME",
+    "mmproj_path": "$MMPROJ_PATH",
     "log_level": "DEBUG",
     "server_port": 8080,
     "server_health_check_timeout": 2,
