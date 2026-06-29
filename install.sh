@@ -48,11 +48,11 @@ TOP_K=""
 MIN_P=""
 
 if [ "$model_choice" == "2" ]; then
-    MODEL_PATH="instance/models/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
-    MMPROJ_PATH="instance/models/Qwen3.6-35B-A3B-UD-Q4_K_M-mmproj-BF16.gguf"
+    MODEL_PATH="instance/models/Qwen3.6-35B-A3B-UD-IQ3_S.gguf"
+    MMPROJ_PATH="instance/models/Qwen3.6-35B-A3B-UD-IQ3_S-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
-        curl -L "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf?download=true" -o "$MODEL_PATH"
+        curl -L "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-IQ3_S.gguf?download=true" -o "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
     fi
@@ -62,8 +62,8 @@ if [ "$model_choice" == "2" ]; then
     else
         echo "$MMPROJ_PATH already exists, skipping download."
     fi
-    CONTEXT_SIZE=262144
-    OUTPUT_TOKENS=131072
+    CONTEXT_SIZE=32768
+    OUTPUT_TOKENS=16384
     TEMPERATURE=0.7
     TOP_P=0.8
     TOP_K=20
