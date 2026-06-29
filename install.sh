@@ -1,5 +1,9 @@
 #!/bin/bash
-# Walbert installation script
+# Walbert Installation Script
+
+set -e
+
+echo "Setting up Walbert..."
 
 # Create directories
 mkdir -p instance
@@ -7,46 +11,6 @@ mkdir -p instance/conversations
 mkdir -p instance/llama.cpp
 mkdir -p instance/llama.cpp/bin
 mkdir -p instance/models
-
-echo "Select a model to install:"
-echo "1) Devstral 24B"
-echo "2) Ministral 14B"
-echo "3) Mistral 7B"
-echo "4) Gemma 4 12B"
-read -p "Enter choice: " model_choice
-
-case $model_choice in
-    1)
-        MODEL_NAME="Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
-        MMPROJ_NAME="Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf"
-        MODEL_URL="https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true"
-        MMPROJ_URL="https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true"
-        ;;
-    2)
-        MODEL_NAME="Ministral-3-14B-Instruct-2512-Q4_K_M.gguf"
-        MMPROJ_NAME="Ministral-3-14B-Instruct-2512-BF16-mmproj.gguf"
-        MODEL_URL="https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512-GGUF/resolve/main/Ministral-3-14B-Instruct-2512-Q4_K_M.gguf?download=true"
-        MMPROJ_URL="https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512-GGUF/resolve/main/Ministral-3-14B-Instruct-2512-BF16-mmproj.gguf?download=true"
-        ;;
-    3)
-        MODEL_NAME="Mistral-7B-Instruct-v0.3.IQ4_XS.gguf"
-        MMPROJ_NAME=""
-        MODEL_URL="https://huggingface.co/MaziyarPanahi/Mistral-7B-Instruct-v0.3-GGUF/resolve/main/Mistral-7B-Instruct-v0.3.IQ4_XS.gguf?download=true"
-        MMPROJ_URL=""
-        ;;
-    4)
-        MODEL_NAME="gemma-4-12B-it-qat-UD-Q4_K_XL.gguf"
-        MMPROJ_NAME="gemma-4-12B-it-qat-UD-Q4_K_XL-mmproj-F32.gguf"
-        MODEL_URL="https://huggingface.co/unsloth/gemma-4-12B-it-qat-GGUF/resolve/main/gemma-4-12B-it-qat-UD-Q4_K_XL.gguf?download=true"
-        MMPROJ_URL="https://huggingface.co/unsloth/gemma-4-12B-it-qat-GGUF/resolve/main/mmproj-F32.gguf?download=true"
-        ;;
-    *)
-        echo "Invalid choice"
-        exit 1
-        ;;
-esac
-
-echo "You selected: $MODEL_NAME"
 
 # Create virtual environment
 echo "Creating Python virtual environment..."
@@ -67,24 +31,60 @@ fi
 # Install requirements
 pip install --upgrade pip
 pip install -r requirements.txt
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to install dependencies"
-    exit 1
+
+# Model selection and configuration
+echo "Select a model:"
+echo "1) Devstral-24B-Instruct-GGUF (Default)"
+echo "2) Qwen3.6-35B-A3B"
+read -p "Enter choice (1 or 2): " model_choice
+
+MODEL_PATH=""
+MMPROJ_PATH=""
+CONTEXT_SIZE=""
+OUTPUT_TOKENS=""
+TEMPERATURE=""
+TOP_P=""
+TOP_K=""
+MIN_P=""
+
+if [ "$model_choice" == "2" ]; then
+    echo "Downloading Qwen3.6-35B-A3B model..."
+    MODEL_PATH="instance/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
+    MMPROJ_PATH="instance/Qwen3.6-35B-A3B-UD-Q4_K_M-mmproj-BF16.gguf"
+    curl -L "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf?download=true" -o "$MODEL_PATH"
+    curl -L "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -o "$MMPROJ_PATH"
+    CONTEXT_SIZE=262144
+    OUTPUT_TOKENS=131072
+    TEMPERATURE=0.7
+    TOP_P=0.8
+    TOP_K=20
+    MIN_P=0.0
+else
+    echo "Using Devstral-24B-Instruct-GGUF (Default)"
+    MODEL_PATH="instance/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
+    MMPROJ_PATH="instance/Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf"
+    curl -L "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true" -o "$MODEL_PATH"
+    curl -L "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -o "$MMPROJ_PATH"
+    CONTEXT_SIZE=32768
+    OUTPUT_TOKENS=16384
+    TEMPERATURE=0.7
+    TOP_P=0.9
+    TOP_K=40
+    MIN_P=0.05
 fi
 
-# Create default config if it doesn't exist
-if [ ! -f "instance/config.json" ]; then
-    cat > instance/config.json <<EOL
+# Generate config.json with selected model hyperparameters
+cat > instance/config.json << EOF
 {
     "model_configs": {
         "model": {
-            "model_path": "instance/models/$MODEL_NAME",
-            "context_size": 32768,
-            "output_tokens": 16384,
-            "temperature": 0.9,
-            "top_p": 0.95,
-            "top_k": 20,
-            "min_p": 0.0
+            "model_path": "$MODEL_PATH",
+            "context_size": $CONTEXT_SIZE,
+            "output_tokens": $OUTPUT_TOKENS,
+            "temperature": $TEMPERATURE,
+            "top_p": $TOP_P,
+            "top_k": $TOP_K,
+            "min_p": $MIN_P
         }
     },
     "llama_binary_path": "instance/llama.cpp/bin/llama-server",
@@ -103,24 +103,6 @@ EOL
     echo "Created default config at instance/config.json"
     echo "Please edit this file with your specific paths and settings"
 fi
-
-
-# Download models if missing
-download_model() {
-    local model_name=$1
-    local model_url=$2
-    local model_path="instance/models/$model_name"
-
-    if [ ! -f "$model_path" ]; then
-        echo "Downloading $model_name..."
-        wget -O "$model_path" "$model_url"
-    else
-        echo "$model_name already exists, skipping download."
-    fi
-}
-
-download_model "$MODEL_NAME" "$MODEL_URL"
-download_model "$MMPROJ_NAME" "$MMPROJ_URL"
 
 # Download llama.cpp binary
 echo "Downloading llama.cpp binary..."

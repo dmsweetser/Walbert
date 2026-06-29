@@ -1,1 +1,13 @@
-I want two separate logs - one should be a running conversation log that just appends new walbert blocks and results of execution. That should prefix with _ so it is at the top of the folder. Then, I want each full prompt and each full response logged to its own file, with the timestamp at the beginning of the filename so they naturally sort by age. Both sets of logs should be under the session folder.
+Update my install script to include a new model:
+
+https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf?download=true
+https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/mmproj-BF16.gguf?download=true
+
+Also, I want the selected model choice to also inject the hyperparameters. Use the current for the existing models, but these for this new model:
+
+MODEL_CONTEXT=262144
+OUTPUT_TOKENS=131072
+TEMPERATURE=0.7
+TOP_P=0.8
+TOP_K=20
+MIN_P=0.0
