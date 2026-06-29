@@ -118,9 +118,9 @@ cat > instance/config.json << EOF
     "be_presbyterian": true
 }
 EOF
-    echo "Created default config at instance/config.json"
-    echo "Please edit this file with your specific paths and settings"
-fi
+
+echo "Created default config at instance/config.json"
+echo "Please edit this file with your specific paths and settings"
 
 # Download llama.cpp binary
 echo "Downloading llama.cpp binary..."
