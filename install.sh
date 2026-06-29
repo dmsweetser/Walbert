@@ -48,11 +48,20 @@ TOP_K=""
 MIN_P=""
 
 if [ "$model_choice" == "2" ]; then
-    echo "Downloading Qwen3.6-35B-A3B model..."
     MODEL_PATH="instance/models/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
     MMPROJ_PATH="instance/models/Qwen3.6-35B-A3B-UD-Q4_K_M-mmproj-BF16.gguf"
-    curl -L "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf?download=true" -o "$MODEL_PATH"
-    curl -L "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -o "$MMPROJ_PATH"
+    if [ ! -f "$MODEL_PATH" ]; then
+        echo "Downloading $MODEL_PATH..."
+        curl -L "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf?download=true" -o "$MODEL_PATH"
+    else
+        echo "$MODEL_PATH already exists, skipping download."
+    fi
+    if [ ! -f "$MMPROJ_PATH" ]; then
+        echo "Downloading $MMPROJ_PATH..."
+        curl -L "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -o "$MMPROJ_PATH"
+    else
+        echo "$MMPROJ_PATH already exists, skipping download."
+    fi
     CONTEXT_SIZE=262144
     OUTPUT_TOKENS=131072
     TEMPERATURE=0.7
@@ -60,11 +69,20 @@ if [ "$model_choice" == "2" ]; then
     TOP_K=20
     MIN_P=0.0
 else
-    echo "Using Devstral-24B-Instruct-GGUF (Default)"
     MODEL_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
     MMPROJ_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf"
-    curl -L "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true" -o "$MODEL_PATH"
-    curl -L "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -o "$MMPROJ_PATH"
+    if [ ! -f "$MODEL_PATH" ]; then
+        echo "Downloading $MODEL_PATH..."
+        curl -L "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true" -o "$MODEL_PATH"
+    else
+        echo "$MODEL_PATH already exists, skipping download."
+    fi
+    if [ ! -f "$MMPROJ_PATH" ]; then
+        echo "Downloading $MMPROJ_PATH..."
+        curl -L "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -o "$MMPROJ_PATH"
+    else
+        echo "$MMPROJ_PATH already exists, skipping download."
+    fi
     CONTEXT_SIZE=32768
     OUTPUT_TOKENS=16384
     TEMPERATURE=0.7
@@ -99,7 +117,7 @@ cat > instance/config.json << EOF
     "database_path": "instance/walbert.db",
     "be_presbyterian": true
 }
-EOL
+EOF
     echo "Created default config at instance/config.json"
     echo "Please edit this file with your specific paths and settings"
 fi
