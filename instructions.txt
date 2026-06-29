@@ -1,1 +1,1 @@
-Fix any issues your design flaws you see in the app.
+I want two separate logs - one should be a running conversation log that just appends new walbert blocks and results of execution. That should prefix with _ so it is at the top of the folder. Then, I want each full prompt and each full response logged to its own file, with the timestamp at the beginning of the filename so they naturally sort by age. Both sets of logs should be under the session folder.
