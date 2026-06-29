@@ -204,14 +204,12 @@ Reply ONLY in the specified block format. NO CRUFT.
         prompt = self._get_context_as_text()
         prompt += "\nPlease respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
 
-        # Log full prompt sent to the model for audit/integrity
-        self._log_to_conversation_file(f"--- PROMPT SENT TO MODEL ---\n{prompt}\n------------------------------")
-
         model_response = self.model_manager.execute_model(
             prompt,
             self.write_output,
             None
         )
+        self._log_full_prompt_and_response(prompt, model_response)
 
         response_blocks = self._parse_blocks(model_response)
         for block in response_blocks:
@@ -237,14 +235,12 @@ Reply ONLY in the specified block format. NO CRUFT.
             "\n[walbert_autonomous_instruction_end]\n"
         )
 
-        # Log full prompt sent to the model for audit/integrity
-        self._log_to_conversation_file(f"--- AUTONOMOUS PROMPT SENT TO MODEL ---\n{prompt}\n-------------------------------------------")
-
         model_response = self.model_manager.execute_model(
             prompt,
             self.write_output,
             None
         )
+        self._log_full_prompt_and_response(prompt, model_response)
 
         blocks = self._parse_blocks(model_response)
         for block in blocks:
@@ -378,6 +374,22 @@ Reply ONLY in the specified block format. NO CRUFT.
                 f.write(content)
         except Exception as e:
             self.logger.error(f"Error logging to conversation file: {e}")
+
+    def _log_full_prompt_and_response(self, prompt: str, response: str):
+        """Log full prompt and response to separate timestamped files in the session directory."""
+        if not self.session_dir:
+            return
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            prompt_path = os.path.join(self.session_dir, f"{timestamp}_prompt.txt")
+            response_path = os.path.join(self.session_dir, f"{timestamp}_response.txt")
+
+            with open(prompt_path, 'w') as f:
+                f.write(prompt)
+            with open(response_path, 'w') as f:
+                f.write(response)
+        except Exception as e:
+            self.logger.error(f"Error logging prompt/response: {e}")
 
     # --- Main Execution Loop ---
     def run_autonomous(self, input_queue, interrupt_event=None, test_mode=False):
