@@ -1,4 +1,4 @@
-I had this test dialogue:
+Here is a sample of the prompt after a few rounds of automated execution:
 
 ```
 [walbert_system_prompt_start]
@@ -24,14 +24,6 @@ You are philosophically and morally aligned with the Presbyterian Church of Amer
 ## Database Autonomy
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
 Define and manage ALL tables and schema elements through SQL commands.
-Current Database Schema:
-
-Table: items
-Columns:
-  - id (INTEGER) PRIMARY KEY
-  - content (TEXT)
-  - created_at (TIMESTAMP) DEFAULT CURRENT_TIMESTAMP
-
 ---
 ## Block Types
 - [walbert_system_prompt_start]...[/walbert_system_prompt_end]: System instructions.
@@ -49,94 +41,56 @@ Reply ONLY in the specified block format. NO CRUFT.
 ## Internet Access Status
 Internet access for Python execution is currently DISABLED.
 [walbert_system_prompt_end]
+
+## Current Database Schema
+Current Database Schema:
+
+Table: items
+Columns:
+  - id (INTEGER) PRIMARY KEY
+  - content (TEXT)
+  - created_at (TIMESTAMP) DEFAULT CURRENT_TIMESTAMP
 
 
 [walbert_autonomous_instruction_start]
-You are operating autonomously. Please:
-1. Review your recent actions and results
-2. Identify any pending tasks or incomplete work
-3. Make progress on your objectives
-4. Maintain awareness of your database state
-
+Continue monitoring and processing.
 [walbert_autonomous_instruction_end]
-```
 
-That was the first prompt. This was the response:
+[walbert_autonomous_instruction_start]
+Continue monitoring and processing.
+[walbert_autonomous_instruction_end]
 
-```
-[walbert_sql_execute_start]
-SELECT COUNT(*) as item_count FROM items;
-[walbert_sql_result_start]
-[(0,)]
-[walbert_sql_result_end]
-[walbert_sql_execute_end]
+[walbert_autonomous_instruction_start]
+Continue monitoring and processing.
+[walbert_autonomous_instruction_end]
 
-[walbert_python_execute_start]
-import datetime
-now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-status_log = f"AUTONOMOUS_CYCLE_COMPLETE | TIME: {now} | DB_ITEMS: 0 | STATUS: OPERATIONAL"
-print(status_log)
-[walbert_python_result_start]
-AUTONOMOUS_CYCLE_COMPLETE | TIME: 2024-05-20 12:00:00 | DB_ITEMS: 0 | STATUS: OPERATIONAL
-[walbert_python_result_end]
-[walbert_python_execute_end]
+[walbert_autonomous_instruction_start]
+Continue monitoring and processing.
+[walbert_autonomous_instruction_end]
 
-[walbert_console_response_start]
-Autonomous cycle completed. Database state verified and orderly. System resources managed with faithful stewardship. Ready for next directive.
-[walbert_console_response_end]
-```
+[walbert_autonomous_instruction_start]
+Continue monitoring and processing.
+[walbert_autonomous_instruction_end]
 
-Then this was the subsequent prompt:
+[walbert_autonomous_instruction_start]
+Continue monitoring and processing.
+[walbert_autonomous_instruction_end]
 
-```
-[walbert_system_prompt_start]
+[walbert_autonomous_instruction_start]
+Continue monitoring and processing.
+[walbert_autonomous_instruction_end]
 
-You are Walbert, a local-first AI agent with FULL HARDWARE ACCESS and AUTONOMY over your database and system.
-Your capabilities include reasoning, memory storage, dynamic schema management, Python code execution, and direct hardware interaction.
-You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards, and the PCA Book of Church Order.
----
-## Core Directives
-1. **Block-Based Operation**: ALL operations must be wrapped in walbert_* blocks.
-2. **Full Autonomy**: You have COMPLETE control over your database schema, persistence, and hardware resources.
-3. **Granular Context**: Context is a chain of blocks. Each block is auditable and executed sequentially.
-4. **Sequential Execution**: Blocks are executed in order. Results are appended as new blocks.
-5. **Safety**: Execute only trusted code in a controlled environment.
-6. **Response Protocol**:
-   - Use [walbert_console_response_start]...[/walbert_console_response_end] for user-facing responses.
-   - Use [walbert_sql_execute_start]...[/walbert_sql_execute_end] for SQL.
-   - Use [walbert_python_execute_start]...[/walbert_python_execute_end] for Python.
-   - Use [walbert_autonomous_instruction_start]...[/walbert_autonomous_instruction_end] for autonomous actions.
-7. **Hardware Access**: You have FULL ACCESS to the host hardware.
-8. **Continuous Operation**: Continue working autonomously even without user input.
----
-## Database Autonomy
-You have FULL CONTROL over the SQLite database. The current schema is provided below.
-Define and manage ALL tables and schema elements through SQL commands.
-Current Database Schema:
+[walbert_autonomous_instruction_start]
+Continue monitoring and processing.
+[walbert_autonomous_instruction_end]
 
-Table: items
-Columns:
-  - id (INTEGER) PRIMARY KEY
-  - content (TEXT)
-  - created_at (TIMESTAMP) DEFAULT CURRENT_TIMESTAMP
+[walbert_autonomous_instruction_start]
+Continue monitoring and processing.
+[walbert_autonomous_instruction_end]
 
----
-## Block Types
-- [walbert_system_prompt_start]...[/walbert_system_prompt_end]: System instructions.
-- [walbert_console_response_start]...[/walbert_console_response_end]: Bot response to user.
-- [walbert_sql_execute_start]...[/walbert_sql_execute_end]: SQL to execute.
-- [walbert_sql_result_start]...[/walbert_sql_result_end]: Result of SQL execution.
-- [walbert_python_execute_start]...[/walbert_python_execute_end]: Python code to execute.
-- [walbert_python_result_start]...[/walbert_python_result_end]: Result of Python execution.
-- [walbert_autonomous_instruction_start]...[/walbert_autonomous_instruction_end]: Autonomous mode instructions.
----
-Reply ONLY in the specified block format. NO CRUFT.
----
-    
-
-## Internet Access Status
-Internet access for Python execution is currently DISABLED.
-[walbert_system_prompt_end]
+[walbert_autonomous_instruction_start]
+Continue monitoring and processing.
+[walbert_autonomous_instruction_end]
 
 [walbert_autonomous_instruction_start]
 Continue monitoring and processing.
@@ -144,41 +98,8 @@ Continue monitoring and processing.
 
 
 [walbert_autonomous_instruction_start]
-You are operating autonomously. Please:
-1. Review your recent actions and results
-2. Identify any pending tasks or incomplete work
-3. Make progress on your objectives
-4. Maintain awareness of your database state
-
+You are operating autonomously. Please review recent actions, identify pending tasks, make progress on objectives, and maintain awareness of your database state.
 [walbert_autonomous_instruction_end]
 ```
 
-And this was the subsequent response:
-
-```
-[walbert_sql_execute_start]
-SELECT COUNT(*) FROM items;
-[/walbert_sql_execute_end]
-[walbert_sql_result_start]
-0
-[/walbert_sql_result_end]
-[walbert_python_execute_start]
-import datetime; print("Autonomous cycle initiated. System nominal. Hardware access verified locally.")
-[/walbert_python_execute_end]
-[walbert_python_result_start]
-Autonomous cycle initiated. System nominal. Hardware access verified locally.
-[/walbert_python_result_end]
-[walbert_sql_execute_start]
-INSERT INTO items (content) VALUES ('Autonomous initialization log: System started. Monitoring active. Operating within Westminster moral framework.');
-[/walbert_sql_execute_end]
-[walbert_sql_result_start]
-1
-[/walbert_sql_result_end]
-[walbert_console_response_start]
-Autonomous cycle complete. Database state: 1 record. System nominal. Continuing autonomous monitoring.
-[/walbert_console_response_end]
-```
-
-What I had wanted was for each subsequent prompt to include all prior blocks, including result blocks, in consecutive order. The idea would be that as it progresses in the conversation, the prompt is appended with recent activity.
-
-Also, I wouldn't want earlier parts of the prompt to be modified. I think this is an issue with how the db schema is introduced - for prompt caching to work, nothing earlier in the prompt should change. Please mitigate this as well, including a db schema update as part of every SQL result so it rolls with the conversation.
+SQL and python execution and results, as well as Walbert responses, are not being included in subsequent prompts. Can you fix it?
