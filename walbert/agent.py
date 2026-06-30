@@ -50,7 +50,6 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 ## Database Autonomy
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
 Define and manage ALL tables and schema elements through SQL commands.
-~db_schema~
 ---
 ## Block Types
 - [walbert_system_prompt_start]...[/walbert_system_prompt_end]: System instructions.
@@ -105,7 +104,7 @@ Reply ONLY in the specified block format. NO CRUFT.
             self._log_to_conversation_file(formatted_content)
 
     def _get_context_as_text(self) -> str:
-        """Convert context blocks to a single string for model input, ensuring system prompt is only included once."""
+        """Convert context blocks to a single string for model input, ensuring system prompt is only included once and schema is stable."""
         context_text = ""
         system_prompt_added = False
         for block in self.context_blocks:
@@ -113,6 +112,9 @@ Reply ONLY in the specified block format. NO CRUFT.
                 if not system_prompt_added:
                     context_text += f"[walbert_{block['type']}_start]\n{block['content']}\n[walbert_{block['type']}_end]\n\n"
                     system_prompt_added = True
+                    # Append current schema immediately after system prompt for caching stability
+                    current_schema = self.db.get_schema()
+                    context_text += f"## Current Database Schema\n{current_schema}\n\n"
                 continue  # Skip additional system prompts
             context_text += f"[walbert_{block['type']}_start]\n{block['content']}\n[walbert_{block['type']}_end]\n\n"
         return context_text
@@ -120,7 +122,7 @@ Reply ONLY in the specified block format. NO CRUFT.
     def _parse_blocks(self, text: str) -> List[Dict[str, str]]:
         """Parse text into a list of blocks."""
         blocks = []
-        block_pattern = r'\[walbert_([a-z_]+)_start\](.*?)\[walbert_\1_end\]'
+        block_pattern = r'\[(?:walbert_|/)([a-z_]+)_start\](.*?)\[(?:walbert_|/)\1_end\]'
         for match in re.finditer(block_pattern, text, re.DOTALL):
             block_type = match.group(1)
             block_content = match.group(2).strip()
@@ -137,7 +139,9 @@ Reply ONLY in the specified block format. NO CRUFT.
                 if not self._is_sql_safe(block["content"]):
                     return {"type": "sql_result", "content": "SQL execution error: Unsafe SQL statement detected."}
                 result = self.db.execute_sql(block["content"])
-                return {"type": "sql_result", "content": str(result)}
+                current_schema = self.db.get_schema()
+                full_result = f"{str(result)}\n\n---\nCurrent Database Schema:\n{current_schema}"
+                return {"type": "sql_result", "content": full_result}
             except Exception as e:
                 return {"type": "sql_result", "content": f"SQL execution error: {str(e)}"}
 
@@ -182,9 +186,8 @@ Reply ONLY in the specified block format. NO CRUFT.
 
     # --- Core Methods ---
     def _build_system_prompt(self) -> str:
-        """Build the system prompt with current schema and settings."""
-        db_schema = self.db.get_schema()
-        system_prompt = self.SYSTEM_PROMPT.replace("~db_schema~", db_schema)
+        """Build the system prompt with settings."""
+        system_prompt = self.SYSTEM_PROMPT
         if self.config.be_presbyterian:
             system_prompt = system_prompt.replace(
                 "~theological_alignment~",
@@ -227,12 +230,8 @@ Reply ONLY in the specified block format. NO CRUFT.
         prompt = self._get_context_as_text()
         prompt += (
             "\n[walbert_autonomous_instruction_start]\n"
-            "You are operating autonomously. Please:\n"
-            "1. Review your recent actions and results\n"
-            "2. Identify any pending tasks or incomplete work\n"
-            "3. Make progress on your objectives\n"
-            "4. Maintain awareness of your database state\n"
-            "\n[walbert_autonomous_instruction_end]\n"
+            "You are operating autonomously. Please review recent actions, identify pending tasks, make progress on objectives, and maintain awareness of your database state.\n"
+            "[walbert_autonomous_instruction_end]\n"
         )
 
         model_response = self.model_manager.execute_model(
