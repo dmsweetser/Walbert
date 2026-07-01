@@ -90,18 +90,17 @@ Reply ONLY in the specified block format. NO CRUFT.
         self.logger = logging.getLogger('walbert.agent')
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
 
-    # --- Block Management ---
     def _append_block(self, block_type: str, content: str):
-        """Append a block to the context chain."""
-        formatted_content = f"[walbert_{block_type}_start]\n{content}\n[walbert_{block_type}_end]\n"
+        """Append a block to the context chain, keeping only the most recent max_context_blocks."""
         with self._lock:
             self.context_blocks.append({
                 "type": block_type,
                 "content": content,
                 "timestamp": time.time()
             })
+            if len(self.context_blocks) > self.config.max_context_blocks:
+                self.context_blocks = self.context_blocks[-self.config.max_context_blocks:]
             self.logger.debug(f"Appended block: {block_type}")
-            self._log_to_conversation_file(formatted_content)
 
     def _get_context_as_text(self) -> str:
         """Convert context blocks to a single string for model input, ensuring system prompt is only included once and schema is stable."""
@@ -115,6 +114,7 @@ Reply ONLY in the specified block format. NO CRUFT.
                     # Append current schema immediately after system prompt for caching stability
                     current_schema = self.db.get_schema()
                     context_text += f"## Current Database Schema\n{current_schema}\n\n"
+                    context_text += f"\n\n## RECENT CONVERSATION HISTORY (limited to the most recent {self.config.max_context_blocks} blocks)\n\n"
                 continue  # Skip additional system prompts
             context_text += f"[walbert_{block['type']}_start]\n{block['content']}\n[walbert_{block['type']}_end]\n\n"
         return context_text
@@ -365,20 +365,6 @@ Reply ONLY in the specified block format. NO CRUFT.
             if self.python_temp_dir and os.path.exists(self.python_temp_dir):
                 shutil.rmtree(self.python_temp_dir)
             self.python_temp_dir = None
-
-    def _log_to_conversation_file(self, content: str, sender: str = "user"):        
-        if not self.session_dir:
-            return        
-        try:
-            file_name = f"conversation_log.txt"
-            file_path = os.path.join(self.session_dir, file_name)
-            with open(file_path, 'a') as f:
-                now = datetime.now()
-                date_string = now.strftime("%Y-%m-%d %H:%M:%S")
-                f.write(f"\n\n{date_string}\n")
-                f.write(content)
-        except Exception as e:
-            self.logger.error(f"Error logging to conversation file: {e}")
 
     def _log_full_prompt_and_response(self, prompt: str, response: str):
         """Log full prompt and response to separate timestamped files in the session directory."""
