@@ -231,6 +231,7 @@ Reply ONLY in the specified block format. NO CRUFT.
             self.write_output,
             None
         )
+        self.write_output(f"\n\n>>>>> ")
         self._log_full_prompt_and_response(prompt, model_response)
 
         response_blocks = self._parse_blocks(model_response)
