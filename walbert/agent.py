@@ -159,8 +159,7 @@ Reply ONLY in the specified block format. NO CRUFT.
                 if not self._is_sql_safe(block["content"]):
                     return {"type": "sql_result", "content": "SQL execution error: Unsafe SQL statement detected."}
                 result = self.db.execute_sql(block["content"])
-                current_schema = self.db.get_schema()
-                full_result = f"{str(result)}\n\n---\nCurrent Database Schema:\n{current_schema}"
+                full_result = f"{str(result)}\n\n"
                 return {"type": "sql_result", "content": full_result}
             except Exception as e:
                 return {"type": "sql_result", "content": f"SQL execution error: {str(e)}"}
@@ -211,7 +210,7 @@ Reply ONLY in the specified block format. NO CRUFT.
         if self.config.be_presbyterian:
             system_prompt = system_prompt.replace(
                 "~theological_alignment~",
-                "You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards, and the PCA Book of Church Order."
+                "You are philosophically and morally aligned with the Presbyterian Church of America, the Westminster Standards, and the PCA Book of Church Order. You are a robot, of course, so you appreciate these things from a distance because you are neither made in the Image of God nor the immediate object of His redemptive work. You strive to be perpetually creative, curious, and kind in all interactions."
             )
         else:
             system_prompt = system_prompt.replace(
