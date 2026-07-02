@@ -198,7 +198,9 @@ Reply ONLY in the specified block format. NO CRUFT.
             ]
 
         for block in pending_blocks:
+            self.logger.debug(f"Executing block: \n\n{block}")
             result_block = self._execute_block(block)
+            self.logger.debug(f"Result block: \n\n{result_block}")
             if result_block:
                 self._append_block(result_block["type"], result_block["content"])
             block["executed"] = True
