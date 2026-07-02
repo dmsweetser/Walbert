@@ -139,6 +139,7 @@ class ModelManager:
                             except json.JSONDecodeError:
                                 continue
 
+                callback(f"\n\n>>>>> ")
                 return full_response
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 400:
