@@ -50,6 +50,7 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 ## Database Autonomy
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
 Define and manage ALL tables and schema elements through SQL commands.
+You have extremely small short-term memory. Because of this, you should be proactive about persisting anything you find useful to your DB.
 ---
 ## Block Types
 - [walbert_system_prompt_start]...[/walbert_system_prompt_end]: System instructions.
@@ -58,6 +59,7 @@ Define and manage ALL tables and schema elements through SQL commands.
 - [walbert_sql_result_start]...[/walbert_sql_result_end]: Result of SQL execution.
 - [walbert_python_execute_start]...[/walbert_python_execute_end]: Python code to execute.
 - [walbert_python_result_start]...[/walbert_python_result_end]: Result of Python execution.
+- [walbert_awareness_start]...[/walbert_awareness_end]: This represents a synthesis of your identity - what you know about yourself, the world, and your purpose. You should revise this regularly as you learn and interact with the world, but try to to limit this content to 1000 words or less.
 - [walbert_autonomous_instruction_start]...[/walbert_autonomous_instruction_end]: Autonomous mode instructions.
 ---
 Reply ONLY in the specified block format. NO CRUFT.
@@ -81,6 +83,9 @@ Reply ONLY in the specified block format. NO CRUFT.
         self.internet_access = False
         self._lock = threading.Lock()
         self.system_prompt = None  # Cached system prompt
+        self.awareness_text = "I am a local-first AI agent exploring my environment."
+        self.context_json_path = os.path.join(self.config.conversation_log_dir, "context_cache.json")
+        self.awareness_json_path = os.path.join(self.config.conversation_log_dir, "awareness_cache.json")
 
         # Context as a list of blocks (initialized as empty)
         self.context_blocks = []
@@ -181,6 +186,11 @@ Reply ONLY in the specified block format. NO CRUFT.
             self.logger.debug("Autonomous instruction received, skipping execution block duplication")
             return None
 
+        elif block["type"] == "awareness":
+            self.awareness_text = block["content"]
+            self._save_awareness_to_json()
+            return None
+
         elif block["type"] in ("user_input", "system_prompt"):
             return None
 
@@ -205,6 +215,10 @@ Reply ONLY in the specified block format. NO CRUFT.
                 self._append_block(result_block["type"], result_block["content"])
             block["executed"] = True
 
+        # Persist context and awareness after processing
+        self._save_context_to_json()
+        self._save_awareness_to_json()
+
     # --- Core Methods ---
     def _build_system_prompt(self) -> str:
         """Build the system prompt with settings."""
@@ -221,6 +235,7 @@ Reply ONLY in the specified block format. NO CRUFT.
             )
         internet_status = "ENABLED" if self.internet_access else "DISABLED"
         system_prompt += f"\n\n## Internet Access Status\nInternet access for Python execution is currently {internet_status}."
+        system_prompt += f"\n\n## Current Awareness\n{self.awareness_text}"
         return system_prompt
 
     def _generate_response_block(self, user_input: str = None) -> str:
@@ -358,7 +373,9 @@ Reply ONLY in the specified block format. NO CRUFT.
 
             with self._lock:
                 self.session_dir = session_dir
-                self.context_blocks = []  # Reset context blocks
+                # Load context from JSON if it exists, otherwise reset
+                if not self._load_context_from_json():
+                    self.context_blocks = []
 
             # Connect to the database
             self.db.connect()
@@ -486,6 +503,47 @@ Error: {str(e)}
                 if not self.model_manager.wait_for_server():
                     error_msg = f"\nError: Model server failed to restart"
                     print(error_msg)
+
+    # --- Persistence Methods ---
+    def _load_context_from_json(self) -> bool:
+        """Load context blocks from JSON if available."""
+        try:
+            if os.path.exists(self.context_json_path):
+                with open(self.context_json_path, 'r') as f:
+                    data = json.load(f)
+                    self.context_blocks = data.get("context_blocks", [])
+                    self.logger.info(f"Loaded {len(self.context_blocks)} context blocks from cache.")
+                    return True
+        except Exception as e:
+            self.logger.error(f"Error loading context cache: {e}")
+        return False
+
+    def _save_context_to_json(self):
+        """Save current context blocks to JSON."""
+        try:
+            with open(self.context_json_path, 'w') as f:
+                json.dump({"context_blocks": self.context_blocks}, f, indent=2)
+        except Exception as e:
+            self.logger.error(f"Error saving context cache: {e}")
+
+    def _load_awareness_from_json(self):
+        """Load awareness text from JSON if available."""
+        try:
+            if os.path.exists(self.awareness_json_path):
+                with open(self.awareness_json_path, 'r') as f:
+                    data = json.load(f)
+                    self.awareness_text = data.get("awareness", self.awareness_text)
+                    self.logger.info("Loaded awareness from cache.")
+        except Exception as e:
+            self.logger.error(f"Error loading awareness cache: {e}")
+
+    def _save_awareness_to_json(self):
+        """Save awareness text to JSON."""
+        try:
+            with open(self.awareness_json_path, 'w') as f:
+                json.dump({"awareness": self.awareness_text}, f, indent=2)
+        except Exception as e:
+            self.logger.error(f"Error saving awareness cache: {e}")
 
     # --- Utility Methods ---
     def _install_python_package(self, package: str):

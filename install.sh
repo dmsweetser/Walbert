@@ -116,7 +116,7 @@ cat > instance/config.json << EOF
     "conversation_log_dir": "instance/conversations",
     "database_path": "instance/walbert.db",
     "be_presbyterian": true,
-    "max_context_blocks": 10
+    "max_context_blocks": 20
 }
 EOF
 
