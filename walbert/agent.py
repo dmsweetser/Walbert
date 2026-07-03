@@ -251,7 +251,7 @@ Reply ONLY in the specified block format. NO CRUFT.
         prompt = self._get_context_as_text()
         prompt += (
             "\n[walbert_autonomous_instruction_start]\n"
-            "You are operating autonomously. Please review recent actions, identify pending tasks, make progress on objectives, and maintain awareness of your database state.\n"
+            "You are operating autonomously. Please review recent actions, identify pending tasks, make progress on objectives, and maintain awareness of your database state. If no objectives have been provided, explore the world around you as safely as you can.\n"
             "[walbert_autonomous_instruction_end]\n"
         )
 
