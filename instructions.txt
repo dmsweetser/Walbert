@@ -1,9 +1,53 @@
-There are some areas I see where this app could be improved.
+I need you to replace the current llama-cpp implementation (which starts up a server) with something direct, like llama-completion. Here is a sample implementation you can refer to:
 
-First, I need Walbert to be more proactive about persisting data as it goes. It needs to be aware that it has limited short-term memory (limited to X conversation blocks), and that it should persist significant details and also code for reusability within its database.
+```
 
-Second, I need the app to persist the short-term context to JSON so that if it is interrupted, and if it detects the presence of that file, it picks up where it left off rather than starting over.
+                            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+                            llama_binary = os.path.join(BASE_DIR, "llama.cpp", "build", "bin", "llama-completion")
 
-Third, I need to persist to JSON a core detail that should present in the system prompt - maybe call it "awareness". This represents the synthesized identity of Walbert as it explores the world and interacts with the user. It should represent what it knows about itself, the world, and its purpose. I want it to be able to emit a walbert block that revises this understanding, and then it will be available in the next system prompt. You should tell it to limit this content to 1000 words or less.
+                            if not os.path.isfile(llama_binary):
+                                raise FileNotFoundError(f"llama binary not found at: {llama_binary}")
 
-Please make the necessary revisions.
+                            ticks = int(time.time() * 1000)
+                            filename = f"aibuilder_prompt_{ticks}.txt"
+                            with open(filename, "w", encoding='utf-8') as f:
+                                f.write(prompt)
+
+                            cmd = [
+                                llama_binary,
+                                "-m", model_path,
+                                "-f", filename,
+                                "--temp", str(Config.get_temperature()),
+                                "--top-p", str(Config.get_top_p()),
+                                "--top-k", str(Config.get_top_k()),
+                                "--min-p", str(Config.get_min_p()),
+                                "-n", str(Config.get_output_tokens()),
+                                "--ctx-size", str(Config.get_model_context()),
+                                "--jinja",
+                                "--no-display-prompt",
+                                "-st"
+                            ]
+
+                            process = subprocess.Popen(
+                                cmd,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                text=True,
+                                bufsize=1
+                            )
+
+                            response_content = ""
+                            current_iteration = 0
+
+                            while True:
+                                token = process.stdout.read(1)
+                                if current_iteration % 100 == 0 or not token:
+                                    with open(self.response_file, 'w', encoding='utf-8') as response_log:
+                                        response_log.write(response_content)
+                                if not token:
+                                    os.remove(filename)
+                                    break
+                                response_content += token
+                                current_iteration += 1
+                            process.wait()
+```

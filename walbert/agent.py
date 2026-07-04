@@ -189,6 +189,12 @@ Reply ONLY in the specified block format. NO CRUFT.
         elif block["type"] == "awareness":
             self.awareness_text = block["content"]
             self._save_awareness_to_json()
+            # Rebuild system prompt and update context chain to reflect new awareness
+            self.system_prompt = self._build_system_prompt()
+            for b in self.context_blocks:
+                if b["type"] == "system_prompt":
+                    b["content"] = self.system_prompt
+                    break
             return None
 
         elif block["type"] in ("user_input", "system_prompt"):
@@ -540,8 +546,10 @@ Error: {str(e)}
     def _save_awareness_to_json(self):
         """Save awareness text to JSON."""
         try:
+            os.makedirs(os.path.dirname(self.awareness_json_path), exist_ok=True)
             with open(self.awareness_json_path, 'w') as f:
                 json.dump({"awareness": self.awareness_text}, f, indent=2)
+            self.logger.debug(f"Awareness saved to {self.awareness_json_path}")
         except Exception as e:
             self.logger.error(f"Error saving awareness cache: {e}")
 
