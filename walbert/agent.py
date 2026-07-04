@@ -116,7 +116,7 @@ Reply ONLY in the specified block format. NO CRUFT.
                 other_blocks = []
 
             # Recombine: first_system_block (if exists) + truncated other_blocks
-            self.context_blocks = self.system_prompt + other_blocks
+            self.context_blocks = [self.system_prompt] + other_blocks
 
             self.logger.debug(f"Appended block: {block_type}")
 
