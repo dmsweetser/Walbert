@@ -105,7 +105,7 @@ cat > instance/config.json << EOF
             "min_p": $MIN_P
         }
     },
-    "llama_binary_path": "instance/llama.cpp/bin/llama-server",
+    "llama_binary_path": "instance/llama.cpp/bin/llama-completion",
     "mmproj_path": "$MMPROJ_PATH",
     "log_level": "DEBUG",
     "server_port": 8080,
