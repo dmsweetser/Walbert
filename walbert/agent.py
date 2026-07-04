@@ -389,11 +389,6 @@ Reply ONLY in the specified block format. NO CRUFT.
             # Build and cache the system prompt
             self.system_prompt = self._build_system_prompt()
             self._append_block("system_prompt", self.system_prompt)
-
-            self.logger.info("Waiting for model server to start...")
-            if not self.model_manager.wait_for_server():
-                raise RuntimeError("Model server failed to start")
-            self.logger.info("Model server ready")
             self.model_ready = True
 
             self.logger.info(f"Conversation session started in {session_dir}")
@@ -443,16 +438,12 @@ Reply ONLY in the specified block format. NO CRUFT.
                     msg_type, msg = input_queue.get_nowait()
                     if msg_type == "exit":
                         self.end_conversation()
-                        self.model_manager.shutdown()
                         return
 
                     if msg_type == "user_input":
                         if msg == last_user_input:
                             print(f"\n\n>>>>> ", end='', flush=True)
                             continue
-
-                        self.model_manager.shutdown()
-                        time.sleep(self.MODEL_RESTART_DELAY)
 
                         if interrupt_event:
                             interrupt_event.set()
@@ -465,12 +456,6 @@ Reply ONLY in the specified block format. NO CRUFT.
                             last_user_input = msg
 
                         self._append_block("user_input", msg)
-
-                        self.model_manager.start_server_thread()
-                        if not self.model_manager.wait_for_server():
-                            error_msg = f"\nError: Model server failed to restart for user input"
-                            print(error_msg)
-                            continue
 
                         self._generate_response_block(msg)
                         print(f"\n\n>>>>> ", end='', flush=True)
@@ -489,7 +474,6 @@ Reply ONLY in the specified block format. NO CRUFT.
             except KeyboardInterrupt:
                 print(f"\nGoodbye!")
                 self.end_conversation()
-                self.model_manager.shutdown()
                 break
             except Exception as e:
                 self.logger.error(f"Error in autonomous loop: {e}", exc_info=True)
@@ -499,16 +483,10 @@ Error: {str(e)}
 """
                 self._append_block("error", error_msg)
 
-                self.model_manager.shutdown()
-                time.sleep(self.MODEL_RESTART_DELAY)
                 if interrupt_event:
                     interrupt_event.set()
                     time.sleep(self.MODEL_RESTART_DELAY)
                     interrupt_event.clear()
-                self.model_manager.start_server_thread()
-                if not self.model_manager.wait_for_server():
-                    error_msg = f"\nError: Model server failed to restart"
-                    print(error_msg)
 
     # --- Persistence Methods ---
     def _load_context_from_json(self) -> bool:
@@ -572,4 +550,3 @@ Error: {str(e)}
     def shutdown(self):
         """Shutdown agent cleanly."""
         self.end_conversation()
-        self.model_manager.shutdown()
