@@ -140,4 +140,4 @@ echo "Installation complete"
 echo "Please edit instance/config.json with your specific paths before running Walbert"
 
 # Make run script executable
-chmod +x run.sh
+chmod +x _run.sh
