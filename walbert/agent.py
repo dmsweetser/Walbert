@@ -105,25 +105,18 @@ Reply ONLY in the specified block format. NO CRUFT.
                 "timestamp": time.time()
             })
 
-            # Find the first system_block (if it exists)
-            first_system_prompt = None
-            for block in self.context_blocks:
-                if block["type"] == "system_prompt":
-                    first_system_prompt = block
-                    break
-
             # Filter out all system blocks except the first one
             other_blocks = [block for block in self.context_blocks if block["type"] != "system_prompt"]
 
             # Truncate other_blocks to the most recent X blocks
-            max_other_blocks = self.config.max_context_blocks - (1 if first_system_prompt else 0)
+            max_other_blocks = self.config.max_context_blocks - 1
             if max_other_blocks > 0:
                 other_blocks = other_blocks[-max_other_blocks:]
             else:
                 other_blocks = []
 
             # Recombine: first_system_block (if exists) + truncated other_blocks
-            self.context_blocks = ([first_system_prompt] if first_system_prompt else []) + other_blocks
+            self.context_blocks = (self.system_prompt) + other_blocks
 
             self.logger.debug(f"Appended block: {block_type}")
 
