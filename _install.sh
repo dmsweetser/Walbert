@@ -84,8 +84,8 @@ elif [ "$model_choice" == "3" ]; then
     else
         echo "$MMPROJ_PATH already exists, skipping download."
     fi
-    CONTEXT_SIZE=32768
-    OUTPUT_TOKENS=16384
+    CONTEXT_SIZE=8192
+    OUTPUT_TOKENS=4096
     TEMPERATURE=0.7
     TOP_P=0.9
     TOP_K=40
