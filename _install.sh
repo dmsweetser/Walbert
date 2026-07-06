@@ -36,7 +36,8 @@ pip install -r requirements.txt
 echo "Select a model:"
 echo "1) Devstral-24B-Instruct-GGUF (Default)"
 echo "2) Qwen3.6-35B-A3B"
-read -p "Enter choice (1 or 2): " model_choice
+echo "3) Gemma4-E2B"
+read -p "Enter choice: " model_choice
 
 MODEL_PATH=""
 MMPROJ_PATH=""
@@ -67,6 +68,27 @@ if [ "$model_choice" == "2" ]; then
     TEMPERATURE=0.7
     TOP_P=0.8
     TOP_K=20
+    MIN_P=0.0
+elif [ "$model_choice" == "3"]; then
+    MODEL_PATH="instance/models/gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf"
+    MMPROJ_PATH="instance/models/gemma-4-E2B-it-qat-UD-Q4_K_XL-mmproj-BF16.gguf"
+    if [ ! -f "$MODEL_PATH" ]; then
+        echo "Downloading $MODEL_PATH..."
+        curl -L "https://huggingface.co/unsloth/gemma-4-E2B-it-qat-GGUF/resolve/main/gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf?download=true" -o "$MODEL_PATH"
+    else
+        echo "$MODEL_PATH already exists, skipping download."
+    fi
+    if [ ! -f "$MMPROJ_PATH" ]; then
+        echo "Downloading $MMPROJ_PATH..."
+        curl -L "https://huggingface.co/unsloth/gemma-4-E2B-it-qat-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -o "$MMPROJ_PATH"
+    else
+        echo "$MMPROJ_PATH already exists, skipping download."
+    fi
+    CONTEXT_SIZE=32768
+    OUTPUT_TOKENS=16384
+    TEMPERATURE=1.0
+    TOP_P=0.95
+    TOP_K=64
     MIN_P=0.0
 else
     MODEL_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
