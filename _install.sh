@@ -69,7 +69,7 @@ if [ "$model_choice" == "2" ]; then
     TOP_P=0.8
     TOP_K=20
     MIN_P=0.0
-elif [ "$model_choice" == "3"]; then
+elif [ "$model_choice" == "3" ]; then
     MODEL_PATH="instance/models/gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf"
     MMPROJ_PATH="instance/models/gemma-4-E2B-it-qat-UD-Q4_K_XL-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
