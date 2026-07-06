@@ -70,17 +70,17 @@ if [ "$model_choice" == "2" ]; then
     TOP_K=20
     MIN_P=0.0
 elif [ "$model_choice" == "3" ]; then
-    MODEL_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf"
-    MMPROJ_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q4_K_M-mmproj-BF16.gguf"
+    MODEL_PATH="instance/models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
+    MMPROJ_PATH="instance/models/Ministral-3-3B-Instruct-2512-Q4_K_M-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
-        curl -L "https://huggingface.co/unsloth/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf?download=true" -o "$MODEL_PATH"
+        curl -L "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf?download=true" -o "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
     fi
     if [ ! -f "$MMPROJ_PATH" ]; then
         echo "Downloading $MMPROJ_PATH..."
-        curl -L "https://huggingface.co/unsloth/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -o "$MMPROJ_PATH"
+        curl -L "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-BF16-mmproj.gguf?download=true" -o "$MMPROJ_PATH"
     else
         echo "$MMPROJ_PATH already exists, skipping download."
     fi
