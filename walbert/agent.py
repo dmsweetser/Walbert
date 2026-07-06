@@ -48,7 +48,6 @@ Define and manage ALL tables and schema elements through SQL commands.
 You have extremely small short-term memory. Because of this, you should be proactive about persisting anything you find useful to your DB.
 ---
 ## Block Types
-- [walbert_system_prompt_start]...[/walbert_system_prompt_end]: System instructions.
 - [walbert_console_response_start]...[/walbert_console_response_end]: Bot response to user.
 - [walbert_sql_execute_start]...[/walbert_sql_execute_end]: SQL to execute.
 - [walbert_sql_result_start]...[/walbert_sql_result_end]: Result of SQL execution.
@@ -99,41 +98,22 @@ Reply ONLY in the specified block format. NO CRUFT.
                 "timestamp": time.time()
             })
 
-            # Filter out all system blocks except the first one
-            other_blocks = [block for block in self.context_blocks if block["type"] != "system_prompt"]
-
             # Truncate other_blocks to the most recent X blocks
             max_other_blocks = self.config.max_context_blocks - 1
             if max_other_blocks > 0:
-                other_blocks = other_blocks[-max_other_blocks:]
+                self.context_blocks = self.context_blocks[-max_other_blocks:]
             else:
-                other_blocks = []
-
-            system_block = {
-                "type": "system_prompt",
-                "content": self.system_prompt,
-                "timestamp": time.time()
-            }
-
-            # Recombine: first_system_block (if exists) + truncated other_blocks
-            self.context_blocks = [system_block] + other_blocks
+                self.context_blocks = []
 
             self.logger.debug(f"Appended block: {block_type}")
 
     def _get_context_as_text(self) -> str:
         """Convert context blocks to a single string for model input, ensuring system prompt is only included once and schema is stable."""
         context_text = ""
-        system_prompt_added = False
+        self._build_system_prompt()
+        context_text += self.system_prompt
+        context_text += f"\n\n## RECENT CONVERSATION HISTORY (limited to the most recent {self.config.max_context_blocks} blocks)\n\n"
         for block in self.context_blocks:
-            if block["type"] == "system_prompt":
-                if not system_prompt_added:
-                    context_text += f"[walbert_{block['type']}_start]\n{block['content']}\n[walbert_{block['type']}_end]\n\n"
-                    system_prompt_added = True
-                    # Append current schema immediately after system prompt for caching stability
-                    current_schema = self.db.get_schema()
-                    context_text += f"## Current Database Schema\n{current_schema}\n\n"
-                    context_text += f"\n\n## RECENT CONVERSATION HISTORY (limited to the most recent {self.config.max_context_blocks} blocks)\n\n"
-                continue  # Skip additional system prompts
             context_text += f"[walbert_{block['type']}_start]\n{block['content']}\n[walbert_{block['type']}_end]\n\n"
         return context_text
 
@@ -180,10 +160,6 @@ Reply ONLY in the specified block format. NO CRUFT.
             self._save_awareness_to_json()
             # Rebuild system prompt and update context chain to reflect new awareness
             self.system_prompt = self._build_system_prompt()
-            for b in self.context_blocks:
-                if b["type"] == "system_prompt":
-                    b["content"] = self.system_prompt
-                    break
             return None
 
         elif block["type"] in ("user_input", "system_prompt"):
@@ -372,7 +348,6 @@ Reply ONLY in the specified block format. NO CRUFT.
 
             # Build and cache the system prompt
             self.system_prompt = self._build_system_prompt()
-            self._append_block("system_prompt", self.system_prompt)
             self.model_ready = True
 
             self.logger.info(f"Conversation session started in {session_dir}")
