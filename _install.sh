@@ -36,7 +36,7 @@ pip install -r requirements.txt
 echo "Select a model:"
 echo "1) Devstral-24B-Instruct-GGUF (Default)"
 echo "2) Qwen3.6-35B-A3B"
-echo "3) Ministral3-8B"
+echo "3) Ministral3-3B"
 read -p "Enter choice: " model_choice
 
 MODEL_PATH=""
