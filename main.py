@@ -101,7 +101,6 @@ def main():
     print("- pip_install <package>: Install a Python package in the main environment")
     print("- Any other input will be treated as a request to Walbert")
     print("")
-    print("Say 'Hey Walbert' to activate voice input, and 'Thanks' to end voice input.")
     print("Press ENTER at any time to interrupt Walbert's current processing.")
     print("")
     print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
