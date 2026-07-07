@@ -12,8 +12,8 @@ import json
 import threading
 import time
 import queue
-from walbert import Config, WalbertAgent
-from walbert.config import ModelConfig
+from walbert.config import Config
+from walbert.model_config import ModelConfig
 
 # Initialize logging
 os.makedirs('instance', exist_ok=True)
