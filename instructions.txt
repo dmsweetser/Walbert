@@ -1,7 +1,1 @@
-Can you refactor the agent.py into individual classes for the various responsibilities? The one I care most about is having an isolated class for state management, but I think you could have one for parsing, execution, etc...
-
-***
-
-I keep asking you to do this, but you neglect state management. What I mean by that is that instead of having context, system prompt, awareness, all over the agent, I want you to centralize it in one class. It should persist to JSON whenever updated, and include all the components required for the next prompt, including awareness, db schema, system prompt, block history, etc...
-
-Do that, plus everything else please. Thank you!
+Can you re-add all the __init__.py files we need?
