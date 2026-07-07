@@ -12,6 +12,7 @@ import json
 import threading
 import time
 import queue
+from walbert.agent import WalbertAgent
 from walbert.config import Config
 from walbert.model_config import ModelConfig
 
