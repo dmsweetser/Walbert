@@ -10,18 +10,23 @@ from typing import List, Dict, Any
 logger = logging.getLogger('walbert.state')
 
 class AgentState:
-    def __init__(self, config, db_manager):
+    def __init__(self, config, db_manager=None):
         self.config = config
         self.db = db_manager
-        self.context_blocks: List[Dict[str, Any]] = []
-        self.system_prompt: str = ""
-        self.awareness_text: str = "I am a local-first AI agent exploring my environment."
-        self.context_json_path = os.path.join(self.config.conversation_log_dir, "context_cache.json")
-        self.awareness_json_path = os.path.join(self.config.conversation_log_dir, "awareness_cache.json")
+        self.state_json_path = os.path.join(self.config.conversation_log_dir, "agent_state.json")
 
-        self._load_context_from_json()
-        self._load_awareness_from_json()
-        self.refresh_system_prompt()
+        # In-memory state
+        self.system_prompt: str = ""
+        self.db_schema: str = ""
+        self.awareness_text: str = "I am a local-first AI agent exploring my environment."
+        self.context_blocks: List[Dict[str, Any]] = []
+
+        # Load state if present on start
+        self._load_from_json()
+
+        # Initialize system prompt if not loaded
+        if not self.system_prompt:
+            self.refresh_system_prompt()
 
     def refresh_system_prompt(self):
         base_prompt = """
@@ -68,25 +73,35 @@ Reply ONLY in the specified block format. NO CRUFT.
         self.system_prompt = base_prompt
         self.save_to_json()
 
+    def refresh_db_schema(self):
+        """Fetch and update in-memory database schema"""
+        if self.db and hasattr(self.db, 'get_schema'):
+            self.db_schema = self.db.get_schema()
+            self.save_to_json()
+
+    def update_awareness(self, text: str):
+        self.awareness_text = text
+        self.save_to_json()
+
     def append_block(self, block_type: str, content: str):
         self.context_blocks.append({
             "type": block_type,
             "content": content,
             "timestamp": time.time()
         })
-        other_blocks = [b for b in self.context_blocks if b["type"] != "system_prompt"]
+        # Maintain only the most recent blocks in memory
         max_other = self.config.max_context_blocks - 1
         if max_other > 0:
-            other_blocks = other_blocks[-max_other:]
+            self.context_blocks = [
+                {"type": "system_prompt", "content": self.system_prompt, "timestamp": time.time()}
+            ] + self.context_blocks[-max_other:]
         else:
-            other_blocks = []
-        self.context_blocks = [{"type": "system_prompt", "content": self.system_prompt, "timestamp": time.time()}] + other_blocks
+            self.context_blocks = [{"type": "system_prompt", "content": self.system_prompt, "timestamp": time.time()}]
         self.save_to_json()
 
     def get_prompt(self, internet_access: bool = False) -> str:
         prompt = f"[walbert_system_prompt_start]\n{self.system_prompt}\n[walbert_system_prompt_end]\n\n"
-        current_schema = self.db.get_schema()
-        prompt += f"## Current Database Schema\n{current_schema}\n\n"
+        prompt += f"## Current Database Schema\n{self.db_schema}\n\n"
         prompt += f"## Current Awareness\n{self.awareness_text}\n\n"
         prompt += f"## RECENT CONVERSATION HISTORY (limited to the most recent {self.config.max_context_blocks} blocks)\n\n"
         for block in self.context_blocks:
@@ -97,36 +112,28 @@ Reply ONLY in the specified block format. NO CRUFT.
 
     def save_to_json(self):
         try:
-            os.makedirs(os.path.dirname(self.context_json_path), exist_ok=True)
-            with open(self.context_json_path, 'w') as f:
+            os.makedirs(os.path.dirname(self.state_json_path), exist_ok=True)
+            with open(self.state_json_path, 'w') as f:
                 json.dump({
-                    "context_blocks": self.context_blocks,
-                    "awareness": self.awareness_text,
-                    "system_prompt": self.system_prompt
+                    "system_prompt": self.system_prompt,
+                    "db_schema": self.db_schema,
+                    "awareness_text": self.awareness_text,
+                    "context_blocks": self.context_blocks
                 }, f, indent=2)
         except Exception as e:
             logger.error(f"Error saving state cache: {e}")
 
-    def _load_context_from_json(self):
+    def _load_from_json(self):
         try:
-            if os.path.exists(self.context_json_path):
-                with open(self.context_json_path, 'r') as f:
+            if os.path.exists(self.state_json_path):
+                with open(self.state_json_path, 'r') as f:
                     data = json.load(f)
+                    self.system_prompt = data.get("system_prompt", "")
+                    self.db_schema = data.get("db_schema", "")
+                    self.awareness_text = data.get("awareness_text", self.awareness_text)
                     self.context_blocks = data.get("context_blocks", [])
-                    self.awareness_text = data.get("awareness", self.awareness_text)
-                    self.system_prompt = data.get("system_prompt", self.system_prompt)
-                    logger.info(f"Loaded {len(self.context_blocks)} context blocks from cache.")
+                    logger.info(f"Loaded state from cache: {len(self.context_blocks)} context blocks.")
                     return True
         except Exception as e:
             logger.error(f"Error loading state cache: {e}")
         return False
-
-    def _load_awareness_from_json(self):
-        try:
-            if os.path.exists(self.awareness_json_path):
-                with open(self.awareness_json_path, 'r') as f:
-                    data = json.load(f)
-                    self.awareness_text = data.get("awareness", self.awareness_text)
-                    logger.info("Loaded awareness from cache.")
-        except Exception as e:
-            logger.error(f"Error loading awareness cache: {e}")
