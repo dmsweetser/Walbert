@@ -14,7 +14,7 @@ import time
 import queue
 import shutil
 import datetime
-from walbert import Config, WalbertAgent
+from walbert import Config
 from walbert.config import ModelConfig
 from walbert.state import AgentState
 from walbert.parser import BlockParser
