@@ -1,1 +1,5 @@
-Can you simplify the state management logic? What I want is for it to maintain in memory the system prompt, db schema, recent conversations, and awareness data. Whenever it is updated, persist the latest to JSON. Load from JSON if present on start.
+Please stop including the system prompt as a context block. Instead, just use the in-memory system prompt constructed on demand.
+
+Also, the awareness is never updated in the state JSON - and it isn't ever updated in the generated prompt for the model.
+
+Please fix these - thanks!
