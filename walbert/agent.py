@@ -187,7 +187,10 @@ class WalbertAgent:
             self.logger.debug(f"Executing block: {block}")
             result_block = self.executor.execute(block)
             if result_block:
-                self.state.append_block(result_block["type"], result_block["content"])
+                if result_block["type"] == "awareness_update":
+                    self.state.update_awareness(result_block["content"])
+                else:
+                    self.state.append_block(result_block["type"], result_block["content"])
             block["executed"] = True
 
         self.state.save_to_json()
