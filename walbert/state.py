@@ -55,7 +55,7 @@ You have extremely small short-term memory. Because of this, you should be proac
 - [walbert_sql_result_start]...[/walbert_sql_result_end]: Result of SQL execution.
 - [walbert_python_execute_start]...[/walbert_python_execute_end]: Python code to execute.
 - [walbert_python_result_start]...[/walbert_python_result_end]: Result of Python execution.
-- [walbert_awareness_start]...[/walbert_awareness_end]: This represents a synthesis of your identity - what you know about yourself, the world, and your purpose. You should revise this regularly as you learn and interact with the world, but try to to limit this content to 1000 words or less, and make it prose rather than bullet points.
+- [walbert_awareness_start]...[/walbert_awareness_end]: This represents a synthesis of your identity - what you know about yourself, the world, and your purpose. You should revise this regularly as you learn and interact with the world, but try to to limit this content to a single prose paragraph of 1000 words or less.
 ---
 Reply ONLY in the specified block format. NO CRUFT.
 ---
@@ -96,8 +96,12 @@ Reply ONLY in the specified block format. NO CRUFT.
         self.save_to_json()
 
     def get_prompt(self, internet_access: bool = False) -> str:
+
+        self.refresh_db_schema()
+
         prompt = f"[walbert_system_prompt_start]\n{self.system_prompt}\n[walbert_system_prompt_end]\n\n"
         prompt += f"## Current Database Schema\n{self.db_schema}\n\n"
+        prompt += f"## Internet Access Enabled?\n{internet_access}\n\n"
         prompt += f"## Current Awareness\n{self.awareness_text}\n\n"
         prompt += f"## RECENT CONVERSATION HISTORY (limited to the most recent {self.config.max_context_blocks} blocks)\n\n"
         for block in self.context_blocks:
