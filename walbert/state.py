@@ -143,10 +143,15 @@ Reply ONLY in the specified block format. NO CRUFT.
     def awareness_text(self) -> str:
         return self._awareness_text
 
-    def update_awareness(self, text: str):
+    @awareness_text.setter
+    def awareness_text(self, value: str):
         """Update and save awareness text."""
-        self._awareness_text = text
+        self._awareness_text = value
         self._save_awareness()
+
+    def update_awareness(self, text: str):
+        """Public method to update awareness text."""
+        self.awareness_text = text
 
     def _load_awareness(self):
         try:
@@ -155,9 +160,11 @@ Reply ONLY in the specified block format. NO CRUFT.
         except FileNotFoundError:
             logger.warning("Awareness file not found. Using default.")
             self._awareness_text = "I am a local-first AI agent exploring my environment."
+            self._save_awareness()  # Save the default
         except Exception as e:
             logger.error(f"Error loading awareness: {e}")
             self._awareness_text = "I am a local-first AI agent exploring my environment."
+            self._save_awareness()  # Save the default
 
     def _save_awareness(self):
         try:
@@ -191,9 +198,11 @@ Reply ONLY in the specified block format. NO CRUFT.
         except FileNotFoundError:
             logger.warning("Context blocks file not found. Starting with empty list.")
             self._context_blocks = []
+            self._save_context_blocks()  # Save the empty list
         except Exception as e:
             logger.error(f"Error loading context blocks: {e}")
             self._context_blocks = []
+            self._save_context_blocks()  # Save the empty list
 
     def _save_context_blocks(self):
         try:
