@@ -90,13 +90,9 @@ Reply ONLY in the specified block format. NO CRUFT.
             "timestamp": time.time()
         })
         # Maintain only the most recent blocks in memory
-        max_other = self.config.max_context_blocks - 1
+        max_other = self.config.max_context_blocks
         if max_other > 0:
-            self.context_blocks = [
-                {"type": "system_prompt", "content": self.system_prompt, "timestamp": time.time()}
-            ] + self.context_blocks[-max_other:]
-        else:
-            self.context_blocks = [{"type": "system_prompt", "content": self.system_prompt, "timestamp": time.time()}]
+            self.context_blocks = self.context_blocks[-max_other:]
         self.save_to_json()
 
     def get_prompt(self, internet_access: bool = False) -> str:
@@ -105,8 +101,6 @@ Reply ONLY in the specified block format. NO CRUFT.
         prompt += f"## Current Awareness\n{self.awareness_text}\n\n"
         prompt += f"## RECENT CONVERSATION HISTORY (limited to the most recent {self.config.max_context_blocks} blocks)\n\n"
         for block in self.context_blocks:
-            if block["type"] == "system_prompt":
-                continue
             prompt += f"[walbert_{block['type']}_start]\n{block['content']}\n[walbert_{block['type']}_end]\n\n"
         return prompt
 
