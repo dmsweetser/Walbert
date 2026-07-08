@@ -89,7 +89,7 @@ elif [ "$model_choice" == "3" ]; then
     TEMPERATURE=0.7
     TOP_P=0.9
     TOP_K=40
-    MIN_P=0.05
+    MIN_P=0.00
 else
     MODEL_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
     MMPROJ_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf"
