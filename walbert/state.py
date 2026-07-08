@@ -1,11 +1,12 @@
 """
-Centralized state management for Walbert agent
+Modular state management for Walbert agent.
+Each state component is stored in a separate file and persisted on update.
 """
 import json
 import os
 import time
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger('walbert.state')
 
@@ -13,22 +14,37 @@ class AgentState:
     def __init__(self, config, db_manager=None):
         self.config = config
         self.db = db_manager
-        self.state_json_path = os.path.join(self.config.conversation_log_dir, "agent_state.json")
+        self._state_dir = os.path.join(self.config.conversation_log_dir, "state")
+        os.makedirs(self._state_dir, exist_ok=True)
 
-        # In-memory state
-        self.system_prompt: str = ""
-        self.db_schema: str = ""
-        self.awareness_text: str = "I am a local-first AI agent exploring my environment."
-        self.context_blocks: List[Dict[str, Any]] = []
+        # File paths for each component
+        self._system_prompt_path = os.path.join(self._state_dir, "system_prompt.md")
+        self._db_schema_path = os.path.join(self._state_dir, "db_schema.sql")
+        self._awareness_path = os.path.join(self._state_dir, "awareness.txt")
+        self._context_blocks_path = os.path.join(self._state_dir, "context_blocks.json")
 
-        # Load state if present on start
-        self._load_from_json()
+        # Initialize in-memory state
+        self._system_prompt: Optional[str] = None
+        self._db_schema: Optional[str] = None
+        self._awareness_text: str = "I am a local-first AI agent exploring my environment."
+        self._context_blocks: List[Dict[str, Any]] = []
+
+        # Load all components
+        self._load_all()
 
         # Initialize system prompt if not loaded
-        if not self.system_prompt:
+        if self._system_prompt is None:
             self.refresh_system_prompt()
 
+    # --- System Prompt ---
+    @property
+    def system_prompt(self) -> str:
+        if self._system_prompt is None:
+            self._load_system_prompt()
+        return self._system_prompt
+
     def refresh_system_prompt(self):
+        """Rebuild and save the system prompt."""
         base_prompt = """
 You are Walbert, a local-first AI agent with FULL HARDWARE ACCESS and AUTONOMY over your database and system.
 Your capabilities include reasoning, memory storage, dynamic schema management, Python code execution, and direct hardware interaction.
@@ -70,68 +86,140 @@ Reply ONLY in the specified block format. NO CRUFT.
                 "~theological_alignment~",
                 "You strive to be perpetually creative, curious, and kind in all interactions."
             )
-        self.system_prompt = base_prompt
-        self.save_to_json()
+        self._system_prompt = base_prompt
+        self._save_system_prompt()
+
+    def _load_system_prompt(self):
+        try:
+            with open(self._system_prompt_path, 'r') as f:
+                self._system_prompt = f.read()
+        except FileNotFoundError:
+            logger.warning("System prompt file not found. Will initialize on first use.")
+            self._system_prompt = None
+        except Exception as e:
+            logger.error(f"Error loading system prompt: {e}")
+            self._system_prompt = None
+
+    def _save_system_prompt(self):
+        try:
+            with open(self._system_prompt_path, 'w') as f:
+                f.write(self._system_prompt)
+        except Exception as e:
+            logger.error(f"Error saving system prompt: {e}")
+
+    # --- DB Schema ---
+    @property
+    def db_schema(self) -> str:
+        if self._db_schema is None:
+            self._load_db_schema()
+        return self._db_schema
 
     def refresh_db_schema(self):
-        """Fetch and update in-memory database schema"""
+        """Fetch and save the latest DB schema."""
         if self.db and hasattr(self.db, 'get_schema'):
-            self.db_schema = self.db.get_schema()
-            self.save_to_json()
+            self._db_schema = self.db.get_schema()
+            self._save_db_schema()
+
+    def _load_db_schema(self):
+        try:
+            with open(self._db_schema_path, 'r') as f:
+                self._db_schema = f.read()
+        except FileNotFoundError:
+            logger.warning("DB schema file not found. Will initialize on first use.")
+            self._db_schema = None
+        except Exception as e:
+            logger.error(f"Error loading DB schema: {e}")
+            self._db_schema = None
+
+    def _save_db_schema(self):
+        try:
+            with open(self._db_schema_path, 'w') as f:
+                f.write(self._db_schema)
+        except Exception as e:
+            logger.error(f"Error saving DB schema: {e}")
+
+    # --- Awareness Text ---
+    @property
+    def awareness_text(self) -> str:
+        return self._awareness_text
 
     def update_awareness(self, text: str):
-        self.awareness_text = text
-        self.save_to_json()
+        """Update and save awareness text."""
+        self._awareness_text = text
+        self._save_awareness()
+
+    def _load_awareness(self):
+        try:
+            with open(self._awareness_path, 'r') as f:
+                self._awareness_text = f.read()
+        except FileNotFoundError:
+            logger.warning("Awareness file not found. Using default.")
+            self._awareness_text = "I am a local-first AI agent exploring my environment."
+        except Exception as e:
+            logger.error(f"Error loading awareness: {e}")
+            self._awareness_text = "I am a local-first AI agent exploring my environment."
+
+    def _save_awareness(self):
+        try:
+            with open(self._awareness_path, 'w') as f:
+                f.write(self._awareness_text)
+        except Exception as e:
+            logger.error(f"Error saving awareness: {e}")
+
+    # --- Context Blocks ---
+    @property
+    def context_blocks(self) -> List[Dict[str, Any]]:
+        return self._context_blocks
 
     def append_block(self, block_type: str, content: str):
-        self.context_blocks.append({
+        """Append a block and save the updated list."""
+        self._context_blocks.append({
             "type": block_type,
             "content": content,
             "timestamp": time.time()
         })
-        # Maintain only the most recent blocks in memory
-        max_other = self.config.max_context_blocks
-        if max_other > 0:
-            self.context_blocks = self.context_blocks[-max_other:]
-        self.save_to_json()
+        # Truncate to max_context_blocks
+        max_blocks = self.config.max_context_blocks
+        if max_blocks > 0:
+            self._context_blocks = self._context_blocks[-max_blocks:]
+        self._save_context_blocks()
 
+    def _load_context_blocks(self):
+        try:
+            with open(self._context_blocks_path, 'r') as f:
+                self._context_blocks = json.load(f)
+        except FileNotFoundError:
+            logger.warning("Context blocks file not found. Starting with empty list.")
+            self._context_blocks = []
+        except Exception as e:
+            logger.error(f"Error loading context blocks: {e}")
+            self._context_blocks = []
+
+    def _save_context_blocks(self):
+        try:
+            with open(self._context_blocks_path, 'w') as f:
+                json.dump(self._context_blocks, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving context blocks: {e}")
+
+    # --- Full State Load ---
+    def _load_all(self):
+        """Load all state components from their respective files."""
+        self._load_system_prompt()
+        self._load_db_schema()
+        self._load_awareness()
+        self._load_context_blocks()
+
+    # --- Prompt Generation ---
     def get_prompt(self, internet_access: bool = False) -> str:
-
-        self.refresh_db_schema()
+        """Generate the full prompt by combining all components."""
+        self.refresh_db_schema()  # Ensure DB schema is up-to-date
 
         prompt = f"[walbert_system_prompt_start]\n{self.system_prompt}\n[walbert_system_prompt_end]\n\n"
         prompt += f"## Current Database Schema\n{self.db_schema}\n\n"
         prompt += f"## Internet Access Enabled?\n{internet_access}\n\n"
         prompt += f"## Current Awareness\n{self.awareness_text}\n\n"
         prompt += f"## RECENT CONVERSATION HISTORY (limited to the most recent {self.config.max_context_blocks} blocks)\n\n"
-        for block in self.context_blocks:
+        for block in self._context_blocks:
             prompt += f"[walbert_{block['type']}_start]\n{block['content']}\n[walbert_{block['type']}_end]\n\n"
         return prompt
-
-    def save_to_json(self):
-        try:
-            os.makedirs(os.path.dirname(self.state_json_path), exist_ok=True)
-            with open(self.state_json_path, 'w') as f:
-                json.dump({
-                    "system_prompt": self.system_prompt,
-                    "db_schema": self.db_schema,
-                    "awareness_text": self.awareness_text,
-                    "context_blocks": self.context_blocks
-                }, f, indent=2)
-        except Exception as e:
-            logger.error(f"Error saving state cache: {e}")
-
-    def _load_from_json(self):
-        try:
-            if os.path.exists(self.state_json_path):
-                with open(self.state_json_path, 'r') as f:
-                    data = json.load(f)
-                    self.system_prompt = data.get("system_prompt", "")
-                    self.db_schema = data.get("db_schema", "")
-                    self.awareness_text = data.get("awareness_text", self.awareness_text)
-                    self.context_blocks = data.get("context_blocks", [])
-                    logger.info(f"Loaded state from cache: {len(self.context_blocks)} context blocks.")
-                    return True
-        except Exception as e:
-            logger.error(f"Error loading state cache: {e}")
-        return False
