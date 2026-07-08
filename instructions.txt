@@ -1,5 +1,5 @@
-Please stop including the system prompt as a context block. Instead, just use the in-memory system prompt constructed on demand.
+I find that the awareness and context blocks are never updated, and those updates are never reflected in the new prompt, even though I see valid blocks returned by the model as it progresses.
 
-Also, the awareness is never updated in the state JSON - and it isn't ever updated in the generated prompt for the model.
+Populate test_walbert_agent.py with a suite of tests that validates functionality without using an actual LLM. Instead, use mocks as needed to get structured inputs and outputs required to validate functionality of other components that ARE testable.
 
-Please fix these - thanks!
+Please fix this and any other issues you see in the app.
