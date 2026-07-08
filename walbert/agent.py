@@ -192,6 +192,9 @@ class WalbertAgent:
                 else:
                     self.state.append_block(result_block["type"], result_block["content"])
             block["executed"] = True
+        
+        # Ensure state syncs immediately after execution so next prompt reflects changes
+        self.state._sync_state()
 
     def _log_full_prompt_and_response(self, prompt: str, response: str):
         """Log full prompt and response to separate timestamped files in the session directory."""

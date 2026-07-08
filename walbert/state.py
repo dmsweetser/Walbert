@@ -223,6 +223,7 @@ Reply ONLY in the specified block format. NO CRUFT.
     def get_prompt(self, internet_access: bool = False) -> str:
         """Generate the full prompt by combining all components."""
         self.refresh_db_schema()  # Ensure DB schema is up-to-date
+        self._sync_state()  # Ensure in-memory state reflects latest updates
 
         prompt = f"[walbert_system_prompt_start]\n{self.system_prompt}\n[walbert_system_prompt_end]\n\n"
         prompt += f"## Current Database Schema\n{self.db_schema}\n\n"
@@ -232,3 +233,11 @@ Reply ONLY in the specified block format. NO CRUFT.
         for block in self._context_blocks:
             prompt += f"[walbert_{block['type']}_start]\n{block['content']}\n[walbert_{block['type']}_end]\n\n"
         return prompt
+
+    def _sync_state(self):
+        """Ensure in-memory state is synchronized and ready for prompt generation."""
+        # Force reload of awareness and context if they were modified externally or during execution
+        if not self._awareness_text or self._awareness_text == "I am a local-first AI agent exploring my environment.":
+            self._load_awareness()
+        if not self._context_blocks:
+            self._load_context_blocks()
