@@ -146,10 +146,7 @@ class WalbertAgent:
         self._log_full_prompt_and_response(prompt, model_response)
 
         response_blocks = self.parser.parse(model_response)
-        for block in response_blocks:
-            self.state.append_block(block["type"], block["content"])
-
-        self._execute_pending_blocks()
+        self._execute_pending_blocks(response_blocks)
 
         for block in response_blocks:
             if block["type"] == "console_response":
@@ -171,8 +168,6 @@ class WalbertAgent:
         self._log_full_prompt_and_response(prompt, model_response)
 
         blocks = self.parser.parse(model_response)
-        for block in blocks:
-            self.state.append_block(block["type"], block["content"])
 
         self._execute_pending_blocks(blocks)
         return "Continue monitoring and processing."
@@ -193,6 +188,7 @@ class WalbertAgent:
                 if result_block["type"] == "awareness_update":
                     self.state.update_awareness(result_block["content"])
                 else:
+                    self.state.append_block(block["type"], block["content"])
                     self.state.append_block(result_block["type"], result_block["content"])
             block["executed"] = True
         
