@@ -174,16 +174,16 @@ class WalbertAgent:
         for block in blocks:
             self.state.append_block(block["type"], block["content"])
 
-        self._execute_pending_blocks()
+        self._execute_pending_blocks(blocks)
         return "Continue monitoring and processing."
 
-    def _execute_pending_blocks(self):
+    def _execute_pending_blocks(self, provided_blocks):
         """Execute all pending blocks (SQL, Python, etc.) in order."""
         executable_types = {"sql_execute", "python_execute", "awareness"}
         with self._lock:
             pending_blocks = [
-                b for b in self.state.context_blocks
-                if b["type"] in executable_types and not b.get("executed", False)
+                b for b in provided_blocks
+                if b["type"] in executable_types
             ]
 
         for block in pending_blocks:
