@@ -31,6 +31,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger('walbert')
 
+
 def load_config() -> Config:
     """Load system configuration"""
     try:
@@ -62,6 +63,7 @@ def load_config() -> Config:
         logger.error(f"Error loading config: {e}")
         sys.exit(1)
 
+
 class WalbertAgent:
     """Refactored Walbert agent with separated responsibilities."""
 
@@ -82,6 +84,7 @@ class WalbertAgent:
         self.model_ready = False
         self.processing_cycle = 0
         self.current_conversation_file = None
+        self.db = None
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 

@@ -236,8 +236,6 @@ Reply ONLY in the specified block format. NO CRUFT.
 
     def _sync_state(self):
         """Ensure in-memory state is synchronized and ready for prompt generation."""
-        # Force reload of awareness and context if they were modified externally or during execution
-        if not self._awareness_text or self._awareness_text == "I am a local-first AI agent exploring my environment.":
-            self._load_awareness()
-        if not self._context_blocks:
-            self._load_context_blocks()
+        # Reload awareness and context blocks to ensure latest updates are reflected
+        self._load_awareness()
+        self._load_context_blocks()
