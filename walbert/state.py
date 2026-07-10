@@ -236,7 +236,7 @@ Reply ONLY in the specified block format. NO CRUFT.
         self._sync_state()  # Ensure in-memory state reflects latest updates
 
         prompt = f"[walbert_system_prompt_start]\n{self.system_prompt}\n[walbert_system_prompt_end]\n\n"
-        prompt += f"## Current Database Schema\n{self.db_schema}\n\n"
+        prompt += f"## Current Database Schema for your database\nDatabase file location: {self.config.database_path}\n\n{self.db_schema}\n\n"
         prompt += f"## Internet Access Enabled?\n{internet_access}\n\n"
         prompt += f"## Current Awareness\n{self.awareness_text}\n\n"
         prompt += f"## RECENT CONVERSATION HISTORY (limited to the most recent {self.config.max_context_blocks} blocks)\n\n"
