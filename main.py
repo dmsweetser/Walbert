@@ -4,7 +4,6 @@ Walbert - Local AI Agent
 Main entry point for the Walbert AI agent system
 """
 
-import select
 import sys
 import os
 import logging
@@ -58,6 +57,28 @@ def load_config() -> Config:
         logger.error(f"Error loading config: {e}")
         sys.exit(1)
 
+def get_nonblocking_input(prompt: str = ">>>>> ") -> str:
+    """
+    Read input from stdin in a non-blocking way, echoing characters as they are typed.
+    Returns the input string when Enter is pressed.
+    """
+    import readchar
+    print(prompt, end='', flush=True)
+    user_input = []
+    while True:
+        try:
+            char = readchar.readchar()
+            if char == '\n':  # Enter key
+                break
+            elif char == '\x03':  # Ctrl+C
+                raise KeyboardInterrupt
+            user_input.append(char)
+            print(char, end='', flush=True)  # Echo the character
+        except KeyboardInterrupt:
+            print("\nInterrupting...")
+            raise
+    return ''.join(user_input)
+
 def main():
     """Main entry point"""
     config = load_config()
@@ -76,7 +97,7 @@ def main():
     agent_thread.daemon = True
     agent_thread.start()
 
-    # Main console loop
+    # Print welcome message and ASCII art
     print("""
           
  ___            ___      
@@ -104,56 +125,43 @@ def main():
     print("")
     print("Press ENTER at any time to interrupt Walbert's current processing.")
     print("")
-    print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
 
     try:
         while True:
-            # Check if there's input available without blocking
-            if select.select([sys.stdin], [], [], 0)[0]:
-                user_input = sys.stdin.readline().strip()
-            else:
-                user_input = ""
-                time.sleep(0.1)
-                continue
+            # Get user input in a non-blocking way
+            user_input = get_nonblocking_input()
 
             if user_input.lower() in ['exit', 'quit']:
                 input_queue.put(("exit",))
                 break
             elif user_input.lower() == 'inet on':
                 agent.internet_access = True
-                print("Internet access enabled for Python execution.")
-                print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                print("\nInternet access enabled for Python execution.")
             elif user_input.lower() == 'inet off':
                 agent.internet_access = False
-                print("Internet access disabled for Python execution.")
-                print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                print("\nInternet access disabled for Python execution.")
             elif user_input.lower().startswith('pip_install '):
                 package = user_input[12:].strip()
                 if package:
                     agent._install_python_package(package)
-                    print("Package installation command executed.")
-                print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                    print("\nPackage installation command executed.")
             elif user_input == "":
                 # User pressed ENTER to interrupt Walbert
-                print(f"{chr(10)}Interrupting Walbert...{chr(10)}")
+                print("\nInterrupting Walbert...")
                 interrupt_event.set()
-                # Wait briefly for interruption to complete
-                time.sleep(5)
+                time.sleep(0.5)  # Brief pause to allow interruption
                 interrupt_event.clear()
-                print(f"Walbert processing interrupted. Waiting for your input...{chr(10)}")
-                print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                print("Walbert processing interrupted. Waiting for your input...")
             else:
                 # Put user input into queue for agent
-                print(f"{chr(10)}Walbert has received your request.{chr(10)}")
-                print(f"Press ENTER to interrupt Walbert at any time.{chr(10)}")
+                print("\nWalbert has received your request.")
+                print("Press ENTER to interrupt Walbert at any time.")
                 interrupt_event.set()
-                # Wait briefly for interruption to complete
-                time.sleep(5)
+                time.sleep(0.5)  # Brief pause to allow interruption
                 interrupt_event.clear()
                 input_queue.put(("user_input", user_input))
-                print(f"{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
     except KeyboardInterrupt:
-        print(f"{chr(10)}Goodbye!")
+        print("\nGoodbye!")
         input_queue.put(("exit",))
     except Exception as e:
         logger.error(f"Error in main loop: {e}", exc_info=True)
