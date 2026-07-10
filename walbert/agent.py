@@ -190,6 +190,7 @@ class WalbertAgent:
                 else:
                     self.state.append_block(block["type"], block["content"])
                     self.state.append_block(result_block["type"], result_block["content"])
+                    self.write_output(json.dumps(result_block, indent=2))
             block["executed"] = True
         
         # Ensure state syncs immediately after execution so next prompt reflects changes

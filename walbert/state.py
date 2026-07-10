@@ -69,10 +69,10 @@ You have extremely small short-term memory. Because of this, you should be proac
 Bot response to user
 [walbert_console_response_end]
 [walbert_sql_execute_start]
-SQL to execute - use this to manage and modify your DB
+SQL to execute - use this to manage, modify and query your DB
 [walbert_sql_execute_end]
 [walbert_python_execute_start]
-Python code to execute - do not use this to manage and modify your DB
+Python code to execute
 [walbert_python_execute_end]
 [walbert_awareness_start]
 A 1000-word or less single paragraph synthesizing your identity - what you know about yourself, the world, and your purpose
@@ -235,8 +235,10 @@ Reply ONLY in the specified block format. NO CRUFT.
         self.refresh_db_schema()  # Ensure DB schema is up-to-date
         self._sync_state()  # Ensure in-memory state reflects latest updates
 
+        full_database_path = os.path.abspath(self.config.database_path)
+
         prompt = f"[walbert_system_prompt_start]\n{self.system_prompt}\n[walbert_system_prompt_end]\n\n"
-        prompt += f"## Current Database Schema\n{self.db_schema}\n\n"
+        prompt += f"## Current Database Schema\nDatabase file location: {full_database_path}\n\n{self.db_schema}\n\n"
         prompt += f"## Internet Access Enabled?\n{internet_access}\n\n"
         prompt += f"## Current Awareness\n{self.awareness_text}\n\n"
         prompt += f"## RECENT CONVERSATION HISTORY (limited to the most recent {self.config.max_context_blocks} blocks)\n\n"
