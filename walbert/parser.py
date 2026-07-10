@@ -9,5 +9,9 @@ class BlockParser:
         for match in re.finditer(block_pattern, text, re.DOTALL):
             block_type = match.group(1)
             block_content = match.group(2).strip()
-            blocks.append({"type": block_type, "content": block_content})
+
+            # Remove triple backticks and optional language specifier
+            block_content = re.sub(r'^```\w*\s*|```\s*$', '', block_content, flags=re.MULTILINE)
+
+            blocks.append({"type": block_type, "content": block_content.strip()})
         return blocks
