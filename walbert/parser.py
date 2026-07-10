@@ -5,7 +5,7 @@ class BlockParser:
     @staticmethod
     def parse(text: str) -> List[Dict[str, str]]:
         blocks = []
-        block_pattern = r'\[walbert_([a-z_]+)_start\](.*?)\[/walbert_\1_end\]'
+        block_pattern = r'\[walbert_([a-z_]+)_start\](.*?)\[walbert_\1_end\]'
         for match in re.finditer(block_pattern, text, re.DOTALL):
             block_type = match.group(1)
             block_content = match.group(2).strip()
