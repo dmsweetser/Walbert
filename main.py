@@ -180,12 +180,7 @@ def main():
                     agent._install_python_package(package)
                     print("\nPackage installation command executed.")
             elif user_input == "":
-                # User pressed ENTER to interrupt Walbert
-                print("\nInterrupting Walbert...")
-                interrupt_event.set()
-                time.sleep(0.5)  # Brief pause to allow interruption
-                interrupt_event.clear()
-                print("Walbert processing interrupted. Waiting for your input...")
+                continue
             else:
                 # Put user input into queue for agent
                 print("\nWalbert has received your request.")
