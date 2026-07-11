@@ -85,6 +85,7 @@ class WalbertAgent:
         self.processing_cycle = 0
         self.current_conversation_file = None
         self.db = None
+        self.print_raw = False
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
@@ -189,8 +190,10 @@ class WalbertAgent:
                     self.state.update_awareness(result_block["content"])
                 else:
                     self.state.append_block(block["type"], block["content"])
-                    self.state.append_block(result_block["type"], result_block["content"])
-                    self.write_output(json.dumps(result_block, indent=2))
+                    self.state.append_block(result_block["type"], block["content"])
+                    # Only print to console if raw mode is enabled or it's a console response
+                    if self.print_raw or result_block["type"] == "console_response":
+                        self.write_output(json.dumps(result_block, indent=2))
             block["executed"] = True
         
         # Ensure state syncs immediately after execution so next prompt reflects changes

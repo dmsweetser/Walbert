@@ -60,7 +60,7 @@ def load_config() -> Config:
 def get_nonblocking_input(prompt: str = ">>>>> ") -> str:
     """
     Read input from stdin in a non-blocking way, echoing characters as they are typed.
-    Returns the input string when Enter is pressed.
+    Supports backspace. Returns the input string when Enter is pressed.
     """
     import readchar
     print(prompt, end='', flush=True)
@@ -72,6 +72,11 @@ def get_nonblocking_input(prompt: str = ">>>>> ") -> str:
                 break
             elif char == '\x03':  # Ctrl+C
                 raise KeyboardInterrupt
+            elif char in ('\x7f', '\x08'):  # Backspace
+                if user_input:
+                    user_input.pop()
+                    print('\b \b', end='', flush=True)
+                continue
             user_input.append(char)
             print(char, end='', flush=True)  # Echo the character
         except KeyboardInterrupt:
@@ -118,14 +123,14 @@ def main():
     print("Welcome to Walbert! The local-first AI agent.")
     print("Available commands:")
     print("- exit/quit: Exit the program")
-    print("- inet on: Enable internet access for Python execution")
-    print("- inet off: Disable internet access for Python execution")
+    print("- inet on/off: Toggle internet access for Python execution")
+    print("- log on/off: Toggle raw block output to console")
+    print("- view log: Open raw model output log (paged)")
+    print("- show awareness/schema/context: View agent state")
     print("- pip_install <package>: Install a Python package in the main environment")
     print("- Any other input will be treated as a request to Walbert")
     print("")
-    print("Press ENTER at any time to interrupt Walbert's current processing.")
-    print("")
-
+    
     try:
         while True:
             # Get user input in a non-blocking way
@@ -140,18 +145,42 @@ def main():
             elif user_input.lower() == 'inet off':
                 agent.internet_access = False
                 print("\nInternet access disabled for Python execution.")
+            elif user_input.lower() == 'log on':
+                agent.print_raw = True
+                print("\nRaw log output enabled. All block executions will be printed.")
+            elif user_input.lower() == 'log off':
+                agent.print_raw = False
+                print("\nRaw log output disabled. Only console responses will be shown.")
+            elif user_input.lower() == 'show awareness':
+                if hasattr(agent, 'state') and agent.state:
+                    print(f"\n--- AWARENESS ---\n{agent.state.awareness_text}\n--- END ---")
+                else:
+                    print("\nNo awareness data available yet.")
+            elif user_input.lower() == 'show schema':
+                if hasattr(agent, 'state') and agent.state:
+                    print(f"\n--- DB SCHEMA ---\n{agent.state.db_schema}\n--- END ---")
+                else:
+                    print("\nNo schema data available yet.")
+            elif user_input.lower() == 'show context':
+                if hasattr(agent, 'state') and agent.state:
+                    blocks = agent.state.context_blocks
+                    print(f"\n--- CONTEXT BLOCKS ({len(blocks)}) ---")
+                    for b in blocks:
+                        print(f"[{b['type']}]: {b['content'][:200]}...")
+                    print("--- END ---")
+                else:
+                    print("\nNo context data available yet.")
+            elif user_input.lower() == 'view log':
+                print("\nEntering raw log viewer...")
+                _view_raw_log(agent)
+                print("Exiting log viewer.")
             elif user_input.lower().startswith('pip_install '):
                 package = user_input[12:].strip()
                 if package:
                     agent._install_python_package(package)
                     print("\nPackage installation command executed.")
             elif user_input == "":
-                # User pressed ENTER to interrupt Walbert
-                print("\nInterrupting Walbert...")
-                interrupt_event.set()
-                time.sleep(0.5)  # Brief pause to allow interruption
-                interrupt_event.clear()
-                print("Walbert processing interrupted. Waiting for your input...")
+                continue
             else:
                 # Put user input into queue for agent
                 print("\nWalbert has received your request.")
@@ -168,5 +197,54 @@ def main():
     finally:
         agent.shutdown()
 
-if __name__ == "__main__":
-    main()
+def _view_raw_log(agent):
+    """View raw model output with paging support."""
+    import glob
+    import readchar
+    if not hasattr(agent, 'session_dir') or not agent.session_dir:
+        print("\nNo active session to view.")
+        return
+    response_files = sorted(glob.glob(os.path.join(agent.session_dir, "*_response.txt")))
+    if not response_files:
+        print("\nNo response logs found.")
+        return
+    latest_file = response_files[-1]
+    try:
+        with open(latest_file, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+    except Exception as e:
+        print(f"\nError reading log: {e}")
+        return
+
+    chunk_size = 10
+    current_idx = 0
+    print("\n--- RAW LOG VIEWER (press 'n' next, 'p' prev, 'q' exit) ---")
+    while current_idx < len(lines):
+        chunk = lines[current_idx:current_idx+chunk_size]
+        for line in chunk:
+            print(line, end='')
+        current_idx += chunk_size
+        if current_idx >= len(lines):
+            print("\n--- END OF LOG ---")
+            break
+        print("\n[Press n for next, p for prev, q to exit] ", end='', flush=True)
+        try:
+            cmd = readchar.readchar()
+            if cmd == 'n':
+                continue
+            elif cmd == 'p':
+                current_idx -= chunk_size
+                if current_idx < 0:
+                    current_idx = 0
+                continue
+            elif cmd == 'q':
+                break
+        except KeyboardInterrupt:
+            break
+    print("\n")
+
+def main():
+    """Main entry point"""
+    config = load_config()
+    log_level = getattr(logging, config.log_level.upper(), logging.INFO)
+    logger.setLevel(log_level)
