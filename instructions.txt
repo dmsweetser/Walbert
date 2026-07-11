@@ -1,5 +1,5 @@
-I find that the awareness and context blocks are never updated, and those updates are never reflected in the new prompt, even though I see valid blocks returned by the model as it progresses.
+I want you to change what is output to the console. By default, have only the console response go to the console. But give a new option in the menu to see the raw log, which will feed all the model output a few lines at a time, allowing the user to page forward or backward or exit the log. That way, the console stays uncluttered, just showing model responses to the user, but you can access all the rest.
 
-Populate test_walbert_agent.py with a suite of tests that validates functionality without using an actual LLM. Instead, use mocks as needed to get structured inputs and outputs required to validate functionality of other components that ARE testable.
+Also allow menu options to see just the awareness, db schema, or context blocks.
 
-Please fix this and any other issues you see in the app.
+Also, I need you to allow backspace for the user console input. Right now that isn't possible and it is very annoying.
