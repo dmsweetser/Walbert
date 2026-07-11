@@ -248,3 +248,6 @@ def main():
     config = load_config()
     log_level = getattr(logging, config.log_level.upper(), logging.INFO)
     logger.setLevel(log_level)
+
+if __name__ == "__main__":
+    main()
