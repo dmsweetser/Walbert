@@ -84,24 +84,7 @@ def get_nonblocking_input(prompt: str = ">>>>> ") -> str:
             raise
     return ''.join(user_input)
 
-def main():
-    """Main entry point"""
-    config = load_config()
-    log_level = getattr(logging, config.log_level.upper(), logging.INFO)
-    logger.setLevel(log_level)
-
-    # Create input/output queue and interrupt event
-    input_queue = queue.Queue()
-    interrupt_event = threading.Event()
-
-    # Create agent
-    agent = WalbertAgent(config)
-
-    # Start agent in autonomous mode in separate thread
-    agent_thread = threading.Thread(target=agent.run_autonomous, args=(input_queue, interrupt_event))
-    agent_thread.daemon = True
-    agent_thread.start()
-
+def print_welcome_message():
     # Print welcome message and ASCII art
     print("""
           
@@ -128,9 +111,31 @@ def main():
     print("- view log: Open raw model output log (paged)")
     print("- show awareness/schema/context: View agent state")
     print("- pip_install <package>: Install a Python package in the main environment")
+    print("- help: Show these options again")
     print("- Any other input will be treated as a request to Walbert")
     print("")
     
+
+def main():
+    """Main entry point"""
+    config = load_config()
+    log_level = getattr(logging, config.log_level.upper(), logging.INFO)
+    logger.setLevel(log_level)
+
+    # Create input/output queue and interrupt event
+    input_queue = queue.Queue()
+    interrupt_event = threading.Event()
+
+    # Create agent
+    agent = WalbertAgent(config)
+
+    # Start agent in autonomous mode in separate thread
+    agent_thread = threading.Thread(target=agent.run_autonomous, args=(input_queue, interrupt_event))
+    agent_thread.daemon = True
+    agent_thread.start()
+
+    print_welcome_message()
+
     try:
         while True:
             # Get user input in a non-blocking way
@@ -139,6 +144,8 @@ def main():
             if user_input.lower() in ['exit', 'quit']:
                 input_queue.put(("exit",))
                 break
+            elif user_input.lower() == 'help':
+                print_welcome_message()
             elif user_input.lower() == 'inet on':
                 agent.internet_access = True
                 print("\nInternet access enabled for Python execution.")
