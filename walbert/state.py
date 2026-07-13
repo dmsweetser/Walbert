@@ -230,21 +230,40 @@ Reply ONLY in the specified block format. NO CRUFT.
         self._load_context_blocks()
 
     # --- Prompt Generation ---
-    def get_prompt(self, internet_access: bool = False) -> str:
-        """Generate the full prompt by combining all components."""
-        self.refresh_db_schema()  # Ensure DB schema is up-to-date
-        self._sync_state()  # Ensure in-memory state reflects latest updates
+    def _estimate_tokens(self, text: str) -> int:
+        """Rough token estimation using character-to-token heuristic."""
+        return len(text) // 4
+
+    def get_prompt(self, internet_access: bool = False, max_tokens: int = 2048) -> str:
+        """Generate the full prompt by combining all components, with token-aware truncation."""
+        self.refresh_db_schema()
+        self._sync_state()
 
         full_database_path = os.path.abspath(self.config.database_path)
 
-        prompt = f"[walbert_system_prompt_start]\n{self.system_prompt}\n[walbert_system_prompt_end]\n\n"
-        prompt += f"## Current Database Schema\nDatabase file location: {full_database_path}\n\n{self.db_schema}\n\n"
-        prompt += f"## Internet Access Enabled?\n{internet_access}\n\n"
-        prompt += f"## Current Awareness\n{self.awareness_text}\n\n"
-        prompt += f"## RECENT CONVERSATION HISTORY (limited to the most recent {self.config.max_context_blocks} blocks)\n\n"
+        base_prompt = f"[walbert_system_prompt_start]\n{self.system_prompt}\n[walbert_system_prompt_end]\n\n"
+        base_prompt += f"## Current Database Schema\nDatabase file location: {full_database_path}\n\n{self.db_schema}\n\n"
+        base_prompt += f"## Internet Access Enabled?\n{internet_access}\n\n"
+        base_prompt += f"## Current Awareness\n{self.awareness_text}\n\n"
+        base_prompt += f"## RECENT CONVERSATION HISTORY\n\n"
+
+        base_tokens = self._estimate_tokens(base_prompt)
+        target_tokens = max_tokens * 0.7
+
+        context_tokens = 0
         for block in self._context_blocks:
-            prompt += f"[walbert_{block['type']}_start]\n{block['content']}\n[walbert_{block['type']}_end]\n\n"
-        return prompt
+            block_str = f"[walbert_{block['type']}_start]\n{block['content']}\n[walbert_{block['type']}_end]\n\n"
+            context_tokens += self._estimate_tokens(block_str)
+
+        while len(self._context_blocks) > 0 and (base_tokens + context_tokens) > target_tokens:
+            oldest = self._context_blocks.pop(0)
+            oldest_str = f"[walbert_{oldest['type']}_start]\n{oldest['content']}\n[walbert_{oldest['type']}_end]\n\n"
+            context_tokens -= self._estimate_tokens(oldest_str)
+
+        context_text = "\n".join(
+            f"[walbert_{b['type']}_start]\n{b['content']}\n[walbert_{b['type']}_end]\n\n" for b in self._context_blocks
+        )
+        return base_prompt + context_text
 
     def _sync_state(self):
         """Ensure in-memory state is synchronized and ready for prompt generation."""

@@ -1,5 +1,5 @@
-I want you to change what is output to the console. By default, have only the console response go to the console. But give a new option in the menu to see the raw log, which will feed all the model output a few lines at a time, allowing the user to page forward or backward or exit the log. That way, the console stays uncluttered, just showing model responses to the user, but you can access all the rest.
+Can you get rid of the "view log" option, and for the "show awareness..." options, can you make those paged?
 
-Also allow menu options to see just the awareness, db schema, or context blocks.
+Also, right now, nothing goes to the console unless you enable print_raw. But I do want the console output to go to the console no matter what - it's just the other ones I want suppressed if you choose print_raw to No.
 
-Also, I need you to allow backspace for the user console input. Right now that isn't possible and it is very annoying.
+Also, before sending the prompt to the model, I want you to calculate the total tokens of the prompt. If it is too high based on the available context size, I want you to remove older context blocks from the history, until the prompt token size is 70% or less of the available context size.

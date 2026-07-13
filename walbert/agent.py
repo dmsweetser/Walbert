@@ -136,7 +136,7 @@ class WalbertAgent:
 
     def _generate_response_block(self, user_input: str = None) -> str:
         """Generate a response block using the model."""
-        prompt = self.state.get_prompt(self.internet_access)
+        prompt = self.state.get_prompt(self.internet_access, max_tokens=self.config.model_configs['model'].context_size)
         prompt += "\nPlease respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
 
         model_response = self.model_manager.execute_model(
@@ -156,7 +156,7 @@ class WalbertAgent:
 
     def _generate_autonomous_block(self) -> str:
         """Generate an autonomous instruction block."""
-        prompt = self.state.get_prompt(self.internet_access)
+        prompt = self.state.get_prompt(self.internet_access, max_tokens=self.config.model_configs['model'].context_size)
         prompt += (
             "\nYou are operating autonomously. Please review recent actions, identify pending tasks, make progress on objectives, and maintain awareness of your database state. If no objectives have been provided, explore the world around you as safely as you can.\n"
         )
@@ -191,7 +191,7 @@ class WalbertAgent:
                 else:
                     self.state.append_block(block["type"], block["content"])
                     self.state.append_block(result_block["type"], block["content"])
-                    self.write_output(json.dumps(result_block, indent=2))
+                    self.write_output(json.dumps(result_block, indent=2), result_block["type"])
                         
             block["executed"] = True
         
@@ -214,9 +214,9 @@ class WalbertAgent:
         except Exception as e:
             self.logger.error(f"Error logging prompt/response: {e}")
 
-    def write_output(self, text: str) -> None:
+    def write_output(self, text: str, block_type: str = None) -> None:
         """Write output to console."""
-        if self.print_raw:
+        if block_type == "console_response" or self.print_raw:
             print(text, end='', flush=True)
 
     def run_autonomous(self, input_queue, interrupt_event=None, test_mode=False):

@@ -86,8 +86,7 @@ def get_nonblocking_input(prompt: str = ">>>>> ") -> str:
 
 def print_welcome_message():
     # Print welcome message and ASCII art
-    print("""
-          
+    print("""          
  ___            ___      
 /   \\          /   \\    
 \\_   \\        /  __/    
@@ -99,8 +98,7 @@ def print_welcome_message():
      _/     /\\          
     /o)  (o/\\ \\_        
     \\_____/ /           
-      \\____/            
-          
+      \\____/                      
               """)
 
     print("Welcome to Walbert! The local-first AI agent.")
@@ -108,13 +106,40 @@ def print_welcome_message():
     print("- exit/quit: Exit the program")
     print("- inet on/off: Toggle internet access for Python execution")
     print("- log on/off: Toggle raw block output to console")
-    print("- view log: Open raw model output log (paged)")
     print("- show awareness/schema/context: View agent state")
     print("- pip_install <package>: Install a Python package in the main environment")
     print("- help: Show these options again")
     print("- Any other input will be treated as a request to Walbert")
     print("")
     
+def _paged_output(text):
+    import readchar
+    lines = text.split('\n')
+    idx = 0
+    print("\n--- PAGED OUTPUT (n=next, p=prev, q=exit) ---")
+    while idx < len(lines):
+        chunk = lines[idx:idx+10]
+        for line in chunk:
+            print(line)
+        idx += 10
+        if idx >= len(lines):
+            print("--- END OF OUTPUT ---")
+            break
+        print("\n[Press n for next, p for prev, q to exit] ", end='', flush=True)
+        try:
+            cmd = readchar.readchar()
+            if cmd == 'n':
+                continue
+            elif cmd == 'p':
+                idx -= 10
+                if idx < 0:
+                    idx = 0
+                continue
+            elif cmd == 'q':
+                break
+        except KeyboardInterrupt:
+            break
+    print("\n")
 
 def main():
     """Main entry point"""
@@ -160,27 +185,24 @@ def main():
                 print("\nRaw log output disabled. Only console responses will be shown.")
             elif user_input.lower() == 'show awareness':
                 if hasattr(agent, 'state') and agent.state:
-                    print(f"\n--- AWARENESS ---\n{agent.state.awareness_text}\n--- END ---")
+                    _paged_output(f"--- AWARENESS ---\n{agent.state.awareness_text}\n--- END ---")
                 else:
                     print("\nNo awareness data available yet.")
             elif user_input.lower() == 'show schema':
                 if hasattr(agent, 'state') and agent.state:
-                    print(f"\n--- DB SCHEMA ---\n{agent.state.db_schema}\n--- END ---")
+                    _paged_output(f"--- DB SCHEMA ---\n{agent.state.db_schema}\n--- END ---")
                 else:
                     print("\nNo schema data available yet.")
             elif user_input.lower() == 'show context':
                 if hasattr(agent, 'state') and agent.state:
                     blocks = agent.state.context_blocks
-                    print(f"\n--- CONTEXT BLOCKS ({len(blocks)}) ---")
+                    ctx = "--- CONTEXT BLOCKS ({}) ---".format(len(blocks))
                     for b in blocks:
-                        print(f"[{b['type']}]: {b['content'][:200]}...")
-                    print("--- END ---")
+                        ctx += "\n[{}]: {}...".format(b['type'], b['content'][:200])
+                    ctx += "\n--- END ---"
+                    _paged_output(ctx)
                 else:
                     print("\nNo context data available yet.")
-            elif user_input.lower() == 'view log':
-                print("\nEntering raw log viewer...")
-                _view_raw_log(agent)
-                print("Exiting log viewer.")
             elif user_input.lower().startswith('pip_install '):
                 package = user_input[12:].strip()
                 if package:
@@ -203,52 +225,6 @@ def main():
         logger.error(f"Error in main loop: {e}", exc_info=True)
     finally:
         agent.shutdown()
-
-def _view_raw_log(agent):
-    """View raw model output with paging support."""
-    import glob
-    import readchar
-    if not hasattr(agent, 'session_dir') or not agent.session_dir:
-        print("\nNo active session to view.")
-        return
-    response_files = sorted(glob.glob(os.path.join(agent.session_dir, "*_response.txt")))
-    if not response_files:
-        print("\nNo response logs found.")
-        return
-    latest_file = response_files[-1]
-    try:
-        with open(latest_file, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-    except Exception as e:
-        print(f"\nError reading log: {e}")
-        return
-
-    chunk_size = 10
-    current_idx = 0
-    print("\n--- RAW LOG VIEWER (press 'n' next, 'p' prev, 'q' exit) ---")
-    while current_idx < len(lines):
-        chunk = lines[current_idx:current_idx+chunk_size]
-        for line in chunk:
-            print(line, end='')
-        current_idx += chunk_size
-        if current_idx >= len(lines):
-            print("\n--- END OF LOG ---")
-            break
-        print("\n[Press n for next, p for prev, q to exit] ", end='', flush=True)
-        try:
-            cmd = readchar.readchar()
-            if cmd == 'n':
-                continue
-            elif cmd == 'p':
-                current_idx -= chunk_size
-                if current_idx < 0:
-                    current_idx = 0
-                continue
-            elif cmd == 'q':
-                break
-        except KeyboardInterrupt:
-            break
-    print("\n")
 
 if __name__ == "__main__":
     main()
