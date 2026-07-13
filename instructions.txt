@@ -1,5 +1,3 @@
-Can you get rid of the "view log" option, and for the "show awareness..." options, can you make those paged?
+Can you make it so that when the user enters input, the existing llama-completion is interrupted and a new prompt including the user input is immediately provided to the model for completion? I don't want the user to have to wait for in-progress work. Only interrupt llama-completion, not block execution.
 
-Also, right now, nothing goes to the console unless you enable print_raw. But I do want the console output to go to the console no matter what - it's just the other ones I want suppressed if you choose print_raw to No.
-
-Also, before sending the prompt to the model, I want you to calculate the total tokens of the prompt. If it is too high based on the available context size, I want you to remove older context blocks from the history, until the prompt token size is 70% or less of the available context size.
+Also, I don't seem to get the console responses back to the console when I have log off. Can you fix that?
