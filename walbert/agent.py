@@ -149,10 +149,15 @@ class WalbertAgent:
         response_blocks = self.parser.parse(model_response)
         self._execute_pending_blocks(response_blocks)
 
+        console_content = ""
         for block in response_blocks:
             if block["type"] == "console_response":
-                return block["content"]
-        return ""
+                console_content = block["content"]
+        
+        if console_content:
+            print(console_content, end='', flush=True)
+            
+        return console_content
 
     def _generate_autonomous_block(self) -> str:
         """Generate an autonomous instruction block."""

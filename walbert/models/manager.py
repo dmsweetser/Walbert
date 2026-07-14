@@ -3,6 +3,7 @@ Model manager implementation using direct llama-completion binary execution
 """
 
 import os
+import select
 import subprocess
 import logging
 import time
@@ -73,22 +74,28 @@ class ModelManager:
                     process.wait()
                     break
 
-                token = process.stdout.read(1)
-                if current_iteration % 100 == 0 or not token:
-                    with open(response_file, 'w', encoding='utf-8') as f:
-                        f.write(response_content)
-                
-                if not token:
-                    break
+                ready, _, _ = select.select([process.stdout], [], [], 0.1)
+                if ready:
+                    try:
+                        token = process.stdout.read(1)
+                    except Exception:
+                        token = None
                     
-                response_content += token
-                current_iteration += 1
-                
-                if callback:
-                    if first_token:
-                        callback(f"{chr(10)}{chr(10)}[Walbert Output]{chr(10)}")
-                        first_token = False
-                    callback(token)
+                    if not token:
+                        break
+                        
+                    response_content += token
+                    current_iteration += 1
+                    
+                    if current_iteration % 100 == 0:
+                        with open(response_file, 'w', encoding='utf-8') as f:
+                            f.write(response_content)
+                    
+                    if callback:
+                        if first_token:
+                            callback(f"{chr(10)}{chr(10)}[Walbert Output]{chr(10)}")
+                            first_token = False
+                        callback(token)
         except Exception as e:
             logger.error(f"Error during model execution: {e}")
         finally:
