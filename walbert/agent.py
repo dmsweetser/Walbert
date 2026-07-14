@@ -180,7 +180,7 @@ class WalbertAgent:
 
     def _execute_pending_blocks(self, provided_blocks):
         """Execute all pending blocks (SQL, Python, etc.) in order."""
-        executable_types = {"sql_execute", "python_execute", "awareness"}
+        executable_types = {"sql_execute", "python_execute", "awareness", "console_response"}
         with self._lock:
             pending_blocks = [
                 b for b in provided_blocks
