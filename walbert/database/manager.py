@@ -3,6 +3,7 @@ Database manager implementation
 """
 
 import sqlite3
+import threading
 import logging
 from typing import List, Tuple, Any, Dict
 
@@ -13,10 +14,11 @@ class DatabaseManager:
         self.logger = logging.getLogger('walbert.database')
         self.conn = None
         self.cursor = None
+        self._lock = threading.Lock()
 
     def connect(self):
         """Connect to SQLite database"""
-        self.conn = sqlite3.connect(self.db_path)
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA synchronous=NORMAL")
         self.cursor = self.conn.cursor()
@@ -26,104 +28,108 @@ class DatabaseManager:
 
     def init_schema(self):
         """Initialize database schema with minimal structure"""
-        self.logger.debug("Initializing database schema")
+        with self._lock:
+            self.logger.debug("Initializing database schema")
 
-        # Create minimal items table - Walbert will define all other tables
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS items (
-                id INTEGER PRIMARY KEY,
-                content TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+            # Create minimal items table - Walbert will define all other tables
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS items (
+                    id INTEGER PRIMARY KEY,
+                    content TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
 
-        self.conn.commit()
-        self.logger.debug("Database schema initialized with minimal items table only")
+            self.conn.commit()
+            self.logger.debug("Database schema initialized with minimal items table only")
 
     def get_schema(self) -> str:
         """Get current database schema"""
-        self.logger.debug("Retrieving database schema")
+        with self._lock:
+            self.logger.debug("Retrieving database schema")
 
-        tables = self.cursor.execute("""
-            SELECT name FROM sqlite_master
-            WHERE type='table' AND name NOT LIKE 'sqlite_%'
-        """).fetchall()
+            tables = self.cursor.execute("""
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name NOT LIKE 'sqlite_%'
+            """).fetchall()
 
-        schema_str = f"Current Database Schema:{chr(10)}{chr(10)}"
-        for table in tables:
-            table_name = table[0]
-            schema_str += f"Table: {table_name}{chr(10)}"
+            schema_str = f"Current Database Schema:{chr(10)}{chr(10)}"
+            for table in tables:
+                table_name = table[0]
+                schema_str += f"Table: {table_name}{chr(10)}"
 
-            columns = self.cursor.execute(f"PRAGMA table_info({table_name})").fetchall()
-            schema_str += f"Columns:{chr(10)}"
-            for col in columns:
-                col_name = col[1]
-                col_type = col[2]
-                schema_str += f"  - {col_name} ({col_type})"
+                columns = self.cursor.execute(f"PRAGMA table_info({table_name})").fetchall()
+                schema_str += f"Columns:{chr(10)}"
+                for col in columns:
+                    col_name = col[1]
+                    col_type = col[2]
+                    schema_str += f"  - {col_name} ({col_type})"
 
-                if col[5]:  # primary key
-                    schema_str += " PRIMARY KEY"
-                if col[3]:  # not null
-                    schema_str += " NOT NULL"
-                if col[4] is not None:  # default value
-                    schema_str += f" DEFAULT {col[4]}"
-                schema_str += f"{chr(10)}"
+                    if col[5]:  # primary key
+                        schema_str += " PRIMARY KEY"
+                    if col[3]:  # not null
+                        schema_str += " NOT NULL"
+                    if col[4] is not None:  # default value
+                        schema_str += f" DEFAULT {col[4]}"
+                    schema_str += f"{chr(10)}"
 
-            fks = self.cursor.execute(f"PRAGMA foreign_key_list({table_name})").fetchall()
-            if fks:
-                schema_str += f"Foreign Keys:{chr(10)}"
-                for fk in fks:
-                    schema_str += f"  - {fk[3]} REFERENCES {fk[2]}({fk[4]})"
-                    if fk[6] != 'NO ACTION':
-                        schema_str += f" ON DELETE {fk[6]}"
-                    if fk[5] != 'NO ACTION':
-                        schema_str += f" ON UPDATE {fk[5]}"
-                    schema_str += chr(10)
+                fks = self.cursor.execute(f"PRAGMA foreign_key_list({table_name})").fetchall()
+                if fks:
+                    schema_str += f"Foreign Keys:{chr(10)}"
+                    for fk in fks:
+                        schema_str += f"  - {fk[3]} REFERENCES {fk[2]}({fk[4]})"
+                        if fk[6] != 'NO ACTION':
+                            schema_str += f" ON DELETE {fk[6]}"
+                        if fk[5] != 'NO ACTION':
+                            schema_str += f" ON UPDATE {fk[5]}"
+                        schema_str += chr(10)
 
-        return schema_str
+            return schema_str
 
     def execute_sql(self, sql: str) -> str:
         """Execute arbitrary SQL statement(s)"""
-        self.logger.debug(f"Executing SQL: {sql}")
-        try:
-            # Split multiple statements by semicolon
-            statements = [s.strip() for s in sql.split(';') if s.strip()]
+        with self._lock:
+            self.logger.debug(f"Executing SQL: {sql}")
+            try:
+                # Split multiple statements by semicolon
+                statements = [s.strip() for s in sql.split(';') if s.strip()]
 
-            results = []
-            for statement in statements:
-                if not statement:
-                    continue
-
-                result = self.cursor.execute(statement)
-
-                if statement.strip().upper().startswith("SELECT"):
-                    rows = result.fetchall()
-                    if not rows:
-                        results.append("Query executed successfully. No rows returned.")
+                results = []
+                for statement in statements:
+                    if not statement:
                         continue
 
-                    output = []
-                    columns = [desc[0] for desc in result.description]
-                    output.append(f"{chr(9)}".join(columns))
-                    output.append("-" * (sum(len(col) for col in columns) + len(columns) * 3))
+                    result = self.cursor.execute(statement)
 
-                    for row in rows:
-                        output_row = []
-                        for val in row:
-                            output_row.append(str(val) if val is not None else "NULL")
-                        output.append(f"{chr(9)}".join(output_row))
+                    if statement.strip().upper().startswith("SELECT"):
+                        rows = result.fetchall()
+                        if not rows:
+                            results.append("Query executed successfully. No rows returned.")
+                            continue
 
-                    results.append(f"{chr(10)}".join(output))
-                else:
-                    results.append(f"SQL executed successfully. Rows affected: {self.cursor.rowcount}")
+                        output = []
+                        columns = [desc[0] for desc in result.description]
+                        output.append(f"{chr(9)}".join(columns))
+                        output.append("-" * (sum(len(col) for col in columns) + len(columns) * 3))
 
-            self.conn.commit()
-            return f"{chr(10)}{chr(10)}".join(results)
-        except Exception as e:
-            self.logger.error(f"SQL execution error: {e}")
-            return f"Error executing SQL: {e}"
+                        for row in rows:
+                            output_row = []
+                            for val in row:
+                                output_row.append(str(val) if val is not None else "NULL")
+                            output.append(f"{chr(9)}".join(output_row))
+
+                        results.append(f"{chr(10)}".join(output))
+                    else:
+                        results.append(f"SQL executed successfully. Rows affected: {self.cursor.rowcount}")
+
+                self.conn.commit()
+                return f"{chr(10)}{chr(10)}".join(results)
+            except Exception as e:
+                self.logger.error(f"SQL execution error: {e}")
+                return f"Error executing SQL: {e}"
 
     def close(self):
         """Close database connection"""
-        self.logger.debug("Closing database connection")
-        self.conn.close()
+        with self._lock:
+            self.logger.debug("Closing database connection")
+            self.conn.close()
