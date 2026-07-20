@@ -1,3 +1,5 @@
-When the user adds a message, please immediately add the block to the context block. That way, if they send a second consecutive message, the first one isn't lost.
+Revise the app so that Walbert knows it can reach out to the user if it needs anything.
 
-I tried running pip_install serial, and I got an error "SQLite objects created in a thread can only be used in that same thread". Can you make the SQLite access thread-safe?
+Also, make it so when a console response is sent to the user, processing halts until a response from the user is received.
+
+Make it clear to Walbert that console responses are blocking, and so it should only respond to the user when necessary.
