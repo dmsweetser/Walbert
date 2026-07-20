@@ -86,6 +86,7 @@ class WalbertAgent:
         self.current_conversation_file = None
         self.db = None
         self.print_raw = False
+        self.waiting_for_user = False
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
@@ -156,6 +157,7 @@ class WalbertAgent:
         
         if console_content:
             print(console_content, end='', flush=True)
+            self.waiting_for_user = True
             
         return console_content
 
@@ -236,34 +238,50 @@ class WalbertAgent:
 
         while True:
             try:
-                try:
-                    msg_type, msg = input_queue.get_nowait()
+                if self.waiting_for_user:
+                    msg_type, msg = input_queue.get()
+                    self.waiting_for_user = False
                     if msg_type == "exit":
                         self.end_conversation()
                         return
-
                     if msg_type == "user_input":
                         if msg == last_user_input:
                             print(f"\n\n>>>>> ", end='', flush=True)
                             continue
-
                         if interrupt_event:
                             interrupt_event.set()
                             time.sleep(self.MODEL_RESTART_DELAY)
                             interrupt_event.clear()
-
                         input_queue.queue.clear()
-
                         with self._lock:
                             last_user_input = msg
-
                         self.state.append_block("user_input", msg)
                         self._generate_response_block(msg)
                         print(f"\n\n>>>>> ", end='', flush=True)
                         continue
-
-                except queue.Empty:
-                    pass
+                else:
+                    try:
+                        msg_type, msg = input_queue.get_nowait()
+                        if msg_type == "exit":
+                            self.end_conversation()
+                            return
+                        if msg_type == "user_input":
+                            if msg == last_user_input:
+                                print(f"\n\n>>>>> ", end='', flush=True)
+                                continue
+                            if interrupt_event:
+                                interrupt_event.set()
+                                time.sleep(self.MODEL_RESTART_DELAY)
+                                interrupt_event.clear()
+                            input_queue.queue.clear()
+                            with self._lock:
+                                last_user_input = msg
+                            self.state.append_block("user_input", msg)
+                            self._generate_response_block(msg)
+                            print(f"\n\n>>>>> ", end='', flush=True)
+                            continue
+                    except queue.Empty:
+                        pass
 
                 if not test_mode:
                     self._generate_autonomous_block()
