@@ -5,6 +5,7 @@ Main entry point for the Walbert AI agent system
 """
 
 import select
+import subprocess
 import sys
 import os
 import logging
@@ -305,6 +306,21 @@ Error: {str(e)}
                     interrupt_event.set()
                     time.sleep(self.MODEL_RESTART_DELAY)
                     interrupt_event.clear()
+
+    def _install_python_package(self, package: str):
+        """Install a Python package in the main environment."""
+        print(f"{chr(10)}Installing package: {package}")
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", package],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            print(f"{chr(10)}Successfully installed {package}")
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to install {package}: {e.stderr}")
+            self.logger.error(f"Failed to install package {package}: {e.stderr}")
 
     def shutdown(self):
         """Shutdown agent cleanly."""
