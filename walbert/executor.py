@@ -12,10 +12,9 @@ from typing import Dict, Optional
 logger = logging.getLogger('walbert.executor')
 
 class BlockExecutor:
-    def __init__(self, config, db_manager, internet_access: bool = False):
+    def __init__(self, config, db_manager):
         self.config = config
         self.db = db_manager
-        self.internet_access = internet_access
         self.python_temp_dir = None
 
     def execute(self, block: Dict[str, str]) -> Optional[Dict[str, str]]:

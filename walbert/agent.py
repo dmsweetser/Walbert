@@ -103,7 +103,7 @@ class WalbertAgent:
             self.model_manager = ModelManager(self.config)
         self.db = DatabaseManager(self.config.database_path)
         self.state.db = self.db
-        self.executor = BlockExecutor(self.config, self.db, self.internet_access)
+        self.executor = BlockExecutor(self.config, self.db)
 
     def start_conversation(self):
         """Start a new conversation session."""
@@ -244,7 +244,7 @@ class WalbertAgent:
 
         while True:
             try:
-                print(f"{chr(10)}Status: Internet={'ON' if self.internet_access else 'OFF'}, Python={'ON' if self.config.python_execution_enabled else 'OFF'}, Bash={'ON' if self.config.bash_execution_enabled else 'OFF'}")
+                print(f"{chr(10)}Status: Python={'ON' if self.config.python_execution_enabled else 'OFF'}, Bash={'ON' if self.config.bash_execution_enabled else 'OFF'}")
                 if self.waiting_for_user:
                     msg_type, msg = input_queue.get()
                     self.waiting_for_user = False

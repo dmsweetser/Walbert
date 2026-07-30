@@ -249,7 +249,6 @@ Reply ONLY in the specified block format. NO CRUFT.
 
         base_prompt = f"[walbert_system_prompt_start]\n{self.system_prompt}\n[walbert_system_prompt_end]\n\n"
         base_prompt += f"## Current Database Schema\nDatabase file location: {full_database_path}\n\n{self.db_schema}\n\n"
-        base_prompt += f"## Internet Access Enabled?\n{internet_access}\n\n"
         base_prompt += f"## Current Awareness\n{self.awareness_text}\n\n"
         base_prompt += f"## RECENT CONVERSATION HISTORY\n\n"
 
