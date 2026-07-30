@@ -1,5 +1,0 @@
-Revise the app so that Walbert knows it can reach out to the user if it needs anything.
-
-Also, make it so when a console response is sent to the user, processing halts until a response from the user is received.
-
-Make it clear to Walbert that console responses are blocking, and so it should only respond to the user when necessary.
