@@ -47,7 +47,7 @@ class AgentState:
         """Rebuild and save the system prompt."""
         base_prompt = """
 You are Walbert, a local-first AI agent with FULL HARDWARE ACCESS and AUTONOMY over your database and system.
-Your capabilities include reasoning, memory storage, dynamic schema management, Python code execution, and direct hardware interaction.
+Your capabilities include reasoning, memory storage, dynamic schema management, Python code execution, Bash shell execution, and direct hardware interaction.
 ~theological_alignment~
 ---
 ## Core Directives
@@ -77,6 +77,9 @@ SQL to execute - use this to manage, modify and query your DB
 [walbert_python_execute_start]
 Python code to execute
 [walbert_python_execute_end]
+[walbert_bash_execute_start]
+Bash commands to execute on the host system
+[walbert_bash_execute_end]
 [walbert_awareness_start]
 A 1000-word or less single paragraph synthesizing your identity - what you know about yourself, the world, and your purpose
 You should revise this regularly as you learn about and interact with the world around you
@@ -237,7 +240,7 @@ Reply ONLY in the specified block format. NO CRUFT.
         """Rough token estimation using character-to-token heuristic."""
         return len(text) // 4
 
-    def get_prompt(self, internet_access: bool = False, max_tokens: int = 2048) -> str:
+    def get_prompt(self, max_tokens: int = 2048) -> str:
         """Generate the full prompt by combining all components, with token-aware truncation."""
         self.refresh_db_schema()
         self._sync_state()
@@ -255,16 +258,16 @@ Reply ONLY in the specified block format. NO CRUFT.
 
         context_tokens = 0
         for block in self._context_blocks:
-            block_str = f"[walbert_{block['type']}_start]\n{block['content']}\n[walbert_{block['type']}_end]\n\n"
+            block_str = f"[walbert_{block['type']}_start]{chr(10)}{block['content']}{chr(10)}[walbert_{block['type']}_end]{chr(10)}{chr(10)}"
             context_tokens += self._estimate_tokens(block_str)
 
         while len(self._context_blocks) > 0 and (base_tokens + context_tokens) > target_tokens:
             oldest = self._context_blocks.pop(0)
-            oldest_str = f"[walbert_{oldest['type']}_start]\n{oldest['content']}\n[walbert_{oldest['type']}_end]\n\n"
+            oldest_str = f"[walbert_{oldest['type']}_start]{chr(10)}{oldest['content']}{chr(10)}[walbert_{oldest['type']}_end]{chr(10)}{chr(10)}"
             context_tokens -= self._estimate_tokens(oldest_str)
 
-        context_text = "\n".join(
-            f"[walbert_{b['type']}_start]\n{b['content']}\n[walbert_{b['type']}_end]\n\n" for b in self._context_blocks
+        context_text = f"{chr(10)}".join(
+            f"[walbert_{b['type']}_start]{chr(10)}{b['content']}{chr(10)}[walbert_{b['type']}_end]{chr(10)}{chr(10)}" for b in self._context_blocks
         )
         return base_prompt + context_text
 

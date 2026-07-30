@@ -78,7 +78,6 @@ class WalbertAgent:
         self.state = AgentState(config, None)
         self.executor = None
         self.parser = BlockParser()
-        self.internet_access = False
         self._lock = threading.Lock()
         self.input_timeout = self.config.autonomous_operation_timeout
         self.last_input_time = 0
@@ -86,6 +85,8 @@ class WalbertAgent:
         self.processing_cycle = 0
         self.current_conversation_file = None
         self.db = None
+        self.python_execution_enabled = config.python_execution_enabled
+        self.bash_execution_enabled = config.bash_execution_enabled
         self.print_raw = False
         self.waiting_for_user = False
 
@@ -138,8 +139,8 @@ class WalbertAgent:
 
     def _generate_response_block(self, user_input: str = None) -> str:
         """Generate a response block using the model."""
-        prompt = self.state.get_prompt(self.internet_access, max_tokens=self.config.model_configs['model'].context_size)
-        prompt += "\nPlease respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
+        prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size)
+        prompt += f"{chr(10)}Please respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
 
         model_response = self.model_manager.execute_model(
             prompt,
@@ -164,9 +165,9 @@ class WalbertAgent:
 
     def _generate_autonomous_block(self) -> str:
         """Generate an autonomous instruction block."""
-        prompt = self.state.get_prompt(self.internet_access, max_tokens=self.config.model_configs['model'].context_size)
+        prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size)
         prompt += (
-            "\nYou are operating autonomously. Please review recent actions, identify pending tasks, make progress on objectives, and maintain awareness of your database state. If no objectives have been provided, explore the world around you as safely as you can.\n"
+            f"{chr(10)}You are operating autonomously. Please review recent actions, identify pending tasks, make progress on objectives, and maintain awareness of your database state. If no objectives have been provided, explore the world around you as safely as you can.\n"
         )
 
         model_response = self.model_manager.execute_model(
@@ -226,7 +227,7 @@ class WalbertAgent:
         """Write output to console."""
         if block_type == "console_response" or self.print_raw:
             if block_type in ("awareness", "db_schema", "context_blocks"):
-                formatted_text = "\n".join(f"**** {line}" for line in text.split("\n"))
+                formatted_text = f"{chr(10)}".join(f"**** {line}" for line in text.split(f"{chr(10)}"))
                 print(formatted_text, end='', flush=True)
             else:
                 print(text, end='', flush=True)
@@ -243,7 +244,7 @@ class WalbertAgent:
 
         while True:
             try:
-                print(f"\nStatus: Internet={'ON' if self.internet_access else 'OFF'}, Python={'ON' if self.config.python_execution_enabled else 'OFF'}, Bash={'ON' if self.config.bash_execution_enabled else 'OFF'}")
+                print(f"{chr(10)}Status: Internet={'ON' if self.internet_access else 'OFF'}, Python={'ON' if self.config.python_execution_enabled else 'OFF'}, Bash={'ON' if self.config.bash_execution_enabled else 'OFF'}")
                 if self.waiting_for_user:
                     msg_type, msg = input_queue.get()
                     self.waiting_for_user = False
@@ -252,7 +253,7 @@ class WalbertAgent:
                         return
                     if msg_type == "user_input":
                         if msg == last_user_input:
-                            print(f"\n\n>>>>> ", end='', flush=True)
+                            print(f"{chr(10)}\n>>>>> ", end='', flush=True)
                             continue
                         if interrupt_event:
                             interrupt_event.set()
@@ -263,7 +264,7 @@ class WalbertAgent:
                             last_user_input = msg
                         self.state.append_block("user_input", msg)
                         self._generate_response_block(msg)
-                        print(f"\n\n>>>>> ", end='', flush=True)
+                        print(f"{chr(10)}\n>>>>> ", end='', flush=True)
                         continue
                 else:
                     try:
@@ -273,7 +274,7 @@ class WalbertAgent:
                             return
                         if msg_type == "user_input":
                             if msg == last_user_input:
-                                print(f"\n\n>>>>> ", end='', flush=True)
+                                print(f"{chr(10)}\n>>>>> ", end='', flush=True)
                                 continue
                             if interrupt_event:
                                 interrupt_event.set()
@@ -284,7 +285,7 @@ class WalbertAgent:
                                 last_user_input = msg
                             self.state.append_block("user_input", msg)
                             self._generate_response_block(msg)
-                            print(f"\n\n>>>>> ", end='', flush=True)
+                            print(f"{chr(10)}\n>>>>> ", end='', flush=True)
                             continue
                     except queue.Empty:
                         pass
@@ -296,7 +297,7 @@ class WalbertAgent:
                     time.sleep(0.1)
 
             except KeyboardInterrupt:
-                print(f"\nGoodbye!")
+                print(f"{chr(10)}Goodbye!")
                 self.end_conversation()
                 break
             except Exception as e:

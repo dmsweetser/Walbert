@@ -92,8 +92,8 @@ Start the agent with:
 
 Available commands:
 - `exit`/`quit`: Exit the program
-- `inet on`: Enable internet access for Python execution
-- `inet off`: Disable internet access for Python execution
+- `python on/off`: Toggle Python execution
+- `bash on/off`: Toggle Bash execution
 - `pip_install <package>`: Install a Python package in the main environment
 - Any other input will be treated as a request to Walbert
 

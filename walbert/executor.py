@@ -69,7 +69,7 @@ class BlockExecutor:
             if result.stderr:
                 output_parts.append(f"Python stderr:\n{result.stderr.strip()}")
             output_parts.append(f"Python return code: {result.returncode}")
-            return {"type": "python_result", "content": "\n".join(output_parts) + "\n"}
+            return {"type": "python_result", "content": f"{chr(10)}".join(output_parts) + f"{chr(10)}"}
         except subprocess.TimeoutExpired:
             return {"type": "python_result", "content": f"Python execution timed out after {self.config.python_execution_timeout} seconds"}
         except Exception as e:
@@ -92,7 +92,7 @@ class BlockExecutor:
             if result.stderr:
                 output_parts.append(f"Bash stderr:\n{result.stderr.strip()}")
             output_parts.append(f"Bash return code: {result.returncode}")
-            return {"type": "bash_result", "content": "\n".join(output_parts) + "\n"}
+            return {"type": "bash_result", "content": f"{chr(10)}".join(output_parts) + f"{chr(10)}"}
         except subprocess.TimeoutExpired:
             return {"type": "bash_result", "content": f"Bash execution timed out after {self.config.python_execution_timeout} seconds"}
         except Exception as e:

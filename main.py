@@ -80,7 +80,7 @@ def get_nonblocking_input(prompt: str = ">>>>> ") -> str:
             user_input.append(char)
             print(char, end='', flush=True)  # Echo the character
         except KeyboardInterrupt:
-            print("\nInterrupting...")
+            print(f"{chr(10)}Interrupting...")
             raise
     return ''.join(user_input)
 
@@ -104,7 +104,8 @@ def print_welcome_message():
     print("Welcome to Walbert! The local-first AI agent.")
     print("Available commands:")
     print("- exit/quit: Exit the program")
-    print("- inet on/off: Toggle internet access for Python execution")
+    print("- python on/off: Toggle Python execution")
+    print("- bash on/off: Toggle Bash execution")
     print("- log on/off: Toggle raw block output to console")
     print("- show awareness/schema/context: View agent state")
     print("- pip_install <package>: Install a Python package in the main environment")
@@ -116,7 +117,7 @@ def _paged_output(text):
     import readchar
     lines = text.split('\n')
     idx = 0
-    print("\n--- PAGED OUTPUT (n=next, p=prev, q=exit) ---")
+    print(f"{chr(10)}--- PAGED OUTPUT (n=next, p=prev, q=exit) ---")
     while idx < len(lines):
         chunk = lines[idx:idx+10]
         for line in chunk:
@@ -125,7 +126,7 @@ def _paged_output(text):
         if idx >= len(lines):
             print("--- END OF OUTPUT ---")
             break
-        print("\n[Press n for next, p for prev, q to exit] ", end='', flush=True)
+        print(f"{chr(10)}[Press n for next, p for prev, q to exit] ", end='', flush=True)
         try:
             cmd = readchar.readchar()
             if cmd == 'n':
@@ -139,7 +140,7 @@ def _paged_output(text):
                 break
         except KeyboardInterrupt:
             break
-    print("\n")
+    print(f"{chr(10)}")
 
 def main():
     """Main entry point"""
@@ -171,55 +172,61 @@ def main():
                 break
             elif user_input.lower() == 'help':
                 print_welcome_message()
-            elif user_input.lower() == 'inet on':
-                agent.internet_access = True
-                print("\nInternet access enabled for Python execution.")
-            elif user_input.lower() == 'inet off':
-                agent.internet_access = False
-                print("\nInternet access disabled for Python execution.")
+            elif user_input.lower() == 'python on':
+                agent.python_execution_enabled = True
+                print(f"{chr(10)}Python execution enabled.")
+            elif user_input.lower() == 'python off':
+                agent.python_execution_enabled = False
+                print(f"{chr(10)}Python execution disabled.")
+            elif user_input.lower() == 'bash on':
+                agent.bash_execution_enabled = True
+                print(f"{chr(10)}Bash execution enabled.")
+            elif user_input.lower() == 'bash off':
+                agent.bash_execution_enabled = False
+                print(f"{chr(10)}Bash execution disabled.")
             elif user_input.lower() == 'log on':
                 agent.print_raw = True
-                print("\nRaw log output enabled. All block executions will be printed.")
+                print(f"{chr(10)}Raw log output enabled. All block executions will be printed.")
             elif user_input.lower() == 'log off':
                 agent.print_raw = False
-                print("\nRaw log output disabled. Only console responses will be shown.")
+                print(f"{chr(10)}Raw log output disabled. Only console responses will be shown.")
             elif user_input.lower() == 'show awareness':
                 if hasattr(agent, 'state') and agent.state:
                     _paged_output(f"--- AWARENESS ---\n{agent.state.awareness_text}\n--- END ---")
                 else:
-                    print("\nNo awareness data available yet.")
+                    print(f"{chr(10)}No awareness data available yet.")
             elif user_input.lower() == 'show schema':
                 if hasattr(agent, 'state') and agent.state:
                     _paged_output(f"--- DB SCHEMA ---\n{agent.state.db_schema}\n--- END ---")
                 else:
-                    print("\nNo schema data available yet.")
+                    print(f"{chr(10)}No schema data available yet.")
             elif user_input.lower() == 'show context':
                 if hasattr(agent, 'state') and agent.state:
                     blocks = agent.state.context_blocks
                     ctx = "--- CONTEXT BLOCKS ({}) ---".format(len(blocks))
                     for b in blocks:
-                        ctx += "\n[{}]: {}...".format(b['type'], b['content'][:200])
-                    ctx += "\n--- END ---"
+                        ctx += f"{chr(10)}" + "[{}]: {}...".format(b['type'], b['content'][:200])
+                    ctx += f"{chr(10)}--- END ---"
                     _paged_output(ctx)
                 else:
-                    print("\nNo context data available yet.")
+                    print(f"{chr(10)}No context data available yet.")
             elif user_input.lower().startswith('pip_install '):
                 package = user_input[12:].strip()
                 if package:
                     agent._install_python_package(package)
-                    print("\nPackage installation command executed.")
+                    print(f"{chr(10)}Package installation command executed.")
             elif user_input == "":
                 continue
             else:
                 # Put user input into queue for agent
-                print("\nWalbert has received your request.")
+                print(f"{chr(10)}Walbert has received your request.")
                 print("Press ENTER to interrupt Walbert at any time.")
                 interrupt_event.set()
                 time.sleep(0.5)  # Brief pause to allow interruption
                 interrupt_event.clear()
                 input_queue.put(("user_input", user_input))
     except KeyboardInterrupt:
-        print("\nGoodbye!")
+        print(f"{chr(10)}Goodbye!")
         input_queue.put(("exit",))
     except Exception as e:
         logger.error(f"Error in main loop: {e}", exc_info=True)
