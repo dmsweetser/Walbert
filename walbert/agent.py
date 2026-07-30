@@ -225,7 +225,11 @@ class WalbertAgent:
     def write_output(self, text: str, block_type: str = None) -> None:
         """Write output to console."""
         if block_type == "console_response" or self.print_raw:
-            print(text, end='', flush=True)
+            if block_type in ("awareness", "db_schema", "context_blocks"):
+                formatted_text = "\n".join(f"**** {line}" for line in text.split("\n"))
+                print(formatted_text, end='', flush=True)
+            else:
+                print(text, end='', flush=True)
 
     def run_autonomous(self, input_queue, interrupt_event=None, test_mode=False):
         """Main agent execution loop with block-based context."""
@@ -239,6 +243,7 @@ class WalbertAgent:
 
         while True:
             try:
+                print(f"\nStatus: Internet={'ON' if self.internet_access else 'OFF'}, Python={'ON' if self.config.python_execution_enabled else 'OFF'}, Bash={'ON' if self.config.bash_execution_enabled else 'OFF'}")
                 if self.waiting_for_user:
                     msg_type, msg = input_queue.get()
                     self.waiting_for_user = False

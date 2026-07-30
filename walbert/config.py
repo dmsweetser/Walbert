@@ -24,3 +24,6 @@ class Config:
     temp_dir_prefix: str = "walbert_python_"
     be_presbyterian: bool = True
     max_context_blocks: int = 20
+    internet_access: bool = False
+    python_execution_enabled: bool = True
+    bash_execution_enabled: bool = True
