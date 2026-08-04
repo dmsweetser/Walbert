@@ -107,7 +107,7 @@ def print_welcome_message():
     print("- python on/off: Toggle Python execution")
     print("- bash on/off: Toggle Bash execution")
     print("- log on/off: Toggle raw block output to console")
-    print("- show awareness/schema/context: View agent state")
+    print("- show awareness/ultimate_task/immediate_task/impediment/schema: View agent state")
     print("- pip_install <package>: Install a Python package in the main environment")
     print("- help: Show these options again")
     print("- Any other input will be treated as a request to Walbert")
@@ -195,6 +195,21 @@ def main():
                     _paged_output(f"--- AWARENESS ---\n{agent.state.awareness_text}\n--- END ---")
                 else:
                     print(f"{chr(10)}No awareness data available yet.")
+            elif user_input.lower() == 'show ultimate_task':
+                if hasattr(agent, 'state') and agent.state:
+                    _paged_output(f"--- ULTIMATE_TASK ---\n{agent.state._ultimate_task}\n--- END ---")
+                else:
+                    print(f"{chr(10)}No ultimate task data available yet.")
+            elif user_input.lower() == 'show immediate_task':
+                if hasattr(agent, 'state') and agent.state:
+                    _paged_output(f"--- IMMEDIATE_TASK ---\n{agent.state._immediate_task}\n--- END ---")
+                else:
+                    print(f"{chr(10)}No immediate task data available yet.")
+            elif user_input.lower() == 'show impediment':
+                if hasattr(agent, 'state') and agent.state:
+                    _paged_output(f"--- IMPEDIMENT ---\n{agent.state._impediment}\n--- END ---")
+                else:
+                    print(f"{chr(10)}No impediment data available yet.")
             elif user_input.lower() == 'show schema':
                 if hasattr(agent, 'state') and agent.state:
                     _paged_output(f"--- DB SCHEMA ---\n{agent.state.db_schema}\n--- END ---")

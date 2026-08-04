@@ -31,8 +31,11 @@ Welcome to Walbert! The local-first AI agent.
   - Schema design and evolution
   - Data storage and retrieval
   - Memory and knowledge persistence
-- **Skill Preservation System**: Breaks down complex tasks into reusable components
-- **Raw Conversation Logging**: Full prompts and responses logged to conversation files
+- **State-Driven Tracking**: Bot state is retained through four persistent state blocks:
+  - `[walbert_awareness_start]` - Synthesized identity and environmental understanding
+  - `[walbert_ultimate_task_start]` - Long-term overarching goal
+  - `[walbert_immediate_task_start]` - Current actionable step
+  - `[walbert_impediment_start]` - Active blockers or constraints
 - **Zero Hard-Coded Persistence**: All database operations handled through the protocol
 - **Python Execution**: Execute Python code in the main application's virtual environment
 - **Autonomous Operation**: Continues working even without user input
@@ -94,6 +97,11 @@ Available commands:
 - `exit`/`quit`: Exit the program
 - `python on/off`: Toggle Python execution
 - `bash on/off`: Toggle Bash execution
+- `show awareness`: View synthesized identity and environmental understanding
+- `show ultimate task`: View long-term overarching goal
+- `show immediate task`: View current actionable step
+- `show impediment`: View active blockers or constraints
+- `show schema`: View database schema
 - `pip_install <package>`: Install a Python package in the main environment
 - Any other input will be treated as a request to Walbert
 

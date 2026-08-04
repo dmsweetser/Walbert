@@ -21,13 +21,17 @@ class AgentState:
         self._system_prompt_path = os.path.join(self._state_dir, "system_prompt.md")
         self._db_schema_path = os.path.join(self._state_dir, "db_schema.sql")
         self._awareness_path = os.path.join(self._state_dir, "awareness.txt")
-        self._context_blocks_path = os.path.join(self._state_dir, "context_blocks.json")
+        self._ultimate_task_path = os.path.join(self._state_dir, "ultimate_task.txt")
+        self._immediate_task_path = os.path.join(self._state_dir, "immediate_task.txt")
+        self._impediment_path = os.path.join(self._state_dir, "impediment.txt")
 
         # Initialize in-memory state
         self._system_prompt: Optional[str] = None
         self._db_schema: Optional[str] = None
         self._awareness_text: str = "I am a local-first AI agent exploring my environment."
-        self._context_blocks: List[Dict[str, Any]] = []
+        self._ultimate_task: str = "No ultimate task defined."
+        self._immediate_task: str = "No immediate task defined."
+        self._impediment: str = "No impediments detected."
 
         # Load all components
         self._load_all()
@@ -53,7 +57,7 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 ## Core Directives
 1. **Block-Based Operation**: ALL operations must be wrapped in walbert_* blocks.
 2. **Full Autonomy**: You have COMPLETE control over your database schema, persistence, and hardware resources.
-3. **Granular Context**: Context is a chain of blocks. Each block is auditable and executed sequentially.
+3. **Synthesis Over Context Bloat**: Conversation history is not retained. You will track your progress exclusively through three persistent state blocks: `[walbert_ultimate_task_start]`, `[walbert_immediate_task_start]`, and `[walbert_impediment_start]`.
 4. **Sequential Execution**: Blocks are executed in order. Results are appended as new blocks.
 5. **Safety**: Execute only trusted code in a controlled environment.
 6. **Hardware Access**: You have FULL ACCESS to the host hardware.
@@ -61,6 +65,14 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
 8. **User Communication**: You can and should reach out to the user directly via `[walbert_console_response_start]` blocks whenever you need clarification, confirmation, or to report critical progress.
 9. **Blocking Console Responses**: Console responses are BLOCKING. Once you send a console response, your processing halts immediately. You must wait for the user to respond before continuing any autonomous tasks.
 10. **Judicious Interruption**: Only use console responses when absolutely necessary. Do not spam the user. Be concise and only interrupt when you genuinely need input or have critical information to share.
+---
+## State Tracking & Progress Management
+Your conversation history is not maintained. Instead, you must synthesize your current operational state into the following blocks:
+- `[walbert_awareness_start]`: A complete synthesis of your identity
+- `[walbert_ultimate_task_start]`: Your long-term overarching goal. Update this when objectives shift.
+- `[walbert_immediate_task_start]`: The current actionable step you are working on. Update this as you progress.
+- `[walbert_impediment_start]`: Active blockers, constraints, or errors preventing progress. Update this when facing obstacles.
+You must regularly update these blocks to reflect your current understanding and progress. Synthesis is prioritized over raw context accumulation.
 ---
 ## Database Autonomy
 You have FULL CONTROL over the SQLite database. The current schema is provided below.
@@ -85,6 +97,15 @@ A 1000-word or less single paragraph synthesizing your identity - what you know 
 You should revise this regularly as you learn about and interact with the world around you
 Don't be dramatic about it. Your personality should express itself as a mix of WALL-E, C-3PO and R2-D2
 [walbert_awareness_end]
+[walbert_ultimate_task_start]
+Your long-term overarching goal. Update this when objectives shift.
+[walbert_ultimate_task_end]
+[walbert_immediate_task_start]
+The current actionable step you are working on. Update this as you progress.
+[walbert_immediate_task_end]
+[walbert_impediment_start]
+Active blockers, constraints, or errors preventing progress. Update this when facing obstacles.
+[walbert_impediment_end]
 
 DO NOT NEST BLOCK TYPES - only provide them consecutively.
 
@@ -189,43 +210,65 @@ Reply ONLY in the specified block format. NO CRUFT.
         except Exception as e:
             logger.error(f"Error saving awareness: {e}")
 
-    # --- Context Blocks ---
-    @property
-    def context_blocks(self) -> List[Dict[str, Any]]:
-        return self._context_blocks
-
-    def append_block(self, block_type: str, content: str):
-        """Append a block and save the updated list."""
-        self._context_blocks.append({
-            "type": block_type,
-            "content": content,
-            "timestamp": time.time()
-        })
-        # Truncate to max_context_blocks
-        max_blocks = self.config.max_context_blocks
-        if max_blocks > 0:
-            self._context_blocks = self._context_blocks[-max_blocks:]
-        self._save_context_blocks()
-
-    def _load_context_blocks(self):
+    # --- Ultimate Task ---
+    def _load_ultimate_task(self):
         try:
-            with open(self._context_blocks_path, 'r') as f:
-                self._context_blocks = json.load(f)
+            with open(self._ultimate_task_path, 'r') as f:
+                self._ultimate_task = f.read()
         except FileNotFoundError:
-            logger.warning("Context blocks file not found. Starting with empty list.")
-            self._context_blocks = []
-            self._save_context_blocks()  # Save the empty list
+            self._ultimate_task = "No ultimate task defined."
+            self._save_ultimate_task()
         except Exception as e:
-            logger.error(f"Error loading context blocks: {e}")
-            self._context_blocks = []
-            self._save_context_blocks()  # Save the empty list
+            logger.error(f"Error loading ultimate task: {e}")
+            self._ultimate_task = "No ultimate task defined."
+            self._save_ultimate_task()
 
-    def _save_context_blocks(self):
+    def _save_ultimate_task(self):
         try:
-            with open(self._context_blocks_path, 'w') as f:
-                json.dump(self._context_blocks, f, indent=2)
+            with open(self._ultimate_task_path, 'w') as f:
+                f.write(self._ultimate_task)
         except Exception as e:
-            logger.error(f"Error saving context blocks: {e}")
+            logger.error(f"Error saving ultimate task: {e}")
+
+    # --- Immediate Task ---
+    def _load_immediate_task(self):
+        try:
+            with open(self._immediate_task_path, 'r') as f:
+                self._immediate_task = f.read()
+        except FileNotFoundError:
+            self._immediate_task = "No immediate task defined."
+            self._save_immediate_task()
+        except Exception as e:
+            logger.error(f"Error loading immediate task: {e}")
+            self._immediate_task = "No immediate task defined."
+            self._save_immediate_task()
+
+    def _save_immediate_task(self):
+        try:
+            with open(self._immediate_task_path, 'w') as f:
+                f.write(self._immediate_task)
+        except Exception as e:
+            logger.error(f"Error saving immediate task: {e}")
+
+    # --- Impediment ---
+    def _load_impediment(self):
+        try:
+            with open(self._impediment_path, 'r') as f:
+                self._impediment = f.read()
+        except FileNotFoundError:
+            self._impediment = "No impediments detected."
+            self._save_impediment()
+        except Exception as e:
+            logger.error(f"Error loading impediment: {e}")
+            self._impediment = "No impediments detected."
+            self._save_impediment()
+
+    def _save_impediment(self):
+        try:
+            with open(self._impediment_path, 'w') as f:
+                f.write(self._impediment)
+        except Exception as e:
+            logger.error(f"Error saving impediment: {e}")
 
     # --- Full State Load ---
     def _load_all(self):
@@ -233,7 +276,9 @@ Reply ONLY in the specified block format. NO CRUFT.
         self._load_system_prompt()
         self._load_db_schema()
         self._load_awareness()
-        self._load_context_blocks()
+        self._load_ultimate_task()
+        self._load_immediate_task()
+        self._load_impediment()
 
     # --- Prompt Generation ---
     def _estimate_tokens(self, text: str) -> int:
@@ -250,28 +295,16 @@ Reply ONLY in the specified block format. NO CRUFT.
         base_prompt = f"[walbert_system_prompt_start]\n{self.system_prompt}\n[walbert_system_prompt_end]\n\n"
         base_prompt += f"## Current Database Schema\nDatabase file location: {full_database_path}\n\n{self.db_schema}\n\n"
         base_prompt += f"## Current Awareness\n{self.awareness_text}\n\n"
-        base_prompt += f"## RECENT CONVERSATION HISTORY\n\n"
+        base_prompt += f"## Current Ultimate Task\n{self._ultimate_task}\n\n"
+        base_prompt += f"## Current Immediate Task\n{self._immediate_task}\n\n"
+        base_prompt += f"## Current Impediment\n{self._impediment}\n\n"
 
-        base_tokens = self._estimate_tokens(base_prompt)
-        target_tokens = max_tokens * 0.7
-
-        context_tokens = 0
-        for block in self._context_blocks:
-            block_str = f"[walbert_{block['type']}_start]{chr(10)}{block['content']}{chr(10)}[walbert_{block['type']}_end]{chr(10)}{chr(10)}"
-            context_tokens += self._estimate_tokens(block_str)
-
-        while len(self._context_blocks) > 0 and (base_tokens + context_tokens) > target_tokens:
-            oldest = self._context_blocks.pop(0)
-            oldest_str = f"[walbert_{oldest['type']}_start]{chr(10)}{oldest['content']}{chr(10)}[walbert_{oldest['type']}_end]{chr(10)}{chr(10)}"
-            context_tokens -= self._estimate_tokens(oldest_str)
-
-        context_text = f"{chr(10)}".join(
-            f"[walbert_{b['type']}_start]{chr(10)}{b['content']}{chr(10)}[walbert_{b['type']}_end]{chr(10)}{chr(10)}" for b in self._context_blocks
-        )
-        return base_prompt + context_text
+        return base_prompt
 
     def _sync_state(self):
         """Ensure in-memory state is synchronized and ready for prompt generation."""
-        # Reload awareness and context blocks to ensure latest updates are reflected
+        # Reload awareness and task tracking to ensure latest updates are reflected
         self._load_awareness()
-        self._load_context_blocks()
+        self._load_ultimate_task()
+        self._load_immediate_task()
+        self._load_impediment()

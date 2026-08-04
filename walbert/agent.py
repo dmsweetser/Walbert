@@ -167,7 +167,7 @@ class WalbertAgent:
         """Generate an autonomous instruction block."""
         prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size)
         prompt += (
-            f"{chr(10)}You are operating autonomously. Please review recent actions, identify pending tasks, make progress on objectives, and maintain awareness of your database state. If no objectives have been provided, explore the world around you as safely as you can.\n"
+            f"{chr(10)}You are operating autonomously. Please review your Current Ultimate Task, Current Immediate Task, and Current Impediment blocks. Synthesize your progress, update these tracking blocks as needed, and maintain awareness of your database state. If no objectives have been provided, explore the world around you as safely as you can.\n"
         )
 
         model_response = self.model_manager.execute_model(
@@ -184,7 +184,7 @@ class WalbertAgent:
 
     def _execute_pending_blocks(self, provided_blocks):
         """Execute all pending blocks (SQL, Python, etc.) in order."""
-        executable_types = {"sql_execute", "python_execute", "awareness"}
+        executable_types = {"sql_execute", "python_execute", "bash_execute", "awareness", "ultimate_task", "immediate_task", "impediment"}
         with self._lock:
             pending_blocks = [
                 b for b in provided_blocks
@@ -193,14 +193,24 @@ class WalbertAgent:
 
         for block in pending_blocks:
             self.logger.debug(f"Executing block: {block}")
-            result_block = self.executor.execute(block)
-            if result_block:
-                if result_block["type"] == "awareness_update":
-                    self.state.update_awareness(result_block["content"])
-                else:
-                    self.state.append_block(block["type"], block["content"])
-                    self.state.append_block(result_block["type"], block["content"])
-                    self.write_output(json.dumps(result_block, indent=2), result_block["type"])
+            if block["type"] == "awareness":
+                self.state.update_awareness(block["content"])
+            elif block["type"] == "ultimate_task":
+                self.state._ultimate_task = block["content"]
+                self.state._save_ultimate_task()
+            elif block["type"] == "immediate_task":
+                self.state._immediate_task = block["content"]
+                self.state._save_immediate_task()
+            elif block["type"] == "impediment":
+                self.state._impediment = block["content"]
+                self.state._save_impediment()
+            elif block["type"] in ("sql_execute", "python_execute", "bash_execute"):
+                result_block = self.executor.execute(block)
+                if result_block:
+                    if result_block["type"] == "awareness_update":
+                        self.state.update_awareness(result_block["content"])
+                    else:
+                        self.write_output(json.dumps(result_block, indent=2), result_block["type"])
                         
             block["executed"] = True
         
