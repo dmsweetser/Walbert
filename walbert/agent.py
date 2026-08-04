@@ -139,7 +139,7 @@ class WalbertAgent:
 
     def _generate_response_block(self, user_input: str = None) -> str:
         """Generate a response block using the model."""
-        prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size)
+        prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size, user_input=user_input)
         prompt += f"{chr(10)}Please respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
 
         model_response = self.model_manager.execute_model(
@@ -165,7 +165,7 @@ class WalbertAgent:
 
     def _generate_autonomous_block(self) -> str:
         """Generate an autonomous instruction block."""
-        prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size)
+        prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size, user_input=None)
         prompt += (
             f"{chr(10)}You are operating autonomously. Please review your Current Ultimate Task, Current Immediate Task, and Current Impediment blocks. Synthesize your progress, update these tracking blocks as needed, and maintain awareness of your database state. If no objectives have been provided, explore the world around you as safely as you can.\n"
         )
