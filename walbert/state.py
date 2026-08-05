@@ -311,8 +311,6 @@ Reply ONLY in the specified block format. NO CRUFT.
     def append_block(self, block_type: str, content: str) -> None:
         """Append a block to recent execution history."""
         self._recent_blocks.append({"type": block_type, "content": content.strip()})
-        if len(self._recent_blocks) > self.max_recent_blocks:
-            self._recent_blocks = self._recent_blocks[-self.max_recent_blocks:]
 
     def _sync_state(self):
         """Ensure in-memory state is synchronized and ready for prompt generation."""
