@@ -138,8 +138,7 @@ cat > instance/config.json << EOF
     "autonomous_operation_timeout": 120,
     "conversation_log_dir": "instance/conversations",
     "database_path": "instance/walbert.db",
-    "be_presbyterian": true,
-    "max_context_blocks": 20
+    "be_presbyterian": true
 }
 EOF
 
