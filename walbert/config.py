@@ -24,6 +24,5 @@ class Config:
     database_path: str = "instance/walbert.db"
     temp_dir_prefix: str = "walbert_python_"
     be_presbyterian: bool = True
-    max_context_blocks: int = 20
     python_execution_enabled: bool = True
     bash_execution_enabled: bool = True

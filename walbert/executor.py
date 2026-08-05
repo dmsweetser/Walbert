@@ -29,8 +29,6 @@ class BlockExecutor:
             return self._execute_bash(content)
         elif block_type == "console_response":
             return {"type": "console_response", "content": f"Walbert:\n{content}\n"}
-        elif block_type == "awareness":
-            return {"type": "awareness_update", "content": content}
         return None
 
     def _execute_sql(self, sql: str) -> Dict[str, str]:

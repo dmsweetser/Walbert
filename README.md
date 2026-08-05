@@ -31,11 +31,12 @@ Welcome to Walbert! The local-first AI agent.
   - Schema design and evolution
   - Data storage and retrieval
   - Memory and knowledge persistence
-- **State-Driven Tracking**: Bot state is retained through four persistent state blocks:
+- **State-Driven Tracking**: Bot state is retained through persistent tracking blocks and recent execution results:
   - `[walbert_awareness_start]` - Synthesized identity and environmental understanding
   - `[walbert_ultimate_task_start]` - Long-term overarching goal
   - `[walbert_immediate_task_start]` - Current actionable step
   - `[walbert_impediment_start]` - Active blockers or constraints
+  - Recent Execution Results - Most recent block outputs/errors for context
 - **Zero Hard-Coded Persistence**: All database operations handled through the protocol
 - **Python Execution**: Execute Python code in the main application's virtual environment
 - **Autonomous Operation**: Continues working even without user input
