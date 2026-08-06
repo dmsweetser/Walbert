@@ -159,6 +159,8 @@ class WalbertAgent:
         if console_content:
             print(console_content, end='', flush=True)
             self.waiting_for_user = True
+        else:
+            self.waiting_for_user = False
             
         return console_content
 
@@ -179,6 +181,18 @@ class WalbertAgent:
         blocks = self.parser.parse(model_response)
 
         self._execute_pending_blocks(blocks)
+
+        console_content = ""
+        for block in blocks:
+            if block["type"] == "console_response":
+                console_content = block["content"]
+        
+        if console_content:
+            print(console_content, end='', flush=True)
+            self.waiting_for_user = True
+        else:
+            self.waiting_for_user = False
+
         return "Continue monitoring and processing."
 
     def _execute_pending_blocks(self, provided_blocks):
