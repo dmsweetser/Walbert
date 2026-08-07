@@ -299,7 +299,7 @@ Reply ONLY in the specified block format. NO CRUFT.
         base_prompt += f"## Current Ultimate Task\n{self._ultimate_task}\n\n"
         base_prompt += f"## Current Immediate Task\n{self._immediate_task}\n\n"
         base_prompt += f"## Current Impediment\n{self._impediment}\n\n"
-        base_prompt += f"## Current User Input\n{user_input if user_input else 'None'}\n\n"
+        base_prompt += f"## Recent Activity\n{json.dumps(self._recent_blocks)}\n\n"
 
         base_prompt += f"{chr(10)}".join(
             f"[walbert_{b['type']}_start]{chr(10)}{b['content']}{chr(10)}[walbert_{b['type']}_end]{chr(10)}{chr(10)}" for b in self._recent_blocks
@@ -310,8 +310,10 @@ Reply ONLY in the specified block format. NO CRUFT.
         return base_prompt
 
     def append_block(self, block_type: str, content: str) -> None:
-        """Append a block to recent execution history."""
+        """Append a block to recent execution history, keeping only the last 10."""
         self._recent_blocks.append({"type": block_type, "content": content.strip()})
+        if len(self._recent_blocks) > 10:
+            self._recent_blocks = self._recent_blocks[-10:]
 
     def _sync_state(self):
         """Ensure in-memory state is synchronized and ready for prompt generation."""
