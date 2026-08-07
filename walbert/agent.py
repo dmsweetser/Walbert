@@ -136,7 +136,7 @@ class WalbertAgent:
                 shutil.rmtree(self.executor.python_temp_dir)
                 self.executor.python_temp_dir = None
 
-    def _generate_response_block(self, user_input: str = None) -> str:
+    def _generate_response_block(self, user_input, interrupt_event) -> str:
         """Generate a response block using the model."""
         prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size, user_input=user_input)
         prompt += f"{chr(10)}Please respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
@@ -144,10 +144,15 @@ class WalbertAgent:
         model_response = self.model_manager.execute_model(
             prompt,
             self.write_output,
-            None
+            interrupt_event
         )
         self._log_full_prompt_and_response(prompt, model_response)
 
+        # Abort if interrupted before processing blocks
+        if interrupt_event and interrupt_event.is_set():
+            interrupt_event.clear()
+            return ""
+            
         response_blocks = self.parser.parse(model_response)
         self._execute_pending_blocks(response_blocks)
 
@@ -157,14 +162,14 @@ class WalbertAgent:
                 console_content = block["content"]
         
         if console_content:
-            print(console_content, end='', flush=True)
+            self.write_output(console_content, "console_response")
             self.waiting_for_user = True
         else:
             self.waiting_for_user = False
             
         return console_content
 
-    def _generate_autonomous_block(self) -> str:
+    def _generate_autonomous_block(self, interrupt_event) -> str:
         """Generate an autonomous instruction block."""
         prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size, user_input=None)
         prompt += (
@@ -174,10 +179,15 @@ class WalbertAgent:
         model_response = self.model_manager.execute_model(
             prompt,
             self.write_output,
-            None
+            interrupt_event
         )
         self._log_full_prompt_and_response(prompt, model_response)
 
+        # Abort if interrupted before processing blocks
+        if interrupt_event and interrupt_event.is_set():
+            interrupt_event.clear()
+            return "Continue monitoring and processing."
+            
         blocks = self.parser.parse(model_response)
 
         self._execute_pending_blocks(blocks)
@@ -188,7 +198,7 @@ class WalbertAgent:
                 console_content = block["content"]
         
         if console_content:
-            print(console_content, end='', flush=True)
+            self.write_output(console_content, "console_response")
             self.waiting_for_user = True
         else:
             self.waiting_for_user = False
@@ -250,8 +260,10 @@ class WalbertAgent:
             if block_type in ("awareness", "db_schema", "context_blocks"):
                 formatted_text = f"{chr(10)}".join(f"**** {line}" for line in text.split(f"{chr(10)}"))
                 print(formatted_text, end='', flush=True)
+                print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
             else:
                 print(text, end='', flush=True)
+                print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
 
     def run_autonomous(self, input_queue, interrupt_event=None, test_mode=False):
         """Main agent execution loop with block-based context."""
@@ -265,16 +277,21 @@ class WalbertAgent:
 
         while True:
             try:
-                print(f"{chr(10)}Status: Python={'ON' if self.config.python_execution_enabled else 'OFF'}, Bash={'ON' if self.config.bash_execution_enabled else 'OFF'}")
-                if self.waiting_for_user:
-                    msg_type, msg = input_queue.get()
-                    self.waiting_for_user = False
+                # Check for immediate interruption/new input signal
+                if interrupt_event and interrupt_event.is_set():
+                    interrupt_event.clear()
+                    try:
+                        msg_type, msg = input_queue.get_nowait()
+                    except queue.Empty:
+                        msg_type = None
+                        msg = None
+                    
                     if msg_type == "exit":
                         self.end_conversation()
                         return
                     if msg_type == "user_input":
                         if msg == last_user_input:
-                            print(f"{chr(10)}\n>>>>> ", end='', flush=True)
+                            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                             continue
                         if interrupt_event:
                             interrupt_event.set()
@@ -284,8 +301,30 @@ class WalbertAgent:
                         with self._lock:
                             last_user_input = msg
                         self.state.append_block("user_input", msg)
-                        self._generate_response_block(msg)
-                        print(f"{chr(10)}\n>>>>> ", end='', flush=True)
+                        self._generate_response_block(msg, interrupt_event)
+                        print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                        continue
+
+                if self.waiting_for_user:
+                    msg_type, msg = input_queue.get(timeout=0.1)
+                    self.waiting_for_user = False
+                    if msg_type == "exit":
+                        self.end_conversation()
+                        return
+                    if msg_type == "user_input":
+                        if msg == last_user_input:
+                            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                            continue
+                        if interrupt_event:
+                            interrupt_event.set()
+                            time.sleep(self.MODEL_RESTART_DELAY)
+                            interrupt_event.clear()
+                        input_queue.queue.clear()
+                        with self._lock:
+                            last_user_input = msg
+                        self.state.append_block("user_input", msg)
+                        self._generate_response_block(msg, interrupt_event)
+                        print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                         continue
                 else:
                     try:
@@ -295,7 +334,7 @@ class WalbertAgent:
                             return
                         if msg_type == "user_input":
                             if msg == last_user_input:
-                                print(f"{chr(10)}\n>>>>> ", end='', flush=True)
+                                print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                                 continue
                             if interrupt_event:
                                 interrupt_event.set()
@@ -305,14 +344,14 @@ class WalbertAgent:
                             with self._lock:
                                 last_user_input = msg
                             self.state.append_block("user_input", msg)
-                            self._generate_response_block(msg)
-                            print(f"{chr(10)}\n>>>>> ", end='', flush=True)
+                            self._generate_response_block(msg, interrupt_event)
+                            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                             continue
                     except queue.Empty:
                         pass
 
                 if not test_mode:
-                    self._generate_autonomous_block()
+                    self._generate_autonomous_block(interrupt_event)
                     time.sleep(self.AUTONOMOUS_LOOP_DELAY)
                 else:
                     time.sleep(0.1)
@@ -345,8 +384,10 @@ Error: {str(e)}
                 text=True
             )
             print(f"{chr(10)}Successfully installed {package}")
+            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
         except subprocess.CalledProcessError as e:
             print(f"Failed to install {package}: {e.stderr}")
+            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
             self.logger.error(f"Failed to install package {package}: {e.stderr}")
 
     def shutdown(self):

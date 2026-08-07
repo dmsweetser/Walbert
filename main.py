@@ -83,7 +83,7 @@ def get_nonblocking_input(prompt: str = ">>>>> ") -> str:
             raise
     return ''.join(user_input)
 
-def print_welcome_message():
+def print_welcome_message(agent):
     # Print welcome message and ASCII art
     print("""          
  ___            ___      
@@ -110,6 +110,7 @@ def print_welcome_message():
     print("- pip_install <package>: Install a Python package in the main environment")
     print("- help: Show these options again")
     print("- Any other input will be treated as a request to Walbert")
+    print(f"{chr(10)}Status: Python={'ON' if agent.config.python_execution_enabled else 'OFF'}, Bash={'ON' if agent.config.bash_execution_enabled else 'OFF'}")
     print("")
     
 def _paged_output(text):
@@ -159,7 +160,7 @@ def main():
     agent_thread.daemon = True
     agent_thread.start()
 
-    print_welcome_message()
+    print_welcome_message(agent)
 
     try:
         while True:
@@ -170,7 +171,7 @@ def main():
                 input_queue.put(("exit",))
                 break
             elif user_input.lower() == 'help':
-                print_welcome_message()
+                print_welcome_message(agent)
             elif user_input.lower() == 'python on':
                 agent.python_execution_enabled = True
                 print(f"{chr(10)}Python execution enabled.")
