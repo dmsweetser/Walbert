@@ -146,6 +146,8 @@ class WalbertAgent:
             self.write_output,
             interrupt_event
         )
+
+        print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
         self._log_full_prompt_and_response(prompt, model_response)
 
         # Abort if interrupted before processing blocks
@@ -163,6 +165,7 @@ class WalbertAgent:
         
         if console_content:
             self.write_output(console_content, "console_response")
+            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
             self.waiting_for_user = True
         else:
             self.waiting_for_user = False
@@ -181,6 +184,7 @@ class WalbertAgent:
             self.write_output,
             interrupt_event
         )
+        print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
         self._log_full_prompt_and_response(prompt, model_response)
 
         # Abort if interrupted before processing blocks
@@ -199,6 +203,7 @@ class WalbertAgent:
         
         if console_content:
             self.write_output(console_content, "console_response")
+            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
             self.waiting_for_user = True
         else:
             self.waiting_for_user = False
@@ -232,6 +237,7 @@ class WalbertAgent:
                 if result_block:
                     self.state.append_block("execution_result", result_block["content"])
                     self.write_output(json.dumps(result_block, indent=2), result_block["type"])
+                    print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                         
             block["executed"] = True
         
@@ -260,10 +266,8 @@ class WalbertAgent:
             if block_type in ("awareness", "db_schema", "context_blocks"):
                 formatted_text = f"{chr(10)}".join(f"**** {line}" for line in text.split(f"{chr(10)}"))
                 print(formatted_text, end='', flush=True)
-                print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
             else:
                 print(text, end='', flush=True)
-                print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
 
     def run_autonomous(self, input_queue, interrupt_event=None, test_mode=False):
         """Main agent execution loop with block-based context."""
