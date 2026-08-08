@@ -113,6 +113,7 @@ A 200-word or less single paragraph summarizing active blockers, constraints, or
 [walbert_user_directive_start]
 A 1000-word or less single paragraph summarizing what the user wants you to do, based on any user input that has been provided.
 This is the most important thing - use this to keep track of what you have been asked to do by the user.
+WHENEVER A USER GIVES YOU INPUT, YOU MUST GENERATE AN UPDATED USER DIRECTIVE BEFORE YOU DO ANYTHING ELSE.
 [walbert_user_directive_end]
 
 DO NOT NEST BLOCK TYPES - only provide them consecutively.
