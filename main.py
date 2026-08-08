@@ -106,7 +106,7 @@ def print_welcome_message(agent):
     print("- python on/off: Toggle Python execution")
     print("- bash on/off: Toggle Bash execution")
     print("- log on/off: Toggle raw block output to console")
-    print("- show awareness/ultimate_task/immediate_task/impediment/schema: View agent state")
+    print("- show awareness/ultimate_task/immediate_task/user_directive/impediment/schema: View agent state")
     print("- pip_install <package>: Install a Python package in the main environment")
     print("- help: Show these options again")
     print("- Any other input will be treated as a request to Walbert")
@@ -121,7 +121,7 @@ def _paged_output(text):
     while idx < len(lines):
         chunk = lines[idx:idx+10]
         for line in chunk:
-            print(line)
+            print("*** " + line)
         idx += 10
         if idx >= len(lines):
             print("--- END OF OUTPUT ---")
@@ -210,6 +210,11 @@ def main():
                     _paged_output(f"--- IMPEDIMENT ---\n{agent.state._impediment}\n--- END ---")
                 else:
                     print(f"{chr(10)}No impediment data available yet.")
+            elif user_input.lower() == 'show user_directive':
+                if hasattr(agent, 'state') and agent.state:
+                    _paged_output(f"--- USER DIRECTIVE ---\n{agent.state._user_directive}\n--- END ---")
+                else:
+                    print(f"{chr(10)}No user directive data available yet.")
             elif user_input.lower() == 'show schema':
                 if hasattr(agent, 'state') and agent.state:
                     _paged_output(f"--- DB SCHEMA ---\n{agent.state.db_schema}\n--- END ---")
