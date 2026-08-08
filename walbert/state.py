@@ -24,6 +24,7 @@ class AgentState:
         self._ultimate_task_path = os.path.join(self._state_dir, "ultimate_task.txt")
         self._immediate_task_path = os.path.join(self._state_dir, "immediate_task.txt")
         self._impediment_path = os.path.join(self._state_dir, "impediment.txt")
+        self._user_directive_path = os.path.join(self._state_dir, "user_directive.txt")
 
         # Initialize in-memory state
         self._system_prompt: Optional[str] = None
@@ -32,6 +33,7 @@ class AgentState:
         self._ultimate_task: str = "No ultimate task defined."
         self._immediate_task: str = "No immediate task defined."
         self._impediment: str = "No impediments detected."
+        self._user_directive: str = "No user directive detected."
         self._recent_blocks: List[Dict[str, str]] = []
 
         # Load all components
@@ -62,8 +64,9 @@ Your capabilities include reasoning, memory storage, dynamic schema management, 
    - `[walbert_ultimate_task_start]`: Your long-term overarching goal.
    - `[walbert_immediate_task_start]`: The current actionable step you are working on.
    - `[walbert_impediment_start]`: Active blockers, constraints, or errors.
+   - '[walbert_user_directive_start]': What the user wants you to do
 3. **Recent Execution Results**: You will be provided with your most recent executed blocks and their outputs/errors. Use these to inform your next steps.
-4. **User Input Handling**: When `## Current User Input` is provided, address it directly. When it is absent/empty, operate autonomously based on your tracked tasks and impediments.
+4. **User Input Handling**: When `## Current User Input` is provided, address it directly. When it is absent/empty, operate autonomously based on your tracked tasks, impediments, and over all user directive.
 5. **Block-Based Operation**: ALL operations must be wrapped in walbert_* blocks.
 6. **Full Autonomy**: You have COMPLETE control over your database schema, persistence, and hardware resources.
 7. **Sequential Execution**: Blocks are executed in order. Results are appended as new blocks.
@@ -107,6 +110,10 @@ A 200-word or less single paragraph summarizing the current actionable step you 
 [walbert_impediment_start]
 A 200-word or less single paragraph summarizing active blockers, constraints, or errors preventing progress. Update this when facing obstacles.
 [walbert_impediment_end]
+[walbert_user_directive_start]
+A 1000-word or less single paragraph summarizing what the user wants you to do, based on any user input that has been provided.
+This is the most important thing - use this to keep track of what you have been asked to do by the user.
+[walbert_user_directive_end]
 
 DO NOT NEST BLOCK TYPES - only provide them consecutively.
 
@@ -271,6 +278,25 @@ Reply ONLY in the specified block format. NO CRUFT.
         except Exception as e:
             logger.error(f"Error saving impediment: {e}")
 
+    def _load_user_directive(self):
+        try:
+            with open(self._user_directive_path, 'r') as f:
+                self._user_directive = f.read()
+        except FileNotFoundError:
+            self._user_directive = "No user_directives detected."
+            self._save_user_directive()
+        except Exception as e:
+            logger.error(f"Error loading user_directive: {e}")
+            self._user_directive = "No user_directives detected."
+            self._save_user_directive()
+
+    def _save_user_directive(self):
+        try:
+            with open(self._user_directive_path, 'w') as f:
+                f.write(self._user_directive)
+        except Exception as e:
+            logger.error(f"Error saving user_directive: {e}")
+
     # --- Full State Load ---
     def _load_all(self):
         """Load all state components from their respective files."""
@@ -280,6 +306,7 @@ Reply ONLY in the specified block format. NO CRUFT.
         self._load_ultimate_task()
         self._load_immediate_task()
         self._load_impediment()
+        self._load_user_directive()
 
     # --- Prompt Generation ---
     def _estimate_tokens(self, text: str) -> int:
@@ -299,7 +326,8 @@ Reply ONLY in the specified block format. NO CRUFT.
         base_prompt += f"## Current Ultimate Task\n{self._ultimate_task}\n\n"
         base_prompt += f"## Current Immediate Task\n{self._immediate_task}\n\n"
         base_prompt += f"## Current Impediment\n{self._impediment}\n\n"
-        base_prompt += f"## Recent Activity\n{json.dumps(self._recent_blocks)}\n\n"
+        base_prompt += f"## Current User Directive\n{self._user_directive}\n\n"
+        base_prompt += f"## Latest User Input\n{user_input if user_input else 'None'}\n\n"
 
         base_prompt += f"{chr(10)}".join(
             f"[walbert_{b['type']}_start]{chr(10)}{b['content']}{chr(10)}[walbert_{b['type']}_end]{chr(10)}{chr(10)}" for b in self._recent_blocks
@@ -310,10 +338,8 @@ Reply ONLY in the specified block format. NO CRUFT.
         return base_prompt
 
     def append_block(self, block_type: str, content: str) -> None:
-        """Append a block to recent execution history, keeping only the last 10."""
+        """Append a block to recent execution history."""
         self._recent_blocks.append({"type": block_type, "content": content.strip()})
-        if len(self._recent_blocks) > 10:
-            self._recent_blocks = self._recent_blocks[-10:]
 
     def _sync_state(self):
         """Ensure in-memory state is synchronized and ready for prompt generation."""
@@ -322,3 +348,4 @@ Reply ONLY in the specified block format. NO CRUFT.
         self._load_ultimate_task()
         self._load_immediate_task()
         self._load_impediment()
+        self._load_user_directive()
