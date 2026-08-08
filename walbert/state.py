@@ -330,9 +330,11 @@ Reply ONLY in the specified block format. NO CRUFT.
         base_prompt += f"## Current User Directive\n{self._user_directive}\n\n"
         base_prompt += f"## Latest User Input\n{user_input if user_input else 'None'}\n\n"
 
-        base_prompt += f"{chr(10)}".join(
-            f"[walbert_{b['type']}_start]{chr(10)}{b['content']}{chr(10)}[walbert_{b['type']}_end]{chr(10)}{chr(10)}" for b in self._recent_blocks
-        )
+        if self._recent_blocks:
+            base_prompt += f"## Recent Execution Blocks and Results{chr(10)}"
+            base_prompt += f"{chr(10)}".join(
+                f"[walbert_{b['type']}_start]{chr(10)}{b['content']}{chr(10)}[walbert_{b['type']}_end]{chr(10)}{chr(10)}" for b in self._recent_blocks
+            )
 
         self._recent_blocks = []
 

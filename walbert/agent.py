@@ -235,6 +235,7 @@ class WalbertAgent:
             elif block["type"] in ("sql_execute", "python_execute", "bash_execute"):
                 result_block = self.executor.execute(block)
                 if result_block:
+                    self.state.append_block(block["type"], block["content"])
                     self.state.append_block("execution_result", result_block["content"])
                     self.write_output(json.dumps(result_block, indent=2), result_block["type"])
                     print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
