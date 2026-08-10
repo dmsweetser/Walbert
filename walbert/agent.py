@@ -278,37 +278,29 @@ class WalbertAgent:
             time.sleep(0.1)
 
         last_user_input = None
-        time.sleep(30)
 
         while True:
             try:
-                # Check for immediate interruption/new input signal
-                if interrupt_event and interrupt_event.is_set():
-                    interrupt_event.clear()
-                    try:
-                        msg_type, msg = input_queue.get_nowait()
-                    except queue.Empty:
-                        msg_type = None
-                        msg = None
-                    
-                    if msg_type == "exit":
-                        self.end_conversation()
-                        return
-                    if msg_type == "user_input":
-                        if msg == last_user_input:
-                            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
-                            continue
-                        if interrupt_event:
-                            interrupt_event.set()
-                            time.sleep(self.MODEL_RESTART_DELAY)
-                            interrupt_event.clear()
-                        input_queue.queue.clear()
-                        with self._lock:
-                            last_user_input = msg
-                        self.state.append_block("user_input", msg)
-                        self._generate_response_block(msg, interrupt_event)
+                # Non-blocking check for user input
+                try:
+                    msg_type, msg = input_queue.get_nowait()
+                except queue.Empty:
+                    msg_type = None
+                    msg = None
+
+                if msg_type == "exit":
+                    self.end_conversation()
+                    return
+
+                if msg_type == "user_input":
+                    if msg == last_user_input:
                         print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                         continue
+                    last_user_input = msg
+                    self.state.append_block("user_input", msg)
+                    self._generate_response_block(msg, interrupt_event)
+                    print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                    continue
 
                 if self.waiting_for_user:
                     msg_type, msg = input_queue.get(timeout=0.1)
@@ -317,49 +309,18 @@ class WalbertAgent:
                         self.end_conversation()
                         return
                     if msg_type == "user_input":
-                        if msg == last_user_input:
-                            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
-                            continue
-                        if interrupt_event:
-                            interrupt_event.set()
-                            time.sleep(self.MODEL_RESTART_DELAY)
-                            interrupt_event.clear()
-                        input_queue.queue.clear()
-                        with self._lock:
-                            last_user_input = msg
+                        last_user_input = msg
                         self.state.append_block("user_input", msg)
                         self._generate_response_block(msg, interrupt_event)
                         print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                         continue
                 else:
-                    try:
-                        msg_type, msg = input_queue.get_nowait()
-                        if msg_type == "exit":
-                            self.end_conversation()
-                            return
-                        if msg_type == "user_input":
-                            if msg == last_user_input:
-                                print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
-                                continue
-                            if interrupt_event:
-                                interrupt_event.set()
-                                time.sleep(self.MODEL_RESTART_DELAY)
-                                interrupt_event.clear()
-                            input_queue.queue.clear()
-                            with self._lock:
-                                last_user_input = msg
-                            self.state.append_block("user_input", msg)
-                            self._generate_response_block(msg, interrupt_event)
-                            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
-                            continue
-                    except queue.Empty:
-                        pass
-
-                if not test_mode:
-                    self._generate_autonomous_block(interrupt_event)
-                    time.sleep(self.AUTONOMOUS_LOOP_DELAY)
-                else:
-                    time.sleep(0.1)
+                    # Autonomous mode
+                    if not test_mode:
+                        self._generate_autonomous_block(interrupt_event)
+                        time.sleep(self.AUTONOMOUS_LOOP_DELAY)
+                    else:
+                        time.sleep(0.1)
 
             except KeyboardInterrupt:
                 print(f"{chr(10)}Goodbye!")

@@ -241,9 +241,6 @@ def main():
                 # Put user input into queue for agent
                 print(f"{chr(10)}Walbert has received your request.")
                 print("Press ENTER to interrupt Walbert at any time.")
-                interrupt_event.set()
-                time.sleep(0.5)  # Brief pause to allow interruption
-                interrupt_event.clear()
                 input_queue.put(("user_input", user_input))
     except KeyboardInterrupt:
         print(f"{chr(10)}Goodbye!")
