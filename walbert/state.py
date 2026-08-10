@@ -321,14 +321,13 @@ Reply ONLY in the specified block format. NO CRUFT.
 
         full_database_path = os.path.abspath(self.config.database_path)
 
-        base_prompt = f"[walbert_system_prompt_start]\n{self.system_prompt}\n[walbert_system_prompt_end]\n\n"
-        base_prompt += f"## Current Database Schema\nDatabase file location: {full_database_path}\n\n{self.db_schema}\n\n"
-        base_prompt += f"## Current Awareness\n{self.awareness_text}\n\n"
-        base_prompt += f"## Current Ultimate Task\n{self._ultimate_task}\n\n"
-        base_prompt += f"## Current Immediate Task\n{self._immediate_task}\n\n"
-        base_prompt += f"## Current Impediment\n{self._impediment}\n\n"
-        base_prompt += f"## Current User Directive\n{self._user_directive}\n\n"
-        base_prompt += f"## Latest User Input\n{user_input if user_input else 'None'}\n\n"
+        base_prompt = f"[walbert_system_prompt_start]{chr(10)}{self.system_prompt}{chr(10)}[walbert_system_prompt_end]{chr(10)}{chr(10)}"
+        base_prompt += f"## Current Database Schema{chr(10)}Database file location: {full_database_path}{chr(10)}{chr(10)}{self.db_schema}{chr(10)}{chr(10)}"
+        base_prompt += f"## Current Awareness{chr(10)}{self.awareness_text}{chr(10)}{chr(10)}"
+        base_prompt += f"## Current Ultimate Task{chr(10)}{self._ultimate_task}{chr(10)}{chr(10)}"
+        base_prompt += f"## Current Immediate Task{chr(10)}{self._immediate_task}{chr(10)}{chr(10)}"
+        base_prompt += f"## Current Impediment{chr(10)}{self._impediment}{chr(10)}{chr(10)}"
+        base_prompt += f"## Current User Directive{chr(10)}{self._user_directive}{chr(10)}{chr(10)}"
 
         if self._recent_blocks:
             base_prompt += f"## Recent Execution Blocks and Results{chr(10)}"
@@ -336,7 +335,10 @@ Reply ONLY in the specified block format. NO CRUFT.
                 f"[walbert_{b['type']}_start]{chr(10)}{b['content']}{chr(10)}[walbert_{b['type']}_end]{chr(10)}{chr(10)}" for b in self._recent_blocks
             )
 
-        self._recent_blocks = []
+        if user_input:
+            base_prompt += f"## Latest User Input{chr(10)}{user_input}{chr(10)}{chr(10)}"
+        else:
+            self._recent_blocks = []
 
         return base_prompt
 
