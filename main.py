@@ -220,16 +220,6 @@ def main():
                     _paged_output(f"--- DB SCHEMA ---\n{agent.state.db_schema}\n--- END ---")
                 else:
                     print(f"{chr(10)}No schema data available yet.")
-            elif user_input.lower() == 'show context':
-                if hasattr(agent, 'state') and agent.state:
-                    blocks = agent.state.context_blocks
-                    ctx = "--- CONTEXT BLOCKS ({}) ---".format(len(blocks))
-                    for b in blocks:
-                        ctx += f"{chr(10)}" + "[{}]: {}...".format(b['type'], b['content'][:200])
-                    ctx += f"{chr(10)}--- END ---"
-                    _paged_output(ctx)
-                else:
-                    print(f"{chr(10)}No context data available yet.")
             elif user_input.lower().startswith('pip_install '):
                 package = user_input[12:].strip()
                 if package:
