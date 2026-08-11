@@ -43,15 +43,25 @@ class BlockExecutor:
     def _execute_python(self, code: str) -> Dict[str, str]:
         if not self.config.python_execution_enabled:
             return {"type": "python_result", "content": "Python execution is disabled."}
+
         try:
+            # Normalize line endings and remove shebang if present
+            code = code.replace('\r\n', '\n').replace('\r', '\n')
+            if code.startswith('#!'):
+                code = '\n'.join(code.splitlines()[1:])
+
+            # Ensure temp directory exists
             if not self.python_temp_dir:
                 self.python_temp_dir = tempfile.mkdtemp(prefix=self.config.temp_dir_prefix)
+
             script_file = os.path.join(self.python_temp_dir, "script.py")
-            with open(script_file, 'w') as f:
+
+            # Write the code to file with UTF-8 encoding
+            with open(script_file, 'w', encoding='utf-8') as f:
                 f.write(code)
 
+            # Execute the script
             python_cmd = [sys.executable, script_file]
-
             result = subprocess.run(
                 python_cmd,
                 capture_output=True,
@@ -60,13 +70,17 @@ class BlockExecutor:
                 env=os.environ.copy(),
                 cwd=self.python_temp_dir
             )
+
+            # Prepare output
             output_parts = []
             if result.stdout:
                 output_parts.append(f"Python stdout:\n{result.stdout.strip()}")
             if result.stderr:
                 output_parts.append(f"Python stderr:\n{result.stderr.strip()}")
             output_parts.append(f"Python return code: {result.returncode}")
+
             return {"type": "python_result", "content": f"{chr(10)}".join(output_parts) + f"{chr(10)}"}
+
         except subprocess.TimeoutExpired:
             return {"type": "python_result", "content": f"Python execution timed out after {self.config.python_execution_timeout} seconds"}
         except Exception as e:
