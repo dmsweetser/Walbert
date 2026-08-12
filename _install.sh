@@ -30,7 +30,7 @@ fi
 
 # Install requirements
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install --use-deprecated=legacy-setup -r requirements.txt
 
 # Model selection and configuration
 echo "Select a model:"
