@@ -96,7 +96,6 @@ else
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
         wget --content-disposition  "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true" -O "$MODEL_PATH"
-
     else
         echo "$MODEL_PATH already exists, skipping download."
     fi
@@ -114,7 +113,37 @@ else
     MIN_P=0.05
 fi
 
-# Generate config.json with selected model hyperparameters
+# Configure Bluetooth Audio Device
+echo "Configure Bluetooth Audio Device:"
+read -p "Enable Bluetooth audio routing? (y/n) [n]: " bt_choice
+bt_enabled=${bt_choice:-n}
+BT_DEVICE="null"
+if [[ "$bt_enabled" == "y" ]]; then
+    echo "Scanning for Bluetooth audio devices..."
+    if command -v bluetoothctl &> /dev/null; then
+        echo "Starting Bluetooth scan..."
+        timeout 10 bluetoothctl scan on
+        sleep 5
+        bluetoothctl scan off
+        echo "Available devices:"
+        bluetoothctl devices
+        read -p "Enter MAC address of target device: " BT_MAC
+        if [ -n "$BT_MAC" ]; then
+            echo "Pairing with $BT_MAC..."
+            bluetoothctl pair "$BT_MAC"
+            echo "Connecting to $BT_MAC..."
+            bluetoothctl connect "$BT_MAC"
+            BT_DEVICE="$BT_MAC"
+        else
+            BT_DEVICE="null"
+        fi
+    else
+        echo "bluetoothctl not found. Please configure manually in config.json."
+        BT_DEVICE="null"
+    fi
+fi
+
+# Configure optional features:
 echo "Configure optional features:"
 read -p "Enable STT (Whisper)? (y/n) [n]: " stt_choice
 stt_enabled=${stt_choice:-n}
@@ -124,9 +153,7 @@ read -p "Enable TTS? (y/n) [n]: " tts_choice
 tts_enabled=${tts_choice:-n}
 if [[ "$tts_enabled" == "y" ]]; then tts_enabled=true; else tts_enabled=false; fi
 
-read -p "Enter Bluetooth audio device name (leave empty for auto): " BT_DEVICE
-if [ -z "$BT_DEVICE" ]; then BT_DEVICE="null"; else BT_DEVICE="\"$BT_DEVICE\""; fi
-
+# Generate config.json
 cat > instance/config.json << EOF
 {
     "model_configs": {
@@ -158,7 +185,7 @@ cat > instance/config.json << EOF
     "audio_enabled": false,
     "stt_enabled": $stt_enabled,
     "tts_enabled": $tts_enabled,
-    "bluetooth_device": $BT_DEVICE,
+    "bluetooth_device": "$BT_DEVICE",
     "stt_timeout": 30,
     "user_input_timeout": 60,
     "tts_voice": "default"

@@ -7,7 +7,7 @@ import threading
 import json
 import logging
 import time
-from typing import Optional, Dict, Any
+from typing import List, Optional, Dict, Any
 
 logger = logging.getLogger('walbert.comms')
 
