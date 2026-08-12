@@ -5,6 +5,7 @@ set -e
 
 echo "Setting up Walbert..."
 
+sudo apt install python3.11-dev
 sudo apt install libbluetooth-dev
 
 # Create directories
