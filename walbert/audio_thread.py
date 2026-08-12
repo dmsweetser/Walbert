@@ -68,6 +68,10 @@ class AudioIOThread(threading.Thread):
 
     def _setup_stt(self):
         """Initialize Whisper STT model."""
+        if not self.config.stt_enabled:
+            logger.info("STT disabled in config.")
+            self._stt_model = None
+            return
         try:
             import whisper
             self._stt_model = whisper.load_model("base")
@@ -81,6 +85,10 @@ class AudioIOThread(threading.Thread):
 
     def _setup_tts(self):
         """Initialize TTS engine."""
+        if not self.config.tts_enabled:
+            logger.info("TTS disabled in config.")
+            self._tts_engine = None
+            return
         try:
             import pyttsx3
             self._tts_engine = pyttsx3.init()

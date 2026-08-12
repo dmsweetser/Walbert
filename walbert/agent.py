@@ -120,7 +120,10 @@ class WalbertAgent:
                 self._init_components()
                 self.state.refresh_system_prompt()
                 self.model_ready = True
-                self.comms.start()
+                if self.config.peer_communication_enabled:
+                    self.comms.start()
+                else:
+                    self.comms = None
 
             self.logger.info(f"Conversation session started in {session_dir}")
         except Exception as e:

@@ -1,11 +1,16 @@
 #!/bin/bash
-# Walbert Installation Script
+# Walbert Android (Termux) Installation Script
 
 set -e
 
-echo "Setting up Walbert..."
+echo "Setting up Walbert for Termux/Android..."
 
-# Create directories
+# Update and install dependencies
+pkg update -y
+pkg upgrade -y
+pkg install -y python git gcc make cmake clang ffmpeg libsndfile portaudio whisper
+
+# Create project directories
 mkdir -p instance
 mkdir -p instance/conversations
 mkdir -p instance/llama.cpp
@@ -14,7 +19,7 @@ mkdir -p instance/models
 
 # Create virtual environment
 echo "Creating Python virtual environment..."
-python3 -m venv venv
+python -m venv venv
 if [ $? -ne 0 ]; then
     echo "Error: Failed to create virtual environment"
     exit 1
@@ -70,11 +75,11 @@ if [ "$model_choice" == "2" ]; then
     TOP_K=20
     MIN_P=0.0
 elif [ "$model_choice" == "3" ]; then
-    MODEL_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf"
-    MMPROJ_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q4_K_M-mmproj-BF16.gguf"
+    MODEL_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q2_K_M.gguf"
+    MMPROJ_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q2_K_M-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
-        wget --content-disposition  "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf?download=true" -O "$MODEL_PATH"
+        wget --content-disposition  "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q2_K_M.gguf?download=true" -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
     fi
@@ -84,8 +89,8 @@ elif [ "$model_choice" == "3" ]; then
     else
         echo "$MMPROJ_PATH already exists, skipping download."
     fi
-    CONTEXT_SIZE=8192
-    OUTPUT_TOKENS=4096
+    CONTEXT_SIZE=4096
+    OUTPUT_TOKENS=2048
     TEMPERATURE=0.7
     TOP_P=0.9
     TOP_K=40
@@ -114,7 +119,7 @@ else
     MIN_P=0.05
 fi
 
-# Generate config.json with selected model hyperparameters
+# Configure optional Android features
 echo "Configure optional features:"
 read -p "Enable STT (Whisper)? (y/n) [n]: " stt_choice
 stt_enabled=${stt_choice:-n}
@@ -127,6 +132,7 @@ if [[ "$tts_enabled" == "y" ]]; then tts_enabled=true; else tts_enabled=false; f
 read -p "Enter Bluetooth audio device name (leave empty for auto): " BT_DEVICE
 if [ -z "$BT_DEVICE" ]; then BT_DEVICE="null"; else BT_DEVICE="\"$BT_DEVICE\""; fi
 
+# Generate config.json
 cat > instance/config.json << EOF
 {
     "model_configs": {
@@ -168,11 +174,11 @@ EOF
 echo "Created default config at instance/config.json"
 echo "Please edit this file with your specific paths and settings"
 
-# Download llama.cpp binary
+# Download llama.cpp binary for Android
 echo "Downloading llama.cpp binary..."
 if [ ! -f "instance/llama.cpp/bin/llama-server" ]; then
     wget -O llama.cpp.tar.gz \
-    "https://github.com/ggml-org/llama.cpp/releases/download/b9279/llama-b9279-bin-ubuntu-x64.tar.gz"
+    "https://github.com/ggml-org/llama.cpp/releases/download/b9279/llama-b9279-bin-android-arm64.tar.gz"
 
     echo "Extracting llama.cpp binary..."
     tar -xzf llama.cpp.tar.gz -C instance/llama.cpp/bin --strip-components=1

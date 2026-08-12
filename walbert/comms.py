@@ -127,14 +127,14 @@ class NetworkManager:
             if not data:
                 return
 
-            request = json.loads(data.decode().strip())
-            logger.info(f"Received request from {addr}: {request}")
+            raw_message = data.decode().strip()
+            logger.info(f"Received request from {addr}: {raw_message}")
 
             # Store incoming message for agent processing
             with self._lock:
                 self.received_messages.append({
                     "peer_ip": addr[0],
-                    "data": request,
+                    "data": raw_message,
                     "timestamp": time.time()
                 })
 

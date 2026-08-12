@@ -49,7 +49,17 @@ def load_config() -> Config:
                 log_level=config_data.get('log_level', "INFO"),
                 walbert_port=config_data.get('walbert_port', 8081),
                 udp_port=config_data.get('udp_port', 9999),
-                be_presbyterian=bool(config_data.get('be_presbyterian', True))
+                be_presbyterian=bool(config_data.get('be_presbyterian', True)),
+                peer_communication_enabled=bool(config_data.get('peer_communication_enabled', False)),
+                python_execution_enabled=bool(config_data.get('python_execution_enabled', False)),
+                bash_execution_enabled=bool(config_data.get('bash_execution_enabled', False)),
+                audio_enabled=bool(config_data.get('audio_enabled', False)),
+                stt_enabled=bool(config_data.get('stt_enabled', False)),
+                tts_enabled=bool(config_data.get('tts_enabled', False)),
+                bluetooth_device=config_data.get('bluetooth_device', None),
+                stt_timeout=int(config_data.get('stt_timeout', 30)),
+                user_input_timeout=int(config_data.get('user_input_timeout', 60)),
+                tts_voice=config_data.get('tts_voice', "default")
             )
     except FileNotFoundError:
         logger.error("instance/config.json not found")

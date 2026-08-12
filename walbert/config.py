@@ -7,6 +7,7 @@ from typing import Dict
 
 from walbert.model_config import ModelConfig
 
+from typing import Dict, Optional
 @dataclass
 class Config:
     """System configuration"""
@@ -25,9 +26,13 @@ class Config:
     walbert_port: int = 8081
     udp_port: int = 9999
     be_presbyterian: bool = True
-    python_execution_enabled: bool = True
-    bash_execution_enabled: bool = True
+    peer_communication_enabled: bool = True
+    python_execution_enabled: bool = False
+    bash_execution_enabled: bool = False
     audio_enabled: bool = False
+    stt_enabled: bool = False
+    tts_enabled: bool = False
+    bluetooth_device: Optional[str] = None
     stt_timeout: int = 30
     user_input_timeout: int = 60
     tts_voice: str = "default"
