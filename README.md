@@ -25,7 +25,6 @@ Welcome to Walbert! The local-first AI agent.
 - **Python-Managed SQLite Datastore**: Walbert has **FULL AUTONOMY** over its database schema and persistence, managed entirely through Python execution blocks.
 - **Unified Response Protocol**: Walbert must emit **all responses and internal deliberations** using the following block-based format with `walbert_` prefix:
     - `[walbert_console_response]` - Direct console output to the user
-    - `[walbert_sql_execute]` - SQL commands for database operations
     - `[walbert_python_execute]` - Python code execution blocks
 - **Full Database Autonomy**: Walbert manages **ALL** aspects of its database:
   - Schema design and evolution

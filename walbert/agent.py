@@ -223,7 +223,7 @@ class WalbertAgent:
 
     def _execute_pending_blocks(self, provided_blocks):
         """Execute all pending blocks (SQL, Python, etc.) in order."""
-        executable_types = {"sql_execute", "python_execute", "bash_execute", "awareness", "ultimate_task", "immediate_task", "impediment"}
+        executable_types = {"python_execute", "bash_execute", "awareness", "ultimate_task", "immediate_task", "impediment"}
         with self._lock:
             pending_blocks = [
                 b for b in provided_blocks
@@ -253,7 +253,7 @@ class WalbertAgent:
                         self.logger.info(f"Sent peer message to {peer_ip}")
                 except Exception as e:
                     self.logger.error(f"Failed to send peer message: {e}")
-            elif block["type"] in ("sql_execute", "python_execute", "bash_execute"):
+            elif block["type"] in ("python_execute", "bash_execute"):
                 result_block = self.executor.execute(block)
                 if result_block:
                     self.state.append_block(block["type"], block["content"])
@@ -285,7 +285,7 @@ class WalbertAgent:
     def write_output(self, text: str, block_type: str = None) -> None:
         """Write output to console."""
         if block_type == "console_response" or self.print_raw:
-            if block_type in ("awareness", "db_schema", "context_blocks"):
+            if block_type in ("awareness", "context_blocks"):
                 formatted_text = f"{chr(10)}".join(f"**** {line}" for line in text.split(f"{chr(10)}"))
                 print(formatted_text, end='', flush=True)
             else:

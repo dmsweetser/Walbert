@@ -41,10 +41,6 @@ dist/
 config.json
 io_config.json
 
-# Database
-walbert.db
-walbert.db-journal
-
 # Scripts
 install.sh
 download_models.sh
