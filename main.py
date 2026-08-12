@@ -166,17 +166,9 @@ def main():
     interrupt_event = threading.Event()
 
     # Create agent
-    agent = WalbertAgent(config)
+    agent = WalbertAgent(config, input_queue=input_queue)
 
-    # Initialize and start audio thread if enabled
-    if config.audio_enabled:
-        from walbert.audio_thread import AudioIOThread
-        def on_response(text):
-            if hasattr(agent, 'audio_thread') and agent.audio_thread:
-                agent.audio_thread.handle_console_response(text)
-        agent.audio_thread = AudioIOThread(input_queue, config, on_response)
-        agent.audio_thread.start()
-        logger.info("Audio I/O thread started")
+    # Audio thread will be initialized dynamically via runtime commands
 
     # Start agent in autonomous mode in separate thread
     agent_thread = threading.Thread(target=agent.run_autonomous, args=(input_queue, interrupt_event))
@@ -208,11 +200,13 @@ def main():
                 agent.config.bash_execution_enabled = False
                 print(f"{chr(10)}Bash execution disabled.")
             elif user_input.lower() == 'peer on':
-                agent.config.peer_communication_enabled = True
-                print(f"{chr(10)}Peer communication enabled.")
+                agent.enable_peer_communication()
             elif user_input.lower() == 'peer off':
-                agent.config.peer_communication_enabled = False
-                print(f"{chr(10)}Peer communication disabled.")
+                agent.disable_peer_communication()
+            elif user_input.lower() in ['stt on', 'tts on', 'audio on']:
+                agent.enable_audio()
+            elif user_input.lower() in ['stt off', 'tts off', 'audio off']:
+                agent.disable_audio()
             elif user_input.lower() == 'log on':
                 agent.print_raw = True
                 print(f"{chr(10)}Raw log output enabled. All block executions will be printed.")

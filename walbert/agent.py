@@ -73,7 +73,7 @@ class WalbertAgent:
     MODEL_RESTART_DELAY = 5
     AUTONOMOUS_LOOP_DELAY = 10
 
-    def __init__(self, config, model_manager=None):
+    def __init__(self, config, model_manager=None, input_queue=None):
         self.config = config
         self.model_manager = model_manager
         self.state = AgentState(config)
@@ -89,9 +89,12 @@ class WalbertAgent:
         self.bash_execution_enabled = config.bash_execution_enabled
         self.print_raw = False
         self.waiting_for_user = False
+        self.input_queue = input_queue
         self.comms = NetworkManager(config)
         self.audio_thread = None
         self._pending_peer_ip = None
+        self._comms_started = False
+        self._audio_started = False
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
@@ -400,6 +403,56 @@ Error: {str(e)}
         if self.audio_thread and self.audio_thread.is_alive():
             self.audio_thread.stop()
         self.end_conversation()
+
+    def enable_peer_communication(self):
+        if not self.config.peer_communication_enabled:
+            self.config.peer_communication_enabled = True
+        if self._comms_started:
+            return
+        if self.comms is None:
+            self.comms = NetworkManager(self.config)
+        self.comms.start()
+        self._comms_started = True
+        self.logger.info("Peer communication enabled")
+
+    def disable_peer_communication(self):
+        self.config.peer_communication_enabled = False
+        if not self._comms_started:
+            return
+        if self.comms:
+            self.comms.stop()
+        self._comms_started = False
+        self.logger.info("Peer communication disabled")
+
+    def enable_audio(self):
+        self.config.audio_enabled = True
+        self.config.stt_enabled = True
+        self.config.tts_enabled = True
+        if self._audio_started:
+            return
+        if not self.input_queue:
+            import queue
+            self.input_queue = queue.Queue()
+        def on_response(text):
+            if hasattr(self, 'audio_thread') and self.audio_thread:
+                self.audio_thread.handle_console_response(text)
+        self.audio_thread = AudioIOThread(self.input_queue, self.config, on_response)
+        self.audio_thread.start()
+        self._audio_started = True
+        self.logger.info("Audio I/O thread enabled")
+
+    def disable_audio(self):
+        self.config.audio_enabled = False
+        self.config.stt_enabled = False
+        self.config.tts_enabled = False
+        if not self._audio_started:
+            return
+        if self.audio_thread and self.audio_thread.is_alive():
+            self.audio_thread.stop()
+            self.audio_thread.join(timeout=2)
+            self.audio_thread = None
+        self._audio_started = False
+        self.logger.info("Audio I/O thread disabled")
 
     def send_peer_message(self, peer_ip: str, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Send a message to a specific peer and wait for response."""
