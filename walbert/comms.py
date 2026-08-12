@@ -56,17 +56,7 @@ class NetworkManager:
         finally:
             sock.close()
 
-    def get_peer_list(self) -> List[str]:
-        """Return list of discovered peer IPs."""
-        with self._lock:
-            return list(self.known_peers.keys())
-
-    def get_pending_messages(self) -> List[Dict[str, Any]]:
-        """Return and clear pending incoming messages."""
-        with self._lock:
-            msgs = self.received_messages.copy()
-            self.received_messages.clear()
-            return msgs
+    
 
     def _listen_udp(self):
         """Listen for UDP discovery announcements."""
@@ -176,14 +166,4 @@ class NetworkManager:
         finally:
             sock.close()
 
-    def get_peer_list(self) -> List[str]:
-        """Return list of discovered peer IPs."""
-        with self._lock:
-            return list(self.known_peers.keys())
-
-    def get_pending_messages(self) -> List[Dict[str, Any]]:
-        """Return and clear pending incoming messages."""
-        with self._lock:
-            msgs = self.received_messages.copy()
-            self.received_messages.clear()
-            return msgs
+    

@@ -255,11 +255,11 @@ Reply ONLY in block format. NO EXTRA TEXT.
             with open(self._user_directive_path, 'r') as f:
                 self._user_directive = f.read()
         except FileNotFoundError:
-            self._user_directive = "No user_directives detected."
+            self._user_directive = "No user directive detected."
             self._save_user_directive()
         except Exception as e:
             logger.error(f"Error loading user_directive: {e}")
-            self._user_directive = "No user_directives detected."
+            self._user_directive = "No user directive detected."
             self._save_user_directive()
 
     def _save_user_directive(self):

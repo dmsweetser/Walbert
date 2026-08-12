@@ -82,7 +82,7 @@ class BlockExecutor:
                 ["bash", "-c", code],
                 capture_output=True,
                 text=True,
-                timeout=self.config.python_execution_timeout,
+                timeout=self.config.bash_execution_timeout,
                 env=os.environ.copy()
             )
             output_parts = []

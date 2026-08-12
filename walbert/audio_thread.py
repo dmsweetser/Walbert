@@ -124,8 +124,15 @@ class AudioIOThread(threading.Thread):
             if len(audio_data) < 1000:  # Minimum threshold
                 self._audio_buffer.clear()
                 return
-            result = self._stt_model.transcribe(audio_data, fp16=False)
-            text = result.get('text', '').strip()
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_f:
+                tmp_f.write(audio_data)
+                tmp_path = tmp_f.name
+            try:
+                result = self._stt_model.transcribe(tmp_path, fp16=False)
+                text = result.get('text', '').strip()
+            finally:
+                os.unlink(tmp_path)
             if text:
                 logger.info(f"STT Output: {text}")
                 self.input_queue.put(("user_input", text))

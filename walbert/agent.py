@@ -22,6 +22,7 @@ from walbert.state import AgentState
 from walbert.parser import BlockParser
 from walbert.executor import BlockExecutor
 from walbert.comms import NetworkManager
+from walbert.audio_thread import AudioIOThread
 
 # Initialize logging
 os.makedirs('instance', exist_ok=True)
