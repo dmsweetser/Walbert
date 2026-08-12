@@ -125,28 +125,43 @@ echo "Configure Bluetooth Audio Device:"
 read -p "Enable Bluetooth audio routing? (y/n) [n]: " bt_choice
 bt_enabled=${bt_choice:-n}
 BT_DEVICE="null"
+
 if [[ "$bt_enabled" == "y" ]]; then
-    echo "Scanning for Bluetooth audio devices..."
     if command -v bluetoothctl &> /dev/null; then
-        echo "Starting Bluetooth scan..."
-        timeout 10 bluetoothctl scan on
-        sleep 5
-        bluetoothctl scan off
-        echo "Available devices:"
+        echo "Scanning for Bluetooth audio devices (10 seconds)..."
+
+        # Start scan
+        bluetoothctl --timeout 10 scan on
+
+        echo "Discovered devices:"
         bluetoothctl devices
+
         read -p "Enter MAC address of target device: " BT_MAC
+
         if [ -n "$BT_MAC" ]; then
-            echo "Pairing with $BT_MAC..."
-            bluetoothctl pair "$BT_MAC"
-            echo "Connecting to $BT_MAC..."
-            bluetoothctl connect "$BT_MAC"
+            echo "Pairing and connecting to $BT_MAC..."
+
+            pair_output=$(echo -e "pair $BT_MAC" | bluetoothctl 2>&1)
+
+            if echo "$pair_output" | grep -q "AlreadyExists"; then
+                echo "Device already paired. Connecting..."
+            else
+                echo "$pair_output"
+            fi
+
+            connect_output=$(echo -e "trust $BT_MAC\nconnect $BT_MAC" | bluetoothctl 2>&1)
+            echo "$connect_output"
+
+            if echo "$connect_output" | grep -q "Failed"; then
+                echo "Connection failed. Removing stale pairing and retrying..."
+                echo -e "remove $BT_MAC" | bluetoothctl
+                echo -e "pair $BT_MAC\ntrust $BT_MAC\nconnect $BT_MAC" | bluetoothctl
+            fi
+
             BT_DEVICE="$BT_MAC"
-        else
-            BT_DEVICE="null"
         fi
     else
         echo "bluetoothctl not found. Please configure manually in config.json."
-        BT_DEVICE="null"
     fi
 fi
 
