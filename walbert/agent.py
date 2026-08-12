@@ -91,6 +91,7 @@ class WalbertAgent:
         self.waiting_for_user = False
         self.comms = NetworkManager(config)
         self.audio_thread = None
+        self._pending_peer_ip = None
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
@@ -243,14 +244,16 @@ class WalbertAgent:
             elif block["type"] == "impediment":
                 self.state._impediment = block["content"]
                 self.state._save_impediment()
+            elif block["type"] == "peer_ip":
+                self._pending_peer_ip = block["content"].strip()
             elif block["type"] == "peer_message":
                 try:
-                    msg_data = json.loads(block["content"])
-                    peer_ip = msg_data.get("peer_ip")
-                    payload = msg_data.get("data", {})
-                    if peer_ip:
-                        self.comms.send_to_peer(peer_ip, payload)
-                        self.logger.info(f"Sent peer message to {peer_ip}")
+                    if hasattr(self, '_pending_peer_ip') and self._pending_peer_ip:
+                        self.comms.send_to_peer(self._pending_peer_ip, block["content"])
+                        self.logger.info(f"Sent peer message to {self._pending_peer_ip}")
+                        self._pending_peer_ip = None
+                    else:
+                        self.logger.warning("Peer IP not set before message block.")
                 except Exception as e:
                     self.logger.error(f"Failed to send peer message: {e}")
             elif block["type"] in ("python_execute", "bash_execute"):

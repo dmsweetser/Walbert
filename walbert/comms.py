@@ -151,14 +151,14 @@ class NetworkManager:
         finally:
             client.close()
 
-    def send_to_peer(self, peer_ip: str, message: Dict[str, Any], port: Optional[int] = None) -> Optional[Dict[str, Any]]:
-        """Send a message to a specific peer and wait for response."""
+    def send_to_peer(self, peer_ip: str, message: str, port: Optional[int] = None) -> Optional[str]:
+        """Send a raw message string to a specific peer and wait for response."""
         target_port = port or self.known_peers.get(peer_ip, self.port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(15.0)
         try:
             sock.connect((peer_ip, target_port))
-            sock.sendall(json.dumps(message).encode() + b"\n")
+            sock.sendall(message.encode() + b"\n")
             response_data = b""
             while True:
                 chunk = sock.recv(4096)
@@ -167,7 +167,7 @@ class NetworkManager:
                 response_data += chunk
                 if b"\n" in response_data:
                     break
-            response = json.loads(response_data.decode().strip())
+            response = response_data.decode().strip()
             logger.info(f"Received response from {peer_ip}:{target_port}")
             return response
         except Exception as e:

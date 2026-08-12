@@ -45,22 +45,26 @@ class AudioIOThread(threading.Thread):
         logger.info("Audio IO Thread stopping")
 
     def _setup_bluetooth(self):
-        """Automatically connect to available Bluetooth audio device."""
-        try:
-            # Use bluez/pulseaudio integration to find and connect audio device
-            result = subprocess.run(['pactl', 'list', 'short', 'sources'], capture_output=True, text=True)
-            sources = result.stdout.strip().split('\n')
-            for line in sources:
-                if 'bluez' in line.lower() or 'bluetooth' in line.lower():
-                    self._bt_device = line.split('\t')[1]
-                    logger.info(f"Connected to Bluetooth audio device: {self._bt_device}")
-                    break
-            if not self._bt_device:
-                logger.warning("No Bluetooth audio device found. Falling back to default.")
-                self._bt_device = "alsa_output.pci-0000_00_1f.3.analog-stereo"
-        except Exception as e:
-            logger.error(f"Bluetooth setup failed: {e}")
-            self._bt_device = None
+        """Use configured Bluetooth audio device."""
+        if self.config.bluetooth_device:
+            self._bt_device = self.config.bluetooth_device
+            logger.info(f"Using configured Bluetooth audio device: {self._bt_device}")
+        else:
+            try:
+                # Fallback to automatic discovery
+                result = subprocess.run(['pactl', 'list', 'short', 'sources'], capture_output=True, text=True)
+                sources = result.stdout.strip().split('\n')
+                for line in sources:
+                    if 'bluez' in line.lower() or 'bluetooth' in line.lower():
+                        self._bt_device = line.split('\t')[1]
+                        logger.info(f"Discovered Bluetooth audio device: {self._bt_device}")
+                        break
+                if not self._bt_device:
+                    logger.warning("No Bluetooth audio device found. Falling back to default.")
+                    self._bt_device = "alsa_output.pci-0000_00_1f.3.analog-stereo"
+            except Exception as e:
+                logger.error(f"Bluetooth setup failed: {e}")
+                self._bt_device = None
 
     def _setup_stt(self):
         """Initialize Whisper STT model."""
