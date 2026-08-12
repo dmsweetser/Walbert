@@ -157,6 +157,16 @@ def main():
     # Create agent
     agent = WalbertAgent(config)
 
+    # Initialize and start audio thread if enabled
+    if config.audio_enabled:
+        from walbert.audio_thread import AudioIOThread
+        def on_response(text):
+            if hasattr(agent, 'audio_thread') and agent.audio_thread:
+                agent.audio_thread.handle_console_response(text)
+        agent.audio_thread = AudioIOThread(input_queue, config, on_response)
+        agent.audio_thread.start()
+        logger.info("Audio I/O thread started")
+
     # Start agent in autonomous mode in separate thread
     agent_thread = threading.Thread(target=agent.run_autonomous, args=(input_queue, interrupt_event))
     agent_thread.daemon = True

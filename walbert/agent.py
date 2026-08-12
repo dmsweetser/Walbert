@@ -90,6 +90,7 @@ class WalbertAgent:
         self.print_raw = False
         self.waiting_for_user = False
         self.comms = NetworkManager(config)
+        self.audio_thread = None
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
@@ -138,6 +139,10 @@ class WalbertAgent:
         """Generate a response block using the model."""
         prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size, user_input=user_input)
         prompt += f"{chr(10)}Please respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
+        # Inject peer list into prompt context
+        peers = self.comms.get_peer_list()
+        if peers:
+            prompt += f"\n## Active Peers\n{', '.join(peers)}\n"
 
         model_response = self.model_manager.execute_model(
             prompt,
@@ -157,14 +162,22 @@ class WalbertAgent:
         self._execute_pending_blocks(response_blocks)
 
         console_content = ""
+        is_blocking = False
         for block in response_blocks:
-            if block["type"] == "console_response":
+            if block["type"] in ("console_response_blocking", "console_response_nonblocking"):
                 console_content = block["content"]
+                is_blocking = block["type"] == "console_response_blocking"
+                break
         
         if console_content:
             self.write_output(console_content, "console_response")
-            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
-            self.waiting_for_user = True
+            if is_blocking:
+                print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                self.waiting_for_user = True
+                # Timeout logic handled in run_autonomous
+            else:
+                print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                self.waiting_for_user = False
         else:
             self.waiting_for_user = False
             
@@ -230,6 +243,16 @@ class WalbertAgent:
             elif block["type"] == "impediment":
                 self.state._impediment = block["content"]
                 self.state._save_impediment()
+            elif block["type"] == "peer_message":
+                try:
+                    msg_data = json.loads(block["content"])
+                    peer_ip = msg_data.get("peer_ip")
+                    payload = msg_data.get("data", {})
+                    if peer_ip:
+                        self.comms.send_to_peer(peer_ip, payload)
+                        self.logger.info(f"Sent peer message to {peer_ip}")
+                except Exception as e:
+                    self.logger.error(f"Failed to send peer message: {e}")
             elif block["type"] in ("sql_execute", "python_execute", "bash_execute"):
                 result_block = self.executor.execute(block)
                 if result_block:
@@ -301,19 +324,31 @@ class WalbertAgent:
                     continue
 
                 if self.waiting_for_user:
-                    msg_type, msg = input_queue.get(timeout=0.1)
-                    self.waiting_for_user = False
-                    if msg_type == "exit":
-                        self.end_conversation()
-                        return
-                    if msg_type == "user_input":
-                        last_user_input = msg
-                        self.state.append_block("user_input", msg)
-                        self._generate_response_block(msg, interrupt_event)
-                        print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                    try:
+                        msg_type, msg = input_queue.get(timeout=self.config.user_input_timeout)
+                        self.waiting_for_user = False
+                        if msg_type == "exit":
+                            self.end_conversation()
+                            return
+                        if msg_type == "user_input":
+                            last_user_input = msg
+                            self.state.append_block("user_input", msg)
+                            self._generate_response_block(msg, interrupt_event)
+                            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                            continue
+                    except queue.Empty:
+                        self.logger.info("User input timeout. Resuming autonomous operation.")
+                        self.state.append_block("system_note", "User failed to respond within timeout. Continuing autonomous operation.")
+                        self.waiting_for_user = False
                         continue
                 else:
                     # Autonomous mode
+                    # Check for incoming peer messages
+                    pending_msgs = self.comms.get_pending_messages()
+                    for msg in pending_msgs:
+                        self.state.append_block("peer_message_received", json.dumps(msg))
+                        self.logger.info(f"Processed peer message from {msg['peer_ip']}")
+                    
                     if not test_mode:
                         self._generate_autonomous_block(interrupt_event)
                         time.sleep(self.AUTONOMOUS_LOOP_DELAY)
@@ -356,6 +391,8 @@ Error: {str(e)}
 
     def shutdown(self):
         """Shutdown agent cleanly."""
+        if self.audio_thread and self.audio_thread.is_alive():
+            self.audio_thread.stop()
         self.end_conversation()
 
     def send_peer_message(self, peer_ip: str, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:

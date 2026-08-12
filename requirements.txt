@@ -2,3 +2,9 @@ python-dotenv
 requests
 numpy
 readchar
+pyaudio
+pybluez
+evdev
+whisper
+pyttsx3
+pydbus

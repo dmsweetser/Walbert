@@ -27,3 +27,7 @@ class Config:
     be_presbyterian: bool = True
     python_execution_enabled: bool = True
     bash_execution_enabled: bool = True
+    audio_enabled: bool = False
+    stt_timeout: int = 30
+    user_input_timeout: int = 60
+    tts_voice: str = "default"

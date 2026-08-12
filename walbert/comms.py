@@ -19,6 +19,7 @@ class NetworkManager:
         self.udp_port = config.udp_port
         self.broadcast_addr = "<broadcast>"
         self.known_peers: Dict[str, int] = {}  # ip:port
+        self.received_messages: List[Dict[str, Any]] = []
         self._lock = threading.Lock()
         self._running = False
         self._udp_thread = None
@@ -54,6 +55,18 @@ class NetworkManager:
             logger.warning(f"UDP broadcast failed: {e}")
         finally:
             sock.close()
+
+    def get_peer_list(self) -> List[str]:
+        """Return list of discovered peer IPs."""
+        with self._lock:
+            return list(self.known_peers.keys())
+
+    def get_pending_messages(self) -> List[Dict[str, Any]]:
+        """Return and clear pending incoming messages."""
+        with self._lock:
+            msgs = self.received_messages.copy()
+            self.received_messages.clear()
+            return msgs
 
     def _listen_udp(self):
         """Listen for UDP discovery announcements."""
@@ -117,6 +130,14 @@ class NetworkManager:
             request = json.loads(data.decode().strip())
             logger.info(f"Received request from {addr}: {request}")
 
+            # Store incoming message for agent processing
+            with self._lock:
+                self.received_messages.append({
+                    "peer_ip": addr[0],
+                    "data": request,
+                    "timestamp": time.time()
+                })
+
             # Process request (placeholder for actual logic)
             response = {
                 "status": "ok",
@@ -154,3 +175,15 @@ class NetworkManager:
             return None
         finally:
             sock.close()
+
+    def get_peer_list(self) -> List[str]:
+        """Return list of discovered peer IPs."""
+        with self._lock:
+            return list(self.known_peers.keys())
+
+    def get_pending_messages(self) -> List[Dict[str, Any]]:
+        """Return and clear pending incoming messages."""
+        with self._lock:
+            msgs = self.received_messages.copy()
+            self.received_messages.clear()
+            return msgs
