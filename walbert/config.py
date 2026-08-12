@@ -21,8 +21,9 @@ class Config:
     bash_execution_timeout: int = 60
     autonomous_operation_timeout: int = 120
     conversation_log_dir: str = "instance/conversations"
-    database_path: str = "instance/walbert.db"
     temp_dir_prefix: str = "walbert_python_"
+    walbert_port: int = 8081
+    udp_port: int = 9999
     be_presbyterian: bool = True
     python_execution_enabled: bool = True
     bash_execution_enabled: bool = True

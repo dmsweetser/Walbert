@@ -22,7 +22,7 @@ Welcome to Walbert! The local-first AI agent.
 
 - **Local-First Execution**: Runs on your Linux system using local llama.cpp binaries
 - **Single Model Focus**: Optimized for Devstral-24B-Instruct-GGUF for high-quality reasoning
-- **SQLite Datastore**: Walbert has **FULL AUTONOMY** over its database schema and persistence
+- **Python-Managed SQLite Datastore**: Walbert has **FULL AUTONOMY** over its database schema and persistence, managed entirely through Python execution blocks.
 - **Unified Response Protocol**: Walbert must emit **all responses and internal deliberations** using the following block-based format with `walbert_` prefix:
     - `[walbert_console_response]` - Direct console output to the user
     - `[walbert_sql_execute]` - SQL commands for database operations
@@ -37,7 +37,7 @@ Welcome to Walbert! The local-first AI agent.
   - `[walbert_immediate_task_start]` - Current actionable step
   - `[walbert_impediment_start]` - Active blockers or constraints
   - Recent Execution Results - Most recent block outputs/errors for context
-- **Zero Hard-Coded Persistence**: All database operations handled through the protocol
+- **Dynamic Data Persistence**: All database operations (schema creation, queries, persistence) are handled via Python execution blocks.
 - **Python Execution**: Execute Python code in the main application's virtual environment
 - **Autonomous Operation**: Continues working even without user input
 - **Error Resilience**: Provides errors as feedback without disrupting execution
@@ -83,7 +83,8 @@ cd walbert
     "python_execution_timeout": 30,
     "autonomous_operation_timeout": 120,
     "conversation_log_dir": "instance/conversations",
-    "database_path": "instance/walbert.db"
+    "walbert_port": 8081,
+    "udp_port": 9999
 }
 ```
 
@@ -102,9 +103,22 @@ Available commands:
 - `show ultimate task`: View long-term overarching goal
 - `show immediate task`: View current actionable step
 - `show impediment`: View active blockers or constraints
-- `show schema`: View database schema
 - `pip_install <package>`: Install a Python package in the main environment
 - Any other input will be treated as a request to Walbert
+
+## Walbert-to-Walbert Communication
+
+Walbert instances can discover and communicate with each other over the local network using UDP discovery and TCP messaging.
+
+- **Discovery**: Each running instance broadcasts its presence via UDP on port 9999.
+- **Messaging**: Use Python execution blocks to send messages to discovered peers:
+  ```python
+  from walbert.agent import WalbertAgent
+  # Access the agent's comms manager to send a message
+  response = agent.send_peer_message("192.168.1.100", {"type": "query", "data": "hello"})
+  print(response)
+  ```
+- All inter-agent communication is handled through the `NetworkManager` class, which manages peer tracking, TCP connections, and response parsing.
 
 ## Testing (there are no tests)
 

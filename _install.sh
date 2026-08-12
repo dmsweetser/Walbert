@@ -137,7 +137,8 @@ cat > instance/config.json << EOF
     "python_execution_timeout": 30,
     "autonomous_operation_timeout": 120,
     "conversation_log_dir": "instance/conversations",
-    "database_path": "instance/walbert.db",
+    "walbert_port": 8081,
+    "udp_port": 9999,
     "be_presbyterian": true
 }
 EOF

@@ -47,6 +47,8 @@ def load_config() -> Config:
                 llama_binary_path=config_data['llama_binary_path'],
                 mmproj_path=config_data.get('mmproj_path', ""),
                 log_level=config_data.get('log_level', "INFO"),
+                walbert_port=config_data.get('walbert_port', 8081),
+                udp_port=config_data.get('udp_port', 9999),
                 be_presbyterian=bool(config_data.get('be_presbyterian', True))
             )
     except FileNotFoundError:
@@ -106,7 +108,7 @@ def print_welcome_message(agent):
     print("- python on/off: Toggle Python execution")
     print("- bash on/off: Toggle Bash execution")
     print("- log on/off: Toggle raw block output to console")
-    print("- show awareness/ultimate_task/immediate_task/user_directive/impediment/schema: View agent state")
+    print("- show awareness/ultimate_task/immediate_task/user_directive/impediment: View agent state")
     print("- pip_install <package>: Install a Python package in the main environment")
     print("- help: Show these options again")
     print("- Any other input will be treated as a request to Walbert")
@@ -215,11 +217,6 @@ def main():
                     _paged_output(f"--- USER DIRECTIVE ---\n{agent.state._user_directive}\n--- END ---")
                 else:
                     print(f"{chr(10)}No user directive data available yet.")
-            elif user_input.lower() == 'show schema':
-                if hasattr(agent, 'state') and agent.state:
-                    _paged_output(f"--- DB SCHEMA ---\n{agent.state.db_schema}\n--- END ---")
-                else:
-                    print(f"{chr(10)}No schema data available yet.")
             elif user_input.lower().startswith('pip_install '):
                 package = user_input[12:].strip()
                 if package:

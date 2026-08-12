@@ -15,11 +15,13 @@ import time
 import queue
 import shutil
 import datetime
+from typing import Dict, Any, Optional
 from walbert.config import Config
 from walbert.model_config import ModelConfig
 from walbert.state import AgentState
 from walbert.parser import BlockParser
 from walbert.executor import BlockExecutor
+from walbert.comms import NetworkManager
 
 # Initialize logging
 os.makedirs('instance', exist_ok=True)
@@ -83,11 +85,11 @@ class WalbertAgent:
         self.model_ready = False
         self.processing_cycle = 0
         self.current_conversation_file = None
-        self.db = None
         self.python_execution_enabled = config.python_execution_enabled
         self.bash_execution_enabled = config.bash_execution_enabled
         self.print_raw = False
         self.waiting_for_user = False
+        self.comms = NetworkManager(config)
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
@@ -95,14 +97,11 @@ class WalbertAgent:
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
 
     def _init_components(self):
-        """Initialize components that depend on DB connection."""
-        from walbert.database.manager import DatabaseManager
+        """Initialize components that depend on runtime state."""
         from walbert.models.manager import ModelManager
         if self.model_manager is None:
             self.model_manager = ModelManager(self.config)
-        self.db = DatabaseManager(self.config.database_path)
-        self.state.db = self.db
-        self.executor = BlockExecutor(self.config, self.db)
+        self.executor = BlockExecutor(self.config, None)
 
     def start_conversation(self):
         """Start a new conversation session."""
@@ -117,9 +116,9 @@ class WalbertAgent:
             with self._lock:
                 self.session_dir = session_dir
                 self._init_components()
-                self.db.connect()
                 self.state.refresh_system_prompt()
                 self.model_ready = True
+                self.comms.start()
 
             self.logger.info(f"Conversation session started in {session_dir}")
         except Exception as e:
@@ -130,11 +129,10 @@ class WalbertAgent:
         """End current conversation."""
         with self._lock:
             self.session_dir = None
-            if self.db and hasattr(self.db, 'close'):
-                self.db.close()
             if self.executor and self.executor.python_temp_dir and os.path.exists(self.executor.python_temp_dir):
                 shutil.rmtree(self.executor.python_temp_dir)
                 self.executor.python_temp_dir = None
+            self.comms.stop()
 
     def _generate_response_block(self, user_input, interrupt_event) -> str:
         """Generate a response block using the model."""
@@ -359,3 +357,7 @@ Error: {str(e)}
     def shutdown(self):
         """Shutdown agent cleanly."""
         self.end_conversation()
+
+    def send_peer_message(self, peer_ip: str, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Send a message to a specific peer and wait for response."""
+        return self.comms.send_to_peer(peer_ip, message)

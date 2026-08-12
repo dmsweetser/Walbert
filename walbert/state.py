@@ -148,37 +148,6 @@ Reply ONLY in block format. NO EXTRA TEXT.
         except Exception as e:
             logger.error(f"Error saving system prompt: {e}")
 
-    # --- DB Schema ---
-    @property
-    def db_schema(self) -> str:
-        if self._db_schema is None:
-            self._load_db_schema()
-        return self._db_schema
-
-    def refresh_db_schema(self):
-        """Fetch and save the latest DB schema."""
-        if self.db and hasattr(self.db, 'get_schema'):
-            self._db_schema = self.db.get_schema()
-            self._save_db_schema()
-
-    def _load_db_schema(self):
-        try:
-            with open(self._db_schema_path, 'r') as f:
-                self._db_schema = f.read()
-        except FileNotFoundError:
-            logger.warning("DB schema file not found. Will initialize on first use.")
-            self._db_schema = None
-        except Exception as e:
-            logger.error(f"Error loading DB schema: {e}")
-            self._db_schema = None
-
-    def _save_db_schema(self):
-        try:
-            with open(self._db_schema_path, 'w') as f:
-                f.write(self._db_schema)
-        except Exception as e:
-            logger.error(f"Error saving DB schema: {e}")
-
     # --- Awareness Text ---
     @property
     def awareness_text(self) -> str:
@@ -297,7 +266,6 @@ Reply ONLY in block format. NO EXTRA TEXT.
     def _load_all(self):
         """Load all state components from their respective files."""
         self._load_system_prompt()
-        self._load_db_schema()
         self._load_awareness()
         self._load_ultimate_task()
         self._load_immediate_task()
@@ -311,13 +279,9 @@ Reply ONLY in block format. NO EXTRA TEXT.
 
     def get_prompt(self, max_tokens: int = 2048, user_input: str = None) -> str:
         """Generate the full prompt by combining all components, with token-aware truncation."""
-        self.refresh_db_schema()
         self._sync_state()
 
-        full_database_path = os.path.abspath(self.config.database_path)
-
         base_prompt = f"[walbert_system_prompt_start]{chr(10)}{self.system_prompt}{chr(10)}[walbert_system_prompt_end]{chr(10)}{chr(10)}"
-        base_prompt += f"## Current Database Schema{chr(10)}Database file location: {full_database_path}{chr(10)}{chr(10)}{self.db_schema}{chr(10)}{chr(10)}"
         base_prompt += f"## Current Awareness{chr(10)}{self.awareness_text}{chr(10)}{chr(10)}"
         base_prompt += f"## Current Ultimate Task{chr(10)}{self._ultimate_task}{chr(10)}{chr(10)}"
         base_prompt += f"## Current Immediate Task{chr(10)}{self._immediate_task}{chr(10)}{chr(10)}"
