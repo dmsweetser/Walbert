@@ -29,8 +29,8 @@ if [ $? -ne 0 ]; then
 fi
 
 # Install requirements
-pip install --upgrade pip
-pip install --use-deprecated=legacy-resolver -r requirements.txt
+pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt
 
 # Model selection and configuration
 echo "Select a model:"
