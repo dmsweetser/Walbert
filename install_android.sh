@@ -119,7 +119,36 @@ else
     MIN_P=0.05
 fi
 
-# Configure optional Android features
+# Configure Bluetooth Audio Device
+echo "Configure Bluetooth Audio Device:"
+read -p "Enable Bluetooth audio routing? (y/n) [n]: " bt_choice
+bt_enabled=${bt_choice:-n}
+BT_DEVICE="null"
+if [[ "$bt_enabled" == "y" ]]; then
+    echo "Scanning for Bluetooth audio devices..."
+    if command -v termux-bluetooth &> /dev/null; then
+        termux-bluetooth scan on
+        sleep 5
+        termux-bluetooth scan off
+        echo "Available devices:"
+        termux-bluetooth list
+        read -p "Enter MAC address of target device: " BT_MAC
+        if [ -n "$BT_MAC" ]; then
+            echo "Pairing with $BT_MAC..."
+            termux-bluetooth pair "$BT_MAC"
+            echo "Connecting to $BT_MAC..."
+            termux-bluetooth connect "$BT_MAC"
+            BT_DEVICE="$BT_MAC"
+        else
+            BT_DEVICE="null"
+        fi
+    else
+        echo "termux-bluetooth not found. Please configure manually in config.json."
+        BT_DEVICE="null"
+    fi
+fi
+
+# Configure optional features:
 echo "Configure optional features:"
 read -p "Enable STT (Whisper)? (y/n) [n]: " stt_choice
 stt_enabled=${stt_choice:-n}
@@ -128,9 +157,6 @@ if [[ "$stt_enabled" == "y" ]]; then stt_enabled=true; else stt_enabled=false; f
 read -p "Enable TTS? (y/n) [n]: " tts_choice
 tts_enabled=${tts_choice:-n}
 if [[ "$tts_enabled" == "y" ]]; then tts_enabled=true; else tts_enabled=false; fi
-
-read -p "Enter Bluetooth audio device name (leave empty for auto): " BT_DEVICE
-if [ -z "$BT_DEVICE" ]; then BT_DEVICE="null"; else BT_DEVICE="\"$BT_DEVICE\""; fi
 
 # Generate config.json
 cat > instance/config.json << EOF

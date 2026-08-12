@@ -26,7 +26,7 @@ class Config:
     walbert_port: int = 8081
     udp_port: int = 9999
     be_presbyterian: bool = True
-    peer_communication_enabled: bool = True
+    peer_communication_enabled: bool = False
     python_execution_enabled: bool = False
     bash_execution_enabled: bool = False
     audio_enabled: bool = False

@@ -98,6 +98,7 @@ Available commands:
 - `exit`/`quit`: Exit the program
 - `python on/off`: Toggle Python execution
 - `bash on/off`: Toggle Bash execution
+- `peer on/off`: Toggle peer communication
 - `show awareness`: View synthesized identity and environmental understanding
 - `show ultimate task`: View long-term overarching goal
 - `show immediate task`: View current actionable step

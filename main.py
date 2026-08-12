@@ -117,12 +117,13 @@ def print_welcome_message(agent):
     print("- exit/quit: Exit the program")
     print("- python on/off: Toggle Python execution")
     print("- bash on/off: Toggle Bash execution")
+    print("- peer on/off: Toggle peer communication")
     print("- log on/off: Toggle raw block output to console")
     print("- show awareness/ultimate_task/immediate_task/user_directive/impediment: View agent state")
     print("- pip_install <package>: Install a Python package in the main environment")
     print("- help: Show these options again")
     print("- Any other input will be treated as a request to Walbert")
-    print(f"{chr(10)}Status: Python={'ON' if agent.config.python_execution_enabled else 'OFF'}, Bash={'ON' if agent.config.bash_execution_enabled else 'OFF'}, Waiting_For_User={'YES' if agent.waiting_for_user else 'NO'}")
+    print(f"{chr(10)}Status: Python={'ON' if agent.config.python_execution_enabled else 'OFF'}, Bash={'ON' if agent.config.bash_execution_enabled else 'OFF'}, Peer={'ON' if agent.config.peer_communication_enabled else 'OFF'}, Waiting_For_User={'YES' if agent.waiting_for_user else 'NO'}")
     print("")
     
 def _paged_output(text):
@@ -198,14 +199,20 @@ def main():
                 agent.python_execution_enabled = True
                 print(f"{chr(10)}Python execution enabled.")
             elif user_input.lower() == 'python off':
-                agent.python_execution_enabled = False
+                agent.config.python_execution_enabled = False
                 print(f"{chr(10)}Python execution disabled.")
             elif user_input.lower() == 'bash on':
-                agent.bash_execution_enabled = True
+                agent.config.bash_execution_enabled = True
                 print(f"{chr(10)}Bash execution enabled.")
             elif user_input.lower() == 'bash off':
-                agent.bash_execution_enabled = False
+                agent.config.bash_execution_enabled = False
                 print(f"{chr(10)}Bash execution disabled.")
+            elif user_input.lower() == 'peer on':
+                agent.config.peer_communication_enabled = True
+                print(f"{chr(10)}Peer communication enabled.")
+            elif user_input.lower() == 'peer off':
+                agent.config.peer_communication_enabled = False
+                print(f"{chr(10)}Peer communication disabled.")
             elif user_input.lower() == 'log on':
                 agent.print_raw = True
                 print(f"{chr(10)}Raw log output enabled. All block executions will be printed.")

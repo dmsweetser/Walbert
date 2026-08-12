@@ -227,7 +227,7 @@ class WalbertAgent:
 
     def _execute_pending_blocks(self, provided_blocks):
         """Execute all pending blocks (SQL, Python, etc.) in order."""
-        executable_types = {"python_execute", "bash_execute", "awareness", "ultimate_task", "immediate_task", "impediment"}
+        executable_types = {"python_execute", "bash_execute", "awareness", "ultimate_task", "immediate_task", "impediment", "peer_ip", "peer_message"}
         with self._lock:
             pending_blocks = [
                 b for b in provided_blocks
@@ -251,12 +251,12 @@ class WalbertAgent:
                 self._pending_peer_ip = block["content"].strip()
             elif block["type"] == "peer_message":
                 try:
-                    if hasattr(self, '_pending_peer_ip') and self._pending_peer_ip:
+                    if self.config.peer_communication_enabled and hasattr(self, '_pending_peer_ip') and self._pending_peer_ip:
                         self.comms.send_to_peer(self._pending_peer_ip, block["content"])
                         self.logger.info(f"Sent peer message to {self._pending_peer_ip}")
                         self._pending_peer_ip = None
                     else:
-                        self.logger.warning("Peer IP not set before message block.")
+                        self.logger.warning("Peer communication disabled or IP not set.")
                 except Exception as e:
                     self.logger.error(f"Failed to send peer message: {e}")
             elif block["type"] in ("python_execute", "bash_execute"):
