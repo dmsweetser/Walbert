@@ -103,7 +103,7 @@ class WalbertAgent:
         from walbert.models.manager import ModelManager
         if self.model_manager is None:
             self.model_manager = ModelManager(self.config)
-        self.executor = BlockExecutor(self.config, None)
+        self.executor = BlockExecutor(self.config)
 
     def start_conversation(self):
         """Start a new conversation session."""
