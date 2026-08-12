@@ -76,7 +76,7 @@ class WalbertAgent:
     def __init__(self, config, model_manager=None):
         self.config = config
         self.model_manager = model_manager
-        self.state = AgentState(config, None)
+        self.state = AgentState(config)
         self.executor = None
         self.parser = BlockParser()
         self._lock = threading.Lock()
