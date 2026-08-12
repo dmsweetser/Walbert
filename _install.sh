@@ -5,6 +5,8 @@ set -e
 
 echo "Setting up Walbert..."
 
+sudo apt install libbluetooth-dev
+
 # Create directories
 mkdir -p instance
 mkdir -p instance/conversations

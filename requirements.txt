@@ -3,7 +3,7 @@ requests
 numpy
 readchar
 pyaudio
-pybluez
+bleak
 evdev
 whisper
 pyttsx3
