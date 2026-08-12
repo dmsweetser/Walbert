@@ -8,6 +8,7 @@ echo "Setting up Walbert..."
 sudo apt install build-essential libssl-dev zlib1g-dev \
                  libbz2-dev libreadline-dev libsqlite3-dev \
                  libffi-dev liblzma-dev libudev-dev
+sudo apt install python3-dev
 sudo apt install libbluetooth-dev
 
 # Create directories
