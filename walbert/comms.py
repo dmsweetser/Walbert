@@ -11,6 +11,7 @@ from typing import List, Optional, Dict, Any
 
 logger = logging.getLogger('walbert.comms')
 
+
 class NetworkManager:
     def __init__(self, config):
         self.config = config
@@ -48,7 +49,6 @@ class NetworkManager:
         """Broadcast presence via UDP."""
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.SOL_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        # Broadcast simple string format instead of JSON
         local_ip = socket.gethostbyname(socket.gethostname())
         payload = f"WALBERT_PEER:{local_ip}:{self.port}"
         try:
@@ -57,8 +57,6 @@ class NetworkManager:
             logger.warning(f"UDP broadcast failed: {e}")
         finally:
             sock.close()
-
-    
 
     def _listen_udp(self):
         """Listen for UDP discovery announcements."""
@@ -132,7 +130,7 @@ class NetworkManager:
                     "timestamp": time.time()
                 })
 
-            # Process request (placeholder for actual logic)
+            # Process request
             response = {
                 "status": "ok",
                 "message": "Request received and processed by Walbert",
@@ -170,4 +168,14 @@ class NetworkManager:
         finally:
             sock.close()
 
-    
+    def get_pending_messages(self) -> List[Dict[str, Any]]:
+        """Get and clear all pending received messages."""
+        with self._lock:
+            pending = self.received_messages.copy()
+            self.received_messages.clear()
+        return pending
+
+    def get_peer_list(self) -> List[str]:
+        """Get list of all known peer IP addresses."""
+        with self._lock:
+            return list(self.known_peers.keys())

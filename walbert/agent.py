@@ -57,7 +57,19 @@ def load_config() -> Config:
                 llama_binary_path=config_data['llama_binary_path'],
                 mmproj_path=config_data.get('mmproj_path', ""),
                 log_level=config_data.get('log_level', "INFO"),
-                be_presbyterian=bool(config_data.get('be_presbyterian', True))
+                walbert_port=config_data.get('walbert_port', 8081),
+                udp_port=config_data.get('udp_port', 9999),
+                be_presbyterian=bool(config_data.get('be_presbyterian', True)),
+                peer_communication_enabled=bool(config_data.get('peer_communication_enabled', False)),
+                python_execution_enabled=bool(config_data.get('python_execution_enabled', False)),
+                bash_execution_enabled=bool(config_data.get('bash_execution_enabled', False)),
+                audio_enabled=bool(config_data.get('audio_enabled', False)),
+                stt_enabled=bool(config_data.get('stt_enabled', False)),
+                tts_enabled=bool(config_data.get('tts_enabled', False)),
+                bluetooth_device=config_data.get('bluetooth_device', None),
+                stt_timeout=int(config_data.get('stt_timeout', 30)),
+                user_input_timeout=int(config_data.get('user_input_timeout', 60)),
+                tts_voice=config_data.get('tts_voice', "default")
             )
     except FileNotFoundError:
         logger.error("instance/config.json not found")
@@ -91,7 +103,7 @@ class WalbertAgent:
         self.print_raw = False
         self.waiting_for_user = False
         self.input_queue = input_queue
-        self.comms = NetworkManager(config)
+        self.comms = NetworkManager(config) if config.peer_communication_enabled else None
         self.audio_thread = None
         self._pending_peer_ip = None
         self._comms_started = False
@@ -124,8 +136,9 @@ class WalbertAgent:
                 self._init_components()
                 self.state.refresh_system_prompt()
                 self.model_ready = True
-                if self.config.peer_communication_enabled:
+                if self.config.peer_communication_enabled and self.comms is not None:
                     self.comms.start()
+                    self._comms_started = True
                 else:
                     self.comms = None
 
@@ -141,14 +154,18 @@ class WalbertAgent:
             if self.executor and self.executor.python_temp_dir and os.path.exists(self.executor.python_temp_dir):
                 shutil.rmtree(self.executor.python_temp_dir)
                 self.executor.python_temp_dir = None
-            self.comms.stop()
+            if self._comms_started and self.comms:
+                self.comms.stop()
+                self._comms_started = False
 
     def _generate_response_block(self, user_input, interrupt_event) -> str:
         """Generate a response block using the model."""
         prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size, user_input=user_input)
         prompt += f"{chr(10)}Please respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
         # Inject peer list into prompt context
-        peers = self.comms.get_peer_list()
+        peers = []
+        if self.comms is not None:
+            peers = self.comms.get_peer_list()
         if peers:
             prompt += f"\n## Active Peers\n{', '.join(peers)}\n"
 
@@ -182,7 +199,6 @@ class WalbertAgent:
             if is_blocking:
                 print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                 self.waiting_for_user = True
-                # Timeout logic handled in run_autonomous
             else:
                 print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                 self.waiting_for_user = False
@@ -256,9 +272,12 @@ class WalbertAgent:
             elif block["type"] == "peer_message":
                 try:
                     if self.config.peer_communication_enabled and hasattr(self, '_pending_peer_ip') and self._pending_peer_ip:
-                        self.comms.send_to_peer(self._pending_peer_ip, block["content"])
-                        self.logger.info(f"Sent peer message to {self._pending_peer_ip}")
-                        self._pending_peer_ip = None
+                        if self.comms is not None:
+                            self.comms.send_to_peer(self._pending_peer_ip, block["content"])
+                            self.logger.info(f"Sent peer message to {self._pending_peer_ip}")
+                            self._pending_peer_ip = None
+                        else:
+                            self.logger.warning("Peer communication disabled or NetworkManager not initialized.")
                     else:
                         self.logger.warning("Peer communication disabled or IP not set.")
                 except Exception as e:
@@ -354,10 +373,11 @@ class WalbertAgent:
                 else:
                     # Autonomous mode
                     # Check for incoming peer messages
-                    pending_msgs = self.comms.get_pending_messages()
-                    for msg in pending_msgs:
-                        self.state.append_block("peer_message_received", json.dumps(msg))
-                        self.logger.info(f"Processed peer message from {msg['peer_ip']}")
+                    if self.comms is not None:
+                        pending_msgs = self.comms.get_pending_messages()
+                        for msg in pending_msgs:
+                            self.state.append_block("peer_message_received", json.dumps(msg))
+                            self.logger.info(f"Processed peer message from {msg['peer_ip']}")
                     
                     if not test_mode:
                         self._generate_autonomous_block(interrupt_event)
@@ -457,4 +477,6 @@ Error: {str(e)}
 
     def send_peer_message(self, peer_ip: str, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Send a message to a specific peer and wait for response."""
-        return self.comms.send_to_peer(peer_ip, message)
+        if self.comms is not None:
+            return self.comms.send_to_peer(peer_ip, message)
+        return None
