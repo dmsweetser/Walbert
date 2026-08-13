@@ -48,7 +48,9 @@ class NetworkManager:
         """Broadcast presence via UDP."""
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.SOL_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        payload = json.dumps({"type": "announce", "host": "0.0.0.0", "port": self.port})
+        # Broadcast simple string format instead of JSON
+        local_ip = socket.gethostbyname(socket.gethostname())
+        payload = f"WALBERT_PEER:{local_ip}:{self.port}"
         try:
             sock.sendto(payload.encode(), (self.broadcast_addr, self.udp_port))
         except Exception as e:
@@ -69,13 +71,15 @@ class NetworkManager:
         while self._running:
             try:
                 data, addr = sock.recvfrom(1024)
-                msg = json.loads(data.decode())
-                if msg["type"] == "announce":
-                    peer_ip = addr[0]
-                    peer_port = msg["port"]
-                    with self._lock:
-                        self.known_peers[peer_ip] = peer_port
-                    logger.info(f"Discovered peer: {peer_ip}:{peer_port}")
+                msg = data.decode().strip()
+                if msg.startswith("WALBERT_PEER:"):
+                    parts = msg.split(":")
+                    if len(parts) == 3:
+                        peer_ip = parts[1]
+                        peer_port = int(parts[2])
+                        with self._lock:
+                            self.known_peers[peer_ip] = peer_port
+                        logger.info(f"Discovered peer: {peer_ip}:{peer_port}")
             except socket.timeout:
                 continue
             except Exception as e:

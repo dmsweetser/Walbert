@@ -104,8 +104,12 @@ Bot response (BLOCKING). Waits for user input or timeout.
 Bot response (NON-BLOCKING). Continues execution immediately.
 [walbert_console_response_nonblocking_end]
 
+[walbert_peer_ip_start]
+Destination peer IP address for communication.
+[walbert_peer_ip_end]
+
 [walbert_peer_message_start]
-Send message to peer. Format: {"peer_ip": "x.x.x.x", "data": {...}}
+Message content to send to the specified peer IP.
 [walbert_peer_message_end]
 
 [walbert_peer_message_received_start]
@@ -284,7 +288,7 @@ Reply ONLY in block format. NO EXTRA TEXT.
         """Rough token estimation using character-to-token heuristic."""
         return len(text) // 4
 
-    def get_prompt(self, max_tokens: int = 2048, user_input: str = None) -> str:
+    def get_prompt(self, max_tokens: int = 2048, user_input: str = None, peers: List[str] = None) -> str:
         """Generate the full prompt by combining all components, with token-aware truncation."""
         self._sync_state()
 
@@ -294,6 +298,8 @@ Reply ONLY in block format. NO EXTRA TEXT.
         base_prompt += f"## Current Immediate Task{chr(10)}{self._immediate_task}{chr(10)}{chr(10)}"
         base_prompt += f"## Current Impediment{chr(10)}{self._impediment}{chr(10)}{chr(10)}"
         base_prompt += f"## Current User Directive{chr(10)}{self._user_directive}{chr(10)}{chr(10)}"
+        if peers:
+            base_prompt += f"## Active Peers{chr(10)}{', '.join(peers)}{chr(10)}{chr(10)}"
 
         if self._recent_blocks:
             base_prompt += f"## Recent Execution Blocks and Results{chr(10)}"
