@@ -188,7 +188,7 @@ def main():
             elif user_input.lower() == 'help':
                 print_welcome_message(agent)
             elif user_input.lower() == 'python on':
-                agent.python_execution_enabled = True
+                agent.config.python_execution_enabled = True
                 print(f"{chr(10)}Python execution enabled.")
             elif user_input.lower() == 'python off':
                 agent.config.python_execution_enabled = False
