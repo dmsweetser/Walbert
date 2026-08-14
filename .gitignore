@@ -51,3 +51,8 @@ download_models.sh
 
 # AI Builder
 ai_builder/
+
+# Temp files
+
+walbert_response_*
+walbert_prompt_*

@@ -434,6 +434,7 @@ Error: {str(e)}
         self.comms.start()
         self._comms_started = True
         self.logger.info(f"{chr(10)}Peer communication enabled{chr(10)}{chr(10)}")
+        print(f"{chr(10)}Peer communication enabled{chr(10)}{chr(10)}")
 
     def disable_peer_communication(self):
         self.config.peer_communication_enabled = False
@@ -443,6 +444,7 @@ Error: {str(e)}
             self.comms.stop()
         self._comms_started = False
         self.logger.info(f"{chr(10)}Peer communication disabled{chr(10)}{chr(10)}")
+        print(f"{chr(10)}Peer communication disabled{chr(10)}{chr(10)}")
 
     def enable_audio(self):
         self.config.audio_enabled = True
@@ -460,6 +462,7 @@ Error: {str(e)}
         self.audio_thread.start()
         self._audio_started = True
         self.logger.info("Audio I/O thread enabled")
+        print("Audio I/O thread enabled")
 
     def disable_audio(self):
         self.config.audio_enabled = False
@@ -473,6 +476,7 @@ Error: {str(e)}
             self.audio_thread = None
         self._audio_started = False
         self.logger.info("Audio I/O thread disabled")
+        print("Audio I/O thread disabled")
 
     def send_peer_message(self, peer_ip: str, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Send a message to a specific peer and wait for response."""
