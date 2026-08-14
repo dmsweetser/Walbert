@@ -1,6 +1,7 @@
 """
 Network communication module for Walbert-to-Walbert interaction.
 Uses TCP-based IP scanning and handshake negotiation for peer discovery.
+Fixed to avoid blocking the main thread on startup.
 """
 import socket
 import threading
@@ -59,7 +60,7 @@ class NetworkManager:
         return '.'.join(parts[:3])
 
     def start(self):
-        """Start TCP listener and network scanning threads."""
+        """Start TCP listener and network scanning threads (non-blocking)."""
         if self._running:
             logger.warning("NetworkManager is already running")
             return
@@ -68,8 +69,7 @@ class NetworkManager:
         self._tcp_thread = threading.Thread(target=self._listen_tcp, daemon=True)
         self._tcp_thread.start()
 
-        # Start periodic scanning
-        self._scan_network()  # Initial scan
+        # Start the scan thread (it will run the initial scan asynchronously)
         self._scan_thread = threading.Thread(target=self._periodic_scan, daemon=True)
         self._scan_thread.start()
 
