@@ -1,6 +1,6 @@
 """
 Network communication module for Walbert-to-Walbert interaction.
-Handles UDP discovery and TCP request/response messaging.
+Uses TCP-based IP scanning and handshake negotiation for peer discovery.
 """
 import socket
 import threading
@@ -17,20 +17,22 @@ class NetworkManager:
         self.config = config
         self.host = "0.0.0.0"
         self.port = config.walbert_port
-        self.udp_port = config.udp_port
-        self.broadcast_addr = "<broadcast>"
         self.known_peers: Dict[str, int] = {}  # ip:port
         self.peer_last_seen: Dict[str, float] = {}  # ip:timestamp
         self.received_messages: List[Dict[str, Any]] = []
         self._lock = threading.Lock()
         self._running = False
-        self._udp_thread = None
         self._tcp_thread = None
+        self._scan_thread = None
+        self.local_ip = self._get_local_ip()
+        self.network_prefix = self._get_network_prefix()
+        self.handshake_message = "WALBERT_HANDSHAKE"
+        self.handshake_response = "WALBERT_CONFIRM"
+        self.scan_interval = 60  # seconds
 
     def _get_local_ip(self) -> Optional[str]:
         """Get the first non-loopback IPv4 address of the machine."""
         try:
-            # Try connecting to a public DNS server to get the local IP
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.connect(("8.8.8.8", 80))
             local_ip = s.getsockname()[0]
@@ -38,8 +40,6 @@ class NetworkManager:
             return local_ip
         except Exception:
             pass
-
-        # Fallback: use socket.gethostbyname_ex for all IPs
         try:
             hostname = socket.gethostname()
             ip_list = socket.gethostbyname_ex(hostname)[2]
@@ -48,90 +48,102 @@ class NetworkManager:
                     return ip
         except Exception:
             pass
-
         logger.warning("Could not determine local IP address, using 0.0.0.0")
         return "0.0.0.0"
 
+    def _get_network_prefix(self) -> str:
+        """Extract network prefix (first 3 octets) from local IP."""
+        if not self.local_ip or self.local_ip == "0.0.0.0":
+            return ""
+        parts = self.local_ip.split('.')
+        return '.'.join(parts[:3])
+
     def start(self):
-        """Start UDP discovery and TCP listener threads."""
+        """Start TCP listener and network scanning threads."""
         if self._running:
             logger.warning("NetworkManager is already running")
             return
 
         self._running = True
-        self._udp_thread = threading.Thread(target=self._listen_udp, daemon=True)
         self._tcp_thread = threading.Thread(target=self._listen_tcp, daemon=True)
-
-        self._udp_thread.start()
         self._tcp_thread.start()
 
-        # Give threads a moment to start
-        time.sleep(0.1)
-        self._announce()
+        # Start periodic scanning
+        self._scan_network()  # Initial scan
+        self._scan_thread = threading.Thread(target=self._periodic_scan, daemon=True)
+        self._scan_thread.start()
+
         logger.info(f"NetworkManager started on port {self.port}")
 
     def stop(self):
         """Stop network listeners."""
         self._running = False
-        if self._udp_thread:
-            self._udp_thread.join(timeout=2)
         if self._tcp_thread:
             self._tcp_thread.join(timeout=2)
+        if self._scan_thread:
+            self._scan_thread.join(timeout=2)
         logger.info("NetworkManager stopped")
 
-    def _announce(self, retries: int = 3):
-        """Broadcast presence via UDP using the actual network IP."""
-        local_ip = self._get_local_ip()
-        if not local_ip or local_ip == "0.0.0.0":
-            logger.warning("Cannot announce with invalid IP address")
-            return
-
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.SOL_UDP)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        payload = f"WALBERT_PEER:{local_ip}:{self.port}"
-
-        for attempt in range(retries):
-            try:
-                sock.sendto(payload.encode(), (self.broadcast_addr, self.udp_port))
-                logger.info(f"Announced presence as {local_ip}:{self.port} (attempt {attempt + 1}/{retries})")
-                break
-            except Exception as e:
-                if attempt == retries - 1:
-                    logger.warning(f"UDP broadcast failed after {retries} attempts: {e}")
-                time.sleep(0.5)
-        sock.close()
-
-    def _listen_udp(self):
-        """Listen for UDP discovery announcements."""
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.SOL_UDP)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
-            sock.bind(("", self.udp_port))
-        except OSError as e:
-            logger.error(f"UDP bind failed: {e}")
-            return
-
-        sock.settimeout(1.0)
+    def _periodic_scan(self):
+        """Run network scan periodically."""
         while self._running:
+            self._scan_network()
+            # Sleep for scan_interval, but check _running every second
+            for _ in range(self.scan_interval):
+                if not self._running:
+                    return
+                time.sleep(1)
+
+    def _scan_network(self, timeout: float = 0.5, max_threads: int = 20):
+        """Scan the local network for Walbert peers using TCP handshake."""
+        if not self.network_prefix:
+            logger.warning("Cannot scan network: no valid local IP")
+            return
+
+        discovered_peers = {}
+        semaphore = threading.Semaphore(max_threads)
+
+        def scan_ip(ip: str):
             try:
-                data, addr = sock.recvfrom(1024)
-                msg = data.decode().strip()
-                if msg.startswith("WALBERT_PEER:"):
-                    parts = msg.split(":")
-                    if len(parts) == 3:
-                        peer_ip = parts[1]
-                        peer_port = int(parts[2])
-                        with self._lock:
-                            if peer_ip != self._get_local_ip():
-                                self.known_peers[peer_ip] = peer_port
-                                self.peer_last_seen[peer_ip] = time.time()
-                        logger.info(f"Discovered peer: {peer_ip}:{peer_port}")
-            except socket.timeout:
-                continue
-            except Exception as e:
-                if self._running:
-                    logger.error(f"UDP listen error: {e}")
-        sock.close()
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(timeout)
+                sock.connect((ip, self.port))
+
+                # Send handshake
+                sock.sendall(self.handshake_message.encode() + b"\n")
+                response = sock.recv(1024).decode().strip()
+
+                if response == self.handshake_response:
+                    with self._lock:
+                        discovered_peers[ip] = self.port
+                    logger.info(f"Discovered Walbert peer at {ip}:{self.port}")
+                sock.close()
+            except Exception:
+                pass
+            finally:
+                semaphore.release()
+
+        # Scan all IPs in the subnet (skip network and broadcast addresses)
+        for i in range(1, 255):
+            ip = f"{self.network_prefix}.{i}"
+            if ip == self.local_ip:
+                continue  # Skip self
+
+            semaphore.acquire()
+            threading.Thread(target=scan_ip, args=(ip,), daemon=True).start()
+
+        # Wait for all threads to complete
+        for _ in range(254):
+            try:
+                semaphore.acquire(timeout=1)
+            except:
+                break
+
+        # Update known peers
+        with self._lock:
+            for ip, port in discovered_peers.items():
+                self.known_peers[ip] = port
+                self.peer_last_seen[ip] = time.time()
 
     def _listen_tcp(self):
         """Listen for TCP request/response messages."""
@@ -178,7 +190,19 @@ class NetworkManager:
                 return
 
             raw_message = data.decode().strip()
-            logger.info(f"Received request from {addr}: {raw_message}")
+            logger.info(f"Received from {addr}: {raw_message}")
+
+            # Handle handshake
+            if raw_message == self.handshake_message:
+                client.sendall(self.handshake_response.encode() + b"\n")
+                logger.info(f"Responded to handshake from {addr}")
+                # Add to peers if not already present
+                with self._lock:
+                    if addr[0] not in self.known_peers:
+                        self.known_peers[addr[0]] = self.port
+                        self.peer_last_seen[addr[0]] = time.time()
+                        logger.info(f"Added peer from handshake: {addr[0]}:{self.port}")
+                return
 
             # Store incoming message for agent processing
             with self._lock:
