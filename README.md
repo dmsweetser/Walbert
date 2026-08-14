@@ -22,9 +22,10 @@ Welcome to Walbert! The local-first AI agent.
 
 - **Local-First Execution**: Runs on your Linux system using local llama.cpp binaries
 - **Single Model Focus**: Optimized for Devstral-24B-Instruct-GGUF for high-quality reasoning
-- **Python-Managed SQLite Datastore**: Walbert has **FULL AUTONOMY** over its database schema and persistence, managed entirely through Python execution blocks.
+- **SQLite Datastore**: Walbert has **FULL AUTONOMY** over its database schema and persistence
 - **Unified Response Protocol**: Walbert must emit **all responses and internal deliberations** using the following block-based format with `walbert_` prefix:
     - `[walbert_console_response]` - Direct console output to the user
+    - `[walbert_sql_execute]` - SQL commands for database operations
     - `[walbert_python_execute]` - Python code execution blocks
 - **Full Database Autonomy**: Walbert manages **ALL** aspects of its database:
   - Schema design and evolution
@@ -36,7 +37,7 @@ Welcome to Walbert! The local-first AI agent.
   - `[walbert_immediate_task_start]` - Current actionable step
   - `[walbert_impediment_start]` - Active blockers or constraints
   - Recent Execution Results - Most recent block outputs/errors for context
-- **Dynamic Data Persistence**: All database operations (schema creation, queries, persistence) are handled via Python execution blocks.
+- **Zero Hard-Coded Persistence**: All database operations handled through the protocol
 - **Python Execution**: Execute Python code in the main application's virtual environment
 - **Autonomous Operation**: Continues working even without user input
 - **Error Resilience**: Provides errors as feedback without disrupting execution
@@ -83,7 +84,8 @@ cd walbert
     "autonomous_operation_timeout": 120,
     "conversation_log_dir": "instance/conversations",
     "walbert_port": 8081,
-    "udp_port": 9999
+    "udp_port": 9999,
+    "database_path": "instance/walbert.db"
 }
 ```
 
@@ -103,6 +105,7 @@ Available commands:
 - `show ultimate task`: View long-term overarching goal
 - `show immediate task`: View current actionable step
 - `show impediment`: View active blockers or constraints
+- `show schema`: View database schema
 - `pip_install <package>`: Install a Python package in the main environment
 - Any other input will be treated as a request to Walbert
 

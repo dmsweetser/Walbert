@@ -35,4 +35,5 @@ class Config:
     bluetooth_device: Optional[str] = None
     stt_timeout: int = 30
     user_input_timeout: int = 60
-    tts_voice: str = "default"
+    tts_voice: str = "default",
+    database_path: str = "instance/walbert.db"

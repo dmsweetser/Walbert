@@ -119,7 +119,7 @@ def print_welcome_message(agent):
     print("- bash on/off: Toggle Bash execution")
     print("- peer on/off: Toggle peer communication")
     print("- log on/off: Toggle raw block output to console")
-    print("- show awareness/ultimate_task/immediate_task/user_directive/impediment: View agent state")
+    print("- show awareness/ultimate_task/immediate_task/user_directive/impediment/schema: View agent state")
     print("- pip_install <package>: Install a Python package in the main environment")
     print("- help: Show these options again")
     print("- Any other input will be treated as a request to Walbert")
@@ -238,6 +238,11 @@ def main():
                     _paged_output(f"--- USER DIRECTIVE ---\n{agent.state._user_directive}\n--- END ---")
                 else:
                     print(f"{chr(10)}No user directive data available yet.")
+            elif user_input.lower() == 'show schema':
+                if hasattr(agent, 'state') and agent.state:
+                    _paged_output(f"--- DB SCHEMA ---\n{agent.state.db_schema}\n--- END ---")
+                else:
+                    print(f"{chr(10)}No schema data available yet.")
             elif user_input.lower().startswith('pip_install '):
                 package = user_input[12:].strip()
                 if package:

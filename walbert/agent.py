@@ -98,6 +98,7 @@ class WalbertAgent:
         self.model_ready = False
         self.processing_cycle = 0
         self.current_conversation_file = None
+        self.db = None
         self.python_execution_enabled = config.python_execution_enabled
         self.bash_execution_enabled = config.bash_execution_enabled
         self.print_raw = False
@@ -115,11 +116,14 @@ class WalbertAgent:
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
 
     def _init_components(self):
-        """Initialize components that depend on runtime state."""
+        """Initialize components that depend on DB connection."""
+        from walbert.database.manager import DatabaseManager
         from walbert.models.manager import ModelManager
         if self.model_manager is None:
             self.model_manager = ModelManager(self.config)
-        self.executor = BlockExecutor(self.config)
+        self.db = DatabaseManager(self.config.database_path)
+        self.state.db = self.db
+        self.executor = BlockExecutor(self.config, self.db)
 
     def start_conversation(self):
         """Start a new conversation session."""
@@ -134,6 +138,7 @@ class WalbertAgent:
             with self._lock:
                 self.session_dir = session_dir
                 self._init_components()
+                self.db.connect()
                 self.state.refresh_system_prompt()
                 self.model_ready = True
                 if self.config.peer_communication_enabled and self.comms is not None:
@@ -151,6 +156,8 @@ class WalbertAgent:
         """End current conversation."""
         with self._lock:
             self.session_dir = None
+            if self.db and hasattr(self.db, 'close'):
+                self.db.close()
             if self.executor and self.executor.python_temp_dir and os.path.exists(self.executor.python_temp_dir):
                 shutil.rmtree(self.executor.python_temp_dir)
                 self.executor.python_temp_dir = None
@@ -162,12 +169,6 @@ class WalbertAgent:
         """Generate a response block using the model."""
         prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size, user_input=user_input)
         prompt += f"{chr(10)}Please respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
-        # Inject peer list into prompt context
-        peers = []
-        if self.comms is not None:
-            peers = self.comms.get_peer_list()
-        if peers:
-            prompt += f"\n## Active Peers\n{', '.join(peers)}\n"
 
         model_response = self.model_manager.execute_model(
             prompt,
@@ -175,7 +176,6 @@ class WalbertAgent:
             interrupt_event
         )
 
-        print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
         self._log_full_prompt_and_response(prompt, model_response)
 
         # Abort if interrupted before processing blocks
@@ -219,7 +219,7 @@ class WalbertAgent:
             self.write_output,
             interrupt_event
         )
-        print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+
         self._log_full_prompt_and_response(prompt, model_response)
 
         # Abort if interrupted before processing blocks
@@ -247,7 +247,7 @@ class WalbertAgent:
 
     def _execute_pending_blocks(self, provided_blocks):
         """Execute all pending blocks (SQL, Python, etc.) in order."""
-        executable_types = {"python_execute", "bash_execute", "awareness", "ultimate_task", "immediate_task", "impediment", "peer_ip", "peer_message"}
+        executable_types = {"sql_execute", "python_execute", "bash_execute", "awareness", "ultimate_task", "immediate_task", "impediment", "peer_ip", "peer_message"}
         with self._lock:
             pending_blocks = [
                 b for b in provided_blocks
@@ -282,13 +282,12 @@ class WalbertAgent:
                         self.logger.warning("Peer communication disabled or IP not set.")
                 except Exception as e:
                     self.logger.error(f"Failed to send peer message: {e}")
-            elif block["type"] in ("python_execute", "bash_execute"):
+            elif block["type"] in ("sql_execute", "python_execute", "bash_execute"):
                 result_block = self.executor.execute(block)
                 if result_block:
                     self.state.append_block(block["type"], block["content"])
                     self.state.append_block("execution_result", result_block["content"])
                     self.write_output(json.dumps(result_block, indent=2), result_block["type"])
-                    print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                         
             block["executed"] = True
         

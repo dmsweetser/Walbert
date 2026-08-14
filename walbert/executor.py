@@ -12,21 +12,33 @@ from typing import Dict, Optional
 logger = logging.getLogger('walbert.executor')
 
 class BlockExecutor:
-    def __init__(self, config):
+    def __init__(self, config, db_manager):
         self.config = config
+        self.db = db_manager
         self.python_temp_dir = None
 
     def execute(self, block: Dict[str, str]) -> Optional[Dict[str, str]]:
         block_type = block["type"]
         content = block["content"]
 
-        if block_type == "python_execute":
+        if block_type == "sql_execute":
+            return self._execute_sql(content)
+        elif block_type == "python_execute":
             return self._execute_python(content)
         elif block_type == "bash_execute":
             return self._execute_bash(content)
         elif block_type == "console_response":
             return {"type": "console_response", "content": f"Walbert:\n{content}\n"}
         return None
+
+    def _execute_sql(self, sql: str) -> Dict[str, str]:
+        try:
+            if not self._is_sql_safe(sql):
+                return {"type": "sql_result", "content": "SQL execution error: Unsafe SQL statement detected."}
+            result = self.db.execute_sql(sql)
+            return {"type": "sql_result", "content": f"{result}\n"}
+        except Exception as e:
+            return {"type": "sql_result", "content": f"SQL execution error: {str(e)}"}
 
     def _execute_python(self, code: str) -> Dict[str, str]:
         if not self.config.python_execution_enabled:
@@ -98,4 +110,7 @@ class BlockExecutor:
             return {"type": "bash_result", "content": f"Bash execution error: {str(e)}"}
             
     def _is_code_safe(self, code: str) -> bool:
-        return True
+        return True # lol
+
+    def _is_sql_safe(self, sql: str) -> bool:
+        return True # lol

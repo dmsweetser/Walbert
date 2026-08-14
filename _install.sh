@@ -210,7 +210,8 @@ cat > instance/config.json << EOF
     "bluetooth_device": "$BT_DEVICE",
     "stt_timeout": 30,
     "user_input_timeout": 60,
-    "tts_voice": "default"
+    "tts_voice": "default",
+    "database_path": "instance/walbert.db"
 }
 EOF
 
