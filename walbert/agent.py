@@ -373,7 +373,6 @@ class WalbertAgent:
                     # Autonomous mode
                     # Check for incoming peer messages
                     if self.comms is not None:
-                        self.comms._announce()
                         pending_msgs = self.comms.get_pending_messages()
                         for msg in pending_msgs:
                             self.state.append_block("peer_message_received", json.dumps(msg))
