@@ -5,12 +5,12 @@ set -e
 
 echo "Setting up Walbert..."
 
-sudo apt install build-essential libssl-dev zlib1g-dev \
+sudo apt install -y build-essential libssl-dev zlib1g-dev \
                  libbz2-dev libreadline-dev libsqlite3-dev \
                  libffi-dev liblzma-dev libudev-dev
-sudo apt install python3-dev
-sudo apt install portaudio19-dev
-sudo apt install libbluetooth-dev
+sudo apt install -y python3-dev
+sudo apt install -y portaudio19-dev
+sudo apt install -y libbluetooth-dev
 
 # Create directories
 mkdir -p instance
@@ -60,13 +60,13 @@ if [ "$model_choice" == "2" ]; then
     MMPROJ_PATH="instance/models/Qwen3.6-35B-A3B-UD-IQ3_S-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
-        wget --content-disposition  "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-IQ3_S.gguf?download=true" -O "$MODEL_PATH"
+        wget --content-disposition "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-IQ3_S.gguf?download=true" -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
     fi
     if [ ! -f "$MMPROJ_PATH" ]; then
         echo "Downloading $MMPROJ_PATH..."
-        wget --content-disposition  "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -O "$MMPROJ_PATH"
+        wget --content-disposition "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -O "$MMPROJ_PATH"
     else
         echo "$MMPROJ_PATH already exists, skipping download."
     fi
@@ -81,13 +81,13 @@ elif [ "$model_choice" == "3" ]; then
     MMPROJ_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q4_K_M-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
-        wget --content-disposition  "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf?download=true" -O "$MODEL_PATH"
+        wget --content-disposition "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf?download=true" -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
     fi
     if [ ! -f "$MMPROJ_PATH" ]; then
         echo "Downloading $MMPROJ_PATH..."
-        wget --content-disposition  "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-BF16-mmproj.gguf?download=true" -O "$MMPROJ_PATH"
+        wget --content-disposition "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-BF16-mmproj.gguf?download=true" -O "$MMPROJ_PATH"
     else
         echo "$MMPROJ_PATH already exists, skipping download."
     fi
@@ -102,13 +102,13 @@ else
     MMPROJ_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
-        wget --content-disposition  "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true" -O "$MODEL_PATH"
+        wget --content-disposition "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true" -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
     fi
     if [ ! -f "$MMPROJ_PATH" ]; then
         echo "Downloading $MMPROJ_PATH..."
-        wget --content-disposition  "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -O "$MMPROJ_PATH"
+        wget --content-disposition "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -O "$MMPROJ_PATH"
     else
         echo "$MMPROJ_PATH already exists, skipping download."
     fi
@@ -129,36 +129,46 @@ BT_DEVICE="null"
 if [[ "$bt_enabled" == "y" ]]; then
     if command -v bluetoothctl &> /dev/null; then
         echo "Scanning for Bluetooth audio devices (10 seconds)..."
-
-        # Start scan
         bluetoothctl --timeout 10 scan on
 
         echo "Discovered devices:"
         bluetoothctl devices
 
-        read -p "Enter MAC address of target device: " BT_MAC
+        # Count devices
+        device_count=$(bluetoothctl devices | grep -c "Device" || echo "0")
 
-        if [ -n "$BT_MAC" ]; then
-            echo "Pairing and connecting to $BT_MAC..."
+        if [ "$device_count" -gt 0 ]; then
+            echo "Select a device by number (1-$device_count):"
+            read -p "Enter choice: " device_num
 
-            pair_output=$(echo -e "pair $BT_MAC" | bluetoothctl 2>&1)
+            if [ "$device_num" -ge 1 ] && [ "$device_num" -le "$device_count" ]; then
+                BT_MAC=$(bluetoothctl devices | grep "Device" | sed -n "${device_num}p" | awk '{print $2}')
+                echo "Pairing and connecting to $BT_MAC..."
 
-            if echo "$pair_output" | grep -q "AlreadyExists"; then
-                echo "Device already paired. Connecting..."
+                pair_output=$(echo -e "pair $BT_MAC" | bluetoothctl 2>&1)
+                if echo "$pair_output" | grep -q "AlreadyExists"; then
+                    echo "Device already paired. Connecting..."
+                else
+                    echo "$pair_output"
+                fi
+
+                connect_output=$(echo -e "trust $BT_MAC\nconnect $BT_MAC" | bluetoothctl 2>&1)
+                echo "$connect_output"
+
+                if echo "$connect_output" | grep -q "Failed"; then
+                    echo "Connection failed. Removing stale pairing and retrying..."
+                    echo -e "remove $BT_MAC" | bluetoothctl
+                    echo -e "pair $BT_MAC\ntrust $BT_MAC\nconnect $BT_MAC" | bluetoothctl
+                fi
+
+                BT_DEVICE="$BT_MAC"
             else
-                echo "$pair_output"
+                echo "Invalid selection. Using null."
+                BT_DEVICE="null"
             fi
-
-            connect_output=$(echo -e "trust $BT_MAC\nconnect $BT_MAC" | bluetoothctl 2>&1)
-            echo "$connect_output"
-
-            if echo "$connect_output" | grep -q "Failed"; then
-                echo "Connection failed. Removing stale pairing and retrying..."
-                echo -e "remove $BT_MAC" | bluetoothctl
-                echo -e "pair $BT_MAC\ntrust $BT_MAC\nconnect $BT_MAC" | bluetoothctl
-            fi
-
-            BT_DEVICE="$BT_MAC"
+        else
+            echo "No devices found."
+            BT_DEVICE="null"
         fi
     else
         echo "bluetoothctl not found. Please configure manually in config.json."

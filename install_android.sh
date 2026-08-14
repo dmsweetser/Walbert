@@ -5,10 +5,24 @@ set -e
 
 echo "Setting up Walbert for Termux/Android..."
 
-# Update and install dependencies
+# Update and install base dependencies
 pkg update -y
 pkg upgrade -y
 pkg install -y python git gcc make cmake clang ffmpeg libsndfile portaudio whisper
+
+# Manually compile and install additional dependencies from source
+echo "Compiling additional dependencies from source..."
+# Example: Compile and install portaudio (if not available via pkg)
+if ! pkg list-installed | grep -q "portaudio"; then
+    echo "Compiling portaudio from source..."
+    apt install -y portaudio2
+    # If Termux's portaudio is insufficient, compile from source:
+    # git clone https://gitlab.xiph.org/xiph/portaudio.git
+    # cd portaudio
+    # ./configure --prefix=$PREFIX
+    # make && make install
+    # cd ..
+fi
 
 # Create project directories
 mkdir -p instance
@@ -17,9 +31,9 @@ mkdir -p instance/llama.cpp
 mkdir -p instance/llama.cpp/bin
 mkdir -p instance/models
 
-# Create virtual environment
+# Create virtual environment with system-site-packages to access compiled dependencies
 echo "Creating Python virtual environment..."
-python -m venv venv
+python -m venv venv --system-site-packages
 if [ $? -ne 0 ]; then
     echo "Error: Failed to create virtual environment"
     exit 1
@@ -33,9 +47,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Install requirements
+# Install Python requirements (compile from source where possible)
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install --no-binary :all: -r requirements.txt
 
 # Model selection and configuration
 echo "Select a model:"
@@ -58,13 +72,13 @@ if [ "$model_choice" == "2" ]; then
     MMPROJ_PATH="instance/models/Qwen3.6-35B-A3B-UD-IQ3_S-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
-        wget --content-disposition  "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-IQ3_S.gguf?download=true" -O "$MODEL_PATH"
+        wget --content-disposition "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-IQ3_S.gguf?download=true" -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
     fi
     if [ ! -f "$MMPROJ_PATH" ]; then
         echo "Downloading $MMPROJ_PATH..."
-        wget --content-disposition  "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -O "$MMPROJ_PATH"
+        wget --content-disposition "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -O "$MMPROJ_PATH"
     else
         echo "$MMPROJ_PATH already exists, skipping download."
     fi
@@ -75,17 +89,17 @@ if [ "$model_choice" == "2" ]; then
     TOP_K=20
     MIN_P=0.0
 elif [ "$model_choice" == "3" ]; then
-    MODEL_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q2_K_M.gguf"
-    MMPROJ_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q2_K_M-mmproj-BF16.gguf"
+    MODEL_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q2_K.gguf"
+    MMPROJ_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q2_K-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
-        wget --content-disposition  "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q2_K_M.gguf?download=true" -O "$MODEL_PATH"
+        wget --content-disposition "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q2_K.gguf?download=true" -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
     fi
     if [ ! -f "$MMPROJ_PATH" ]; then
         echo "Downloading $MMPROJ_PATH..."
-        wget --content-disposition  "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-BF16-mmproj.gguf?download=true" -O "$MMPROJ_PATH"
+        wget --content-disposition "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-BF16-mmproj.gguf?download=true" -O "$MMPROJ_PATH"
     else
         echo "$MMPROJ_PATH already exists, skipping download."
     fi
@@ -100,14 +114,13 @@ else
     MMPROJ_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
-        wget --content-disposition  "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true" -O "$MODEL_PATH"
-
+        wget --content-disposition "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true" -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
     fi
     if [ ! -f "$MMPROJ_PATH" ]; then
         echo "Downloading $MMPROJ_PATH..."
-        wget --content-disposition  "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -O "$MMPROJ_PATH"
+        wget --content-disposition "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -O "$MMPROJ_PATH"
     else
         echo "$MMPROJ_PATH already exists, skipping download."
     fi
@@ -124,22 +137,37 @@ echo "Configure Bluetooth Audio Device:"
 read -p "Enable Bluetooth audio routing? (y/n) [n]: " bt_choice
 bt_enabled=${bt_choice:-n}
 BT_DEVICE="null"
+
 if [[ "$bt_enabled" == "y" ]]; then
-    echo "Scanning for Bluetooth audio devices..."
     if command -v termux-bluetooth &> /dev/null; then
+        echo "Scanning for Bluetooth audio devices..."
         termux-bluetooth scan on
         sleep 5
         termux-bluetooth scan off
+
         echo "Available devices:"
         termux-bluetooth list
-        read -p "Enter MAC address of target device: " BT_MAC
-        if [ -n "$BT_MAC" ]; then
-            echo "Pairing with $BT_MAC..."
-            termux-bluetooth pair "$BT_MAC"
-            echo "Connecting to $BT_MAC..."
-            termux-bluetooth connect "$BT_MAC"
-            BT_DEVICE="$BT_MAC"
+
+        # Count devices
+        device_count=$(termux-bluetooth list | grep -c "Address:" || echo "0")
+
+        if [ "$device_count" -gt 0 ]; then
+            echo "Select a device by number (1-$device_count):"
+            read -p "Enter choice: " device_num
+
+            if [ "$device_num" -ge 1 ] && [ "$device_num" -le "$device_count" ]; then
+                BT_MAC=$(termux-bluetooth list | grep "Address:" | sed -n "${device_num}p" | awk -F'[ ,]' '{print $2}')
+                echo "Pairing with $BT_MAC..."
+                termux-bluetooth pair "$BT_MAC"
+                echo "Connecting to $BT_MAC..."
+                termux-bluetooth connect "$BT_MAC"
+                BT_DEVICE="$BT_MAC"
+            else
+                echo "Invalid selection. Using null."
+                BT_DEVICE="null"
+            fi
         else
+            echo "No devices found."
             BT_DEVICE="null"
         fi
     else
@@ -190,10 +218,11 @@ cat > instance/config.json << EOF
     "audio_enabled": false,
     "stt_enabled": $stt_enabled,
     "tts_enabled": $tts_enabled,
-    "bluetooth_device": $BT_DEVICE,
+    "bluetooth_device": "$BT_DEVICE",
     "stt_timeout": 30,
     "user_input_timeout": 60,
-    "tts_voice": "default"
+    "tts_voice": "default",
+    "database_path": "instance/walbert.db"
 }
 EOF
 
