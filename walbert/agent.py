@@ -439,8 +439,8 @@ Error: {str(e)}
             self.comms = NetworkManager(self.config)
         self.comms.start()
         self._comms_started = True
-        self.logger.info(f"{chr(10)}Peer communication enabled{chr(10)}{chr(10)}")
-        print(f"{chr(10)}Peer communication enabled{chr(10)}{chr(10)}")
+        self.logger.info(f"{chr(10)}Peer communication enabled")
+        print(f"{chr(10)}Peer communication enabled")
 
     def disable_peer_communication(self):
         self.config.peer_communication_enabled = False
@@ -449,8 +449,8 @@ Error: {str(e)}
         if self.comms:
             self.comms.stop()
         self._comms_started = False
-        self.logger.info(f"{chr(10)}Peer communication disabled{chr(10)}{chr(10)}")
-        print(f"{chr(10)}Peer communication disabled{chr(10)}{chr(10)}")
+        self.logger.info(f"{chr(10)}Peer communication disabled")
+        print(f"{chr(10)}Peer communication disabled")
 
     def enable_audio(self):
         self.config.audio_enabled = True
