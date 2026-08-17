@@ -5,6 +5,6 @@ readchar
 pyaudio
 bleak
 evdev
-whisper
+openai-whisper
 pyttsx3
 pydbus
