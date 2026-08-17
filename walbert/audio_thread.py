@@ -56,6 +56,7 @@ class AudioIOThread(threading.Thread):
         """Use configured Bluetooth audio device and attempt pairing if needed."""
         if self.config.bluetooth_device and self.config.bluetooth_device != "null":
             self._bt_device = self.config.bluetooth_device
+            self._pair_and_connect_bluetooth(self._bt_device)
             logger.info(f"Using configured Bluetooth audio device: {self._bt_device}")
         else:
             try:

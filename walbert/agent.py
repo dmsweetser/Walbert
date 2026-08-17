@@ -158,9 +158,6 @@ class WalbertAgent:
             self.session_dir = None
             if self.db and hasattr(self.db, 'close'):
                 self.db.close()
-            if self.executor and self.executor.python_temp_dir and os.path.exists(self.executor.python_temp_dir):
-                shutil.rmtree(self.executor.python_temp_dir)
-                self.executor.python_temp_dir = None
             if self._comms_started and self.comms:
                 self.comms.stop()
                 self._comms_started = False
