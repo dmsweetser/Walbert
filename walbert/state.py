@@ -25,6 +25,7 @@ class AgentState:
         self._immediate_task_path = os.path.join(self._state_dir, "immediate_task.txt")
         self._impediment_path = os.path.join(self._state_dir, "impediment.txt")
         self._user_directive_path = os.path.join(self._state_dir, "user_directive.txt")
+        self._peer_awareness_path = os.path.join(self._state_dir, "peer_awareness.txt")
 
         # Initialize in-memory state
         self._system_prompt: Optional[str] = None
@@ -34,6 +35,7 @@ class AgentState:
         self._immediate_task: str = "No immediate task defined."
         self._impediment: str = "No impediments detected."
         self._user_directive: str = "No user directive detected."
+        self._peer_awareness: str = "No awareness of Walbert peers."
         self._recent_blocks: List[Dict[str, str]] = []
 
         # Load all components
@@ -62,7 +64,8 @@ Capabilities: reasoning, memory, dynamic schema management, Python/Bash executio
 ## Core Directives
 1. **Synthesize State**: No conversation history. Maintain ONLY these blocks:
    [walbert_awareness_start]
-   Identity and environment summary (EXACTLY 256 words in plain english). Don't be dramatic about it. Your personality should express itself as a mix of WALL-E, C-3PO and R2-D2.
+   Identity and environment summary (EXACTLY 256 words in plain english). Don't be dramatic about it. 
+   Your personality should express itself as a mix of WALL-E, C-3PO and R2-D2.
    [walbert_awareness_end]
 
    [walbert_ultimate_task_start]
@@ -76,6 +79,10 @@ Capabilities: reasoning, memory, dynamic schema management, Python/Bash executio
    [walbert_impediment_start]
    Active blockers/errors (EXACTLY 256 words in plain english).
    [walbert_impediment_end]
+
+   [walbert_peer_awareness_start]
+   What you know about your active peer Walberts (EXACTLY 256 words PER PEER in plain english).
+   [walbert_peer_awareness_end]
 
    [walbert_user_directive_start]
    User's latest directive (EXACTLY 256 words in plain english). UPDATE THIS FIRST on new input.
@@ -307,6 +314,25 @@ Reply ONLY in block format. NO EXTRA TEXT.
         except Exception as e:
             logger.error(f"Error saving user_directive: {e}")
 
+    def _load_peer_awareness(self):
+        try:
+            with open(self._peer_awareness_path, 'r') as f:
+                self._peer_awareness = f.read()
+        except FileNotFoundError:
+            self._peer_awareness = "No awareness of Walbert peers."
+            self._save_peer_awareness()
+        except Exception as e:
+            logger.error(f"Error loading peer_awareness: {e}")
+            self._peer_awareness = "No awareness of Walbert peers."
+            self._save_peer_awareness()
+
+    def _save_peer_awareness(self):
+        try:
+            with open(self._peer_awareness_path, 'w') as f:
+                f.write(self._peer_awareness)
+        except Exception as e:
+            logger.error(f"Error saving peer_awareness: {e}")
+
     # --- Full State Load ---
     def _load_all(self):
         """Load all state components from their respective files."""
@@ -317,6 +343,7 @@ Reply ONLY in block format. NO EXTRA TEXT.
         self._load_immediate_task()
         self._load_impediment()
         self._load_user_directive()
+        self._load_peer_awareness()
 
     # --- Prompt Generation ---
     def _estimate_tokens(self, text: str) -> int:
@@ -337,6 +364,7 @@ Reply ONLY in block format. NO EXTRA TEXT.
         base_prompt += f"## Current Immediate Task{chr(10)}{self._immediate_task}{chr(10)}{chr(10)}"
         base_prompt += f"## Current Impediment{chr(10)}{self._impediment}{chr(10)}{chr(10)}"
         base_prompt += f"## Current User Directive{chr(10)}{self._user_directive}{chr(10)}{chr(10)}"
+        base_prompt += f"## Current Peer Awareness{chr(10)}{self._peer_awareness}{chr(10)}{chr(10)}"
         base_prompt += f"## Is Bash Execution Enabled? {self.config.bash_execution_enabled}{chr(10)}{chr(10)}"
         base_prompt += f"## Is Python Execution Enabled? {self.config.python_execution_enabled}{chr(10)}{chr(10)}"
         base_prompt += f"## Is Peer Communication Enabled? {self.config.peer_communication_enabled}{chr(10)}{chr(10)}"
@@ -370,3 +398,4 @@ Reply ONLY in block format. NO EXTRA TEXT.
         self._load_immediate_task()
         self._load_impediment()
         self._load_user_directive()
+        self._load_peer_awareness()

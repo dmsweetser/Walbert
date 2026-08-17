@@ -117,9 +117,10 @@ def print_welcome_message(agent):
     print("- exit/quit: Exit the program")
     print("- python on/off: Toggle Python execution")
     print("- bash on/off: Toggle Bash execution")
+    print("- audio on/off: Toggle STT/TTS")
     print("- peer on/off: Toggle peer communication")
     print("- log on/off: Toggle raw block output to console")
-    print("- show awareness/ultimate_task/immediate_task/user_directive/impediment/schema: View agent state")
+    print("- show awareness/ultimate_task/immediate_task/user_directive/impediment/peer_awareness/schema: View agent state")
     print("- pip_install <package>: Install a Python package in the main environment")
     print("- help: Show these options again")
     print("- Any other input will be treated as a request to Walbert")
@@ -203,9 +204,9 @@ def main():
                 agent.enable_peer_communication()
             elif user_input.lower() == 'peer off':
                 agent.disable_peer_communication()
-            elif user_input.lower() in ['stt on', 'tts on', 'audio on']:
+            elif user_input.lower() in ['audio on']:
                 agent.enable_audio()
-            elif user_input.lower() in ['stt off', 'tts off', 'audio off']:
+            elif user_input.lower() in ['audio off']:
                 agent.disable_audio()
             elif user_input.lower() == 'log on':
                 agent.print_raw = True

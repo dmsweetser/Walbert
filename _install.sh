@@ -175,16 +175,6 @@ if [[ "$bt_enabled" == "y" ]]; then
     fi
 fi
 
-# Configure optional features:
-echo "Configure optional features:"
-read -p "Enable STT (Whisper)? (y/n) [n]: " stt_choice
-stt_enabled=${stt_choice:-n}
-if [[ "$stt_enabled" == "y" ]]; then stt_enabled=true; else stt_enabled=false; fi
-
-read -p "Enable TTS? (y/n) [n]: " tts_choice
-tts_enabled=${tts_choice:-n}
-if [[ "$tts_enabled" == "y" ]]; then tts_enabled=true; else tts_enabled=false; fi
-
 # Generate config.json
 cat > instance/config.json << EOF
 {
@@ -214,7 +204,7 @@ cat > instance/config.json << EOF
     "peer_communication_enabled": false,
     "python_execution_enabled": false,
     "bash_execution_enabled": false,
-    "audio_enabled": false,
+    "audio_enabled": $bt_enabled,
     "stt_enabled": $stt_enabled,
     "tts_enabled": $tts_enabled,
     "bluetooth_device": "$BT_DEVICE",

@@ -253,7 +253,7 @@ class WalbertAgent:
 
     def _execute_pending_blocks(self, provided_blocks):
         """Execute all pending blocks (SQL, Python, etc.) in order."""
-        executable_types = {"sql_execute", "python_execute", "bash_execute", "awareness", "ultimate_task", "immediate_task", "impediment", "peer_ip", "peer_message"}
+        executable_types = {"sql_execute", "python_execute", "bash_execute", "awareness", "ultimate_task", "immediate_task", "impediment", "peer_ip", "peer_message", "peer_awareness"}
         with self._lock:
             pending_blocks = [
                 b for b in provided_blocks
@@ -273,6 +273,12 @@ class WalbertAgent:
             elif block["type"] == "impediment":
                 self.state._impediment = block["content"]
                 self.state._save_impediment()
+            elif block["type"] == "user_directive":
+                self.state._user_directive = block["content"]
+                self.state._save_user_directive()
+            elif block["type"] == "peer_awareness":
+                self.state._peer_awareness = block["content"]
+                self.state._save_peer_awareness()
             elif block["type"] == "peer_ip":
                 self._pending_peer_ip = block["content"].strip()
             elif block["type"] == "peer_message":
@@ -468,7 +474,7 @@ Error: {str(e)}
         self.audio_thread.start()
         self._audio_started = True
         self.logger.info("Audio I/O thread enabled")
-        print("Audio I/O thread enabled")
+        print(f"{chr(10)}Audio I/O thread enabled")
 
     def disable_audio(self):
         self.config.audio_enabled = False
@@ -482,7 +488,7 @@ Error: {str(e)}
             self.audio_thread = None
         self._audio_started = False
         self.logger.info("Audio I/O thread disabled")
-        print("Audio I/O thread disabled")
+        print(f"{chr(10)}Audio I/O thread disabled")
 
     def send_peer_message(self, peer_ip: str, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Send a message to a specific peer and wait for response."""
