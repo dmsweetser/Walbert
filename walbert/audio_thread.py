@@ -16,7 +16,6 @@ import evdev
 
 logger = logging.getLogger('walbert.audio_thread')
 
-
 class AudioIOThread(threading.Thread):
     def __init__(self, input_queue: queue.Queue, config, on_console_response: Callable[[str], None]):
         super().__init__(daemon=True)
@@ -54,12 +53,13 @@ class AudioIOThread(threading.Thread):
         logger.info("Audio IO Thread stopping")
 
     def _setup_bluetooth(self):
-        """Use configured Bluetooth audio device."""
+        """Use configured Bluetooth audio device and attempt pairing if needed."""
         if self.config.bluetooth_device and self.config.bluetooth_device != "null":
             self._bt_device = self.config.bluetooth_device
             logger.info(f"Using configured Bluetooth audio device: {self._bt_device}")
         else:
             try:
+                # Discover Bluetooth devices
                 result = subprocess.run(['pactl', 'list', 'short', 'sources'], capture_output=True, text=True)
                 sources = result.stdout.strip().split('\n')
                 for line in sources:
@@ -67,12 +67,48 @@ class AudioIOThread(threading.Thread):
                         self._bt_device = line.split('\t')[1]
                         logger.info(f"Discovered Bluetooth audio device: {self._bt_device}")
                         break
+
                 if not self._bt_device:
                     logger.warning("No Bluetooth audio device found. Falling back to default.")
                     self._bt_device = "alsa_output.pci-0000_00_1f.3.analog-stereo"
+
+                # Attempt to pair and connect if not already connected
+                if self._bt_device and "bluez" in self._bt_device.lower():
+                    self._pair_and_connect_bluetooth(self._bt_device)
+
             except Exception as e:
                 logger.error(f"Bluetooth setup failed: {e}")
                 self._bt_device = None
+
+    def _pair_and_connect_bluetooth(self, device_mac: str):
+        """Pair and connect to a Bluetooth device using bluetoothctl."""
+        try:
+            # Check if the device is already paired
+            check_paired = subprocess.run(
+                ['bluetoothctl', 'devices'],
+                capture_output=True, text=True
+            )
+            if device_mac not in check_paired.stdout:
+                # Pair the device
+                subprocess.run(
+                    ['bluetoothctl', 'pair', device_mac],
+                    check=True,
+                    capture_output=True, text=True
+                )
+                logger.info(f"Paired with Bluetooth device: {device_mac}")
+
+            # Connect to the device
+            subprocess.run(
+                ['bluetoothctl', 'connect', device_mac],
+                check=True,
+                capture_output=True, text=True
+            )
+            logger.info(f"Connected to Bluetooth device: {device_mac}")
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Bluetooth pairing/connection failed: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error during Bluetooth pairing/connection: {e}")
 
     def _setup_stt(self):
         """Initialize Whisper STT model."""
