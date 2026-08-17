@@ -176,6 +176,8 @@ if [[ "$bt_enabled" == "y" ]]; then
     fi
 fi
 
+if [[ "$bt_enabled" == "y" ]]; then bt_enabled=true; else bt_enabled=false; fi
+
 # Generate config.json
 cat > instance/config.json << EOF
 {
@@ -206,8 +208,8 @@ cat > instance/config.json << EOF
     "python_execution_enabled": false,
     "bash_execution_enabled": false,
     "audio_enabled": $bt_enabled,
-    "stt_enabled": $stt_enabled,
-    "tts_enabled": $tts_enabled,
+    "stt_enabled": $bt_enabled,
+    "tts_enabled": $bt_enabled,
     "bluetooth_device": "$BT_DEVICE",
     "stt_timeout": 30,
     "user_input_timeout": 60,
