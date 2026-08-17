@@ -148,17 +148,20 @@ class AudioIOThread(threading.Thread):
             self._tts_engine = None
 
     def _setup_hid(self):
-        """Set up HID listener for trigger detection."""
+        """Set up HID listener for Bluetooth play/pause button detection."""
         try:
             import evdev
             from select import select
 
-            # Find HID devices
+            # Find HID devices, prioritizing Bluetooth devices
             devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
             for dev in devices:
-                if 'keyboard' in dev.name.lower() or 'button' in dev.name.lower() or 'keypad' in dev.name.lower():
+                # Check if the device is a Bluetooth HID (e.g., headset)
+                if ('bluetooth' in dev.name.lower() or
+                    'headset' in dev.name.lower() or
+                    'audio' in dev.name.lower()):
                     self._hid_device = dev
-                    logger.info(f"HID listener attached to {dev.name} at {dev.path}")
+                    logger.info(f"HID listener attached to Bluetooth device: {dev.name} at {dev.path}")
                     break
 
             if self._hid_device:
@@ -168,7 +171,7 @@ class AudioIOThread(threading.Thread):
             logger.error(f"HID setup failed: {e}")
 
     def _hid_listener(self):
-        """Listen for HID events to toggle recording."""
+        """Listen for HID events, specifically the play/pause button."""
         try:
             if not self._hid_device:
                 return
@@ -180,12 +183,14 @@ class AudioIOThread(threading.Thread):
                     r, _, _ = select([self._hid_device], [], [], 0.1)
                     if r:
                         for event in self._hid_device.read():
-                            if event.type == evdev.ecodes.EV_KEY and event.value == 1:
-                                # Key pressed - toggle recording
+                            # Check for play/pause button (KEY_PLAYPAUSE = 164 in Linux)
+                            if (event.type == evdev.ecodes.EV_KEY and
+                                event.code == 164 and  # KEY_PLAYPAUSE
+                                event.value == 1):     # Key pressed
                                 with self._record_lock:
                                     self._recording = not self._recording
                                 status = "STARTED" if self._recording else "STOPPED"
-                                logger.info(f"Recording {status} via HID trigger (Key code: {event.code})")
+                                logger.info(f"Recording {status} via Bluetooth play/pause button")
                                 break
                 except Exception as e:
                     if self._running:
