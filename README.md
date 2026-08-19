@@ -32,10 +32,11 @@ Welcome to Walbert! The local-first AI agent.
   - Data storage and retrieval
   - Memory and knowledge persistence
 - **State-Driven Tracking**: Bot state is retained through persistent tracking blocks and recent execution results:
-  - `[walbert_awareness_start]` - Synthesized identity and environmental understanding
-  - `[walbert_ultimate_task_start]` - Long-term overarching goal
-  - `[walbert_immediate_task_start]` - Current actionable step
-  - `[walbert_impediment_start]` - Active blockers or constraints
+  - `[walbert_self_awareness_start]` - Consolidated identity, environment, long-term goal, current step, and blockers (EXACTLY 256 words)
+  - `[walbert_user_awareness_start]` - User's latest directive and interaction context (EXACTLY 256 words)
+  - `[walbert_peer_<IP>_awareness_start]` - What you know about a specific peer (EXACTLY 256 words per peer)
+  - `[walbert_peer_<IP>_message_send_start]` - Message to send to peer `<IP>`
+  - `[walbert_peer_<IP>_message_received_start]` - Message received from peer `<IP>`
   - Recent Execution Results - Most recent block outputs/errors for context
 - **Zero Hard-Coded Persistence**: All database operations handled through the protocol
 - **Python Execution**: Execute Python code in the main application's virtual environment
@@ -101,10 +102,9 @@ Available commands:
 - `python on/off`: Toggle Python execution
 - `bash on/off`: Toggle Bash execution
 - `peer on/off`: Toggle peer communication
-- `show awareness`: View synthesized identity and environmental understanding
-- `show ultimate task`: View long-term overarching goal
-- `show immediate task`: View current actionable step
-- `show impediment`: View active blockers or constraints
+- `show self_awareness`: View consolidated identity, goals, and blockers
+- `show user_awareness`: View user directive and interaction context
+- `show peer_awareness <ip>`: View awareness of specific peer
 - `show schema`: View database schema
 - `pip_install <package>`: Install a Python package in the main environment
 - Any other input will be treated as a request to Walbert

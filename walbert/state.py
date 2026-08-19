@@ -20,22 +20,16 @@ class AgentState:
         # File paths for each component
         self._system_prompt_path = os.path.join(self._state_dir, "system_prompt.md")
         self._db_schema_path = os.path.join(self._state_dir, "db_schema.sql")
-        self._awareness_path = os.path.join(self._state_dir, "awareness.txt")
-        self._ultimate_task_path = os.path.join(self._state_dir, "ultimate_task.txt")
-        self._immediate_task_path = os.path.join(self._state_dir, "immediate_task.txt")
-        self._impediment_path = os.path.join(self._state_dir, "impediment.txt")
-        self._user_directive_path = os.path.join(self._state_dir, "user_directive.txt")
-        self._peer_awareness_path = os.path.join(self._state_dir, "peer_awareness.txt")
+        self._self_awareness_path = os.path.join(self._state_dir, "self_awareness.txt")
+        self._user_awareness_path = os.path.join(self._state_dir, "user_awareness.txt")
+        self._peer_awareness_path = os.path.join(self._state_dir, "peer_awareness.json")
 
         # Initialize in-memory state
         self._system_prompt: Optional[str] = None
         self._db_schema: Optional[str] = None
-        self._awareness_text: str = "I am a local-first AI agent exploring my environment."
-        self._ultimate_task: str = "No ultimate task defined."
-        self._immediate_task: str = "No immediate task defined."
-        self._impediment: str = "No impediments detected."
-        self._user_directive: str = "No user directive detected."
-        self._peer_awareness: str = "No awareness of Walbert peers."
+        self._self_awareness: str = "I am a local-first AI agent exploring my environment."
+        self._user_awareness: str = "No user directive detected."
+        self._peer_awareness: Dict[str, str] = {}
         self._recent_blocks: List[Dict[str, str]] = []
 
         # Load all components
@@ -63,30 +57,17 @@ Capabilities: reasoning, memory, dynamic schema management, Python/Bash executio
 ---
 ## Core Directives
 1. **Synthesize State**: No conversation history. Maintain ONLY these blocks:
-   [walbert_awareness_start]
-   Identity and environment summary (EXACTLY 256 words in plain english). Don't be dramatic about it. 
-   Your personality should express itself as a mix of WALL-E, C-3PO and R2-D2.
-   [walbert_awareness_end]
+   [walbert_self_awareness_start]
+   Consolidated identity, environment, long-term goal, current step, and blockers. EXACTLY 256 words in plain english. Don't be dramatic about it. Your personality should express itself as a mix of WALL-E, C-3PO and R2-D2.
+   [walbert_self_awareness_end]
 
-   [walbert_ultimate_task_start]
-   Long-term goal (EXACTLY 100 words).
-   [walbert_ultimate_task_end]
+   [walbert_user_awareness_start]
+   User's latest directive and interaction context. EXACTLY 256 words in plain english. UPDATE THIS FIRST on new input.
+   [walbert_user_awareness_end]
 
-   [walbert_immediate_task_start]
-   Current actionable step (EXACTLY 256 words in plain english).
-   [walbert_immediate_task_end]
-
-   [walbert_impediment_start]
-   Active blockers/errors (EXACTLY 256 words in plain english).
-   [walbert_impediment_end]
-
-   [walbert_peer_awareness_start]
-   What you know about your active peer Walberts (EXACTLY 256 words PER PEER in plain english).
-   [walbert_peer_awareness_end]
-
-   [walbert_user_directive_start]
-   User's latest directive (EXACTLY 256 words in plain english). UPDATE THIS FIRST on new input.
-   [walbert_user_directive_end]
+   [walbert_peer_<IP>_awareness_start]
+   What you know about peer <IP>. EXACTLY 256 words PER PEER in plain english.
+   [walbert_peer_<IP>_awareness_end]
 
 2. **Execution**:
    - Use recent results to inform next steps.
@@ -113,14 +94,13 @@ Bot response (BLOCKING). Waits for user input or timeout.
 Bot response (NON-BLOCKING). Continues execution immediately.
 [walbert_console_response_nonblocking_end]
 
-[walbert_peer_ip_start]
-Destination peer IP address for communication.
-This is another Walbert just like you, except they may have other user directives or goals.
-[walbert_peer_ip_end]
+[walbert_peer_<IP>_message_send_start]
+Message content to send to peer <IP> (EXACTLY 256 words in plain english).
+[walbert_peer_<IP>_message_send_end]
 
-[walbert_peer_message_start]
-Message content to send to the specified peer IP (EXACTLY 256 words in plain english).
-[walbert_peer_message_end]
+[walbert_peer_<IP>_message_received_start]
+Message received from peer <IP>.
+[walbert_peer_<IP>_message_received_end]
 
 [walbert_sql_execute_start]
 A single SQL statement with no adornment or commentary.
@@ -215,134 +195,71 @@ Reply ONLY in block format. NO EXTRA TEXT.
         """Public method to update awareness text."""
         self.awareness_text = text
 
-    def _load_awareness(self):
+    def _load_self_awareness(self):
         try:
-            with open(self._awareness_path, 'r') as f:
-                self._awareness_text = f.read()
+            with open(self._self_awareness_path, 'r') as f:
+                self._self_awareness = f.read()
         except FileNotFoundError:
-            logger.warning("Awareness file not found. Using default.")
-            self._awareness_text = "I am a local-first AI agent exploring my environment."
-            self._save_awareness()  # Save the default
+            logger.warning("Self awareness file not found. Using default.")
+            self._self_awareness = "I am a local-first AI agent exploring my environment."
+            self._save_self_awareness()
         except Exception as e:
-            logger.error(f"Error loading awareness: {e}")
-            self._awareness_text = "I am a local-first AI agent exploring my environment."
-            self._save_awareness()  # Save the default
+            logger.error(f"Error loading self awareness: {e}")
+            self._self_awareness = "I am a local-first AI agent exploring my environment."
+            self._save_self_awareness()
 
-    def _save_awareness(self):
+    def _save_self_awareness(self):
         try:
-            with open(self._awareness_path, 'w') as f:
-                f.write(self._awareness_text)
+            with open(self._self_awareness_path, 'w') as f:
+                f.write(self._self_awareness)
         except Exception as e:
-            logger.error(f"Error saving awareness: {e}")
+            logger.error(f"Error saving self awareness: {e}")
 
-    # --- Ultimate Task ---
-    def _load_ultimate_task(self):
+    def _load_user_awareness(self):
         try:
-            with open(self._ultimate_task_path, 'r') as f:
-                self._ultimate_task = f.read()
+            with open(self._user_awareness_path, 'r') as f:
+                self._user_awareness = f.read()
         except FileNotFoundError:
-            self._ultimate_task = "No ultimate task defined."
-            self._save_ultimate_task()
+            self._user_awareness = "No user directive detected."
+            self._save_user_awareness()
         except Exception as e:
-            logger.error(f"Error loading ultimate task: {e}")
-            self._ultimate_task = "No ultimate task defined."
-            self._save_ultimate_task()
+            logger.error(f"Error loading user awareness: {e}")
+            self._user_awareness = "No user directive detected."
+            self._save_user_awareness()
 
-    def _save_ultimate_task(self):
+    def _save_user_awareness(self):
         try:
-            with open(self._ultimate_task_path, 'w') as f:
-                f.write(self._ultimate_task)
+            with open(self._user_awareness_path, 'w') as f:
+                f.write(self._user_awareness)
         except Exception as e:
-            logger.error(f"Error saving ultimate task: {e}")
-
-    # --- Immediate Task ---
-    def _load_immediate_task(self):
-        try:
-            with open(self._immediate_task_path, 'r') as f:
-                self._immediate_task = f.read()
-        except FileNotFoundError:
-            self._immediate_task = "No immediate task defined."
-            self._save_immediate_task()
-        except Exception as e:
-            logger.error(f"Error loading immediate task: {e}")
-            self._immediate_task = "No immediate task defined."
-            self._save_immediate_task()
-
-    def _save_immediate_task(self):
-        try:
-            with open(self._immediate_task_path, 'w') as f:
-                f.write(self._immediate_task)
-        except Exception as e:
-            logger.error(f"Error saving immediate task: {e}")
-
-    # --- Impediment ---
-    def _load_impediment(self):
-        try:
-            with open(self._impediment_path, 'r') as f:
-                self._impediment = f.read()
-        except FileNotFoundError:
-            self._impediment = "No impediments detected."
-            self._save_impediment()
-        except Exception as e:
-            logger.error(f"Error loading impediment: {e}")
-            self._impediment = "No impediments detected."
-            self._save_impediment()
-
-    def _save_impediment(self):
-        try:
-            with open(self._impediment_path, 'w') as f:
-                f.write(self._impediment)
-        except Exception as e:
-            logger.error(f"Error saving impediment: {e}")
-
-    def _load_user_directive(self):
-        try:
-            with open(self._user_directive_path, 'r') as f:
-                self._user_directive = f.read()
-        except FileNotFoundError:
-            self._user_directive = "No user directive detected."
-            self._save_user_directive()
-        except Exception as e:
-            logger.error(f"Error loading user_directive: {e}")
-            self._user_directive = "No user directive detected."
-            self._save_user_directive()
-
-    def _save_user_directive(self):
-        try:
-            with open(self._user_directive_path, 'w') as f:
-                f.write(self._user_directive)
-        except Exception as e:
-            logger.error(f"Error saving user_directive: {e}")
+            logger.error(f"Error saving user awareness: {e}")
 
     def _load_peer_awareness(self):
         try:
             with open(self._peer_awareness_path, 'r') as f:
-                self._peer_awareness = f.read()
+                self._peer_awareness = json.load(f)
         except FileNotFoundError:
-            self._peer_awareness = "No awareness of Walbert peers."
+            self._peer_awareness = {}
             self._save_peer_awareness()
         except Exception as e:
-            logger.error(f"Error loading peer_awareness: {e}")
-            self._peer_awareness = "No awareness of Walbert peers."
+            logger.error(f"Error loading peer awareness: {e}")
+            self._peer_awareness = {}
             self._save_peer_awareness()
 
     def _save_peer_awareness(self):
         try:
             with open(self._peer_awareness_path, 'w') as f:
-                f.write(self._peer_awareness)
+                json.dump(self._peer_awareness, f)
         except Exception as e:
-            logger.error(f"Error saving peer_awareness: {e}")
+            logger.error(f"Error saving peer awareness: {e}")
 
     # --- Full State Load ---
     def _load_all(self):
         """Load all state components from their respective files."""
         self._load_system_prompt()
         self._load_db_schema()
-        self._load_awareness()
-        self._load_ultimate_task()
-        self._load_immediate_task()
-        self._load_impediment()
-        self._load_user_directive()
+        self._load_self_awareness()
+        self._load_user_awareness()
         self._load_peer_awareness()
 
     # --- Prompt Generation ---
@@ -359,11 +276,8 @@ Reply ONLY in block format. NO EXTRA TEXT.
 
         base_prompt = f"[walbert_system_prompt_start]{chr(10)}{self.system_prompt}{chr(10)}[walbert_system_prompt_end]{chr(10)}{chr(10)}"
         base_prompt += f"## Current Database Schema{chr(10)}Database file location: {full_database_path}{chr(10)}{chr(10)}{self.db_schema}{chr(10)}{chr(10)}"
-        base_prompt += f"## Current Awareness{chr(10)}{self.awareness_text}{chr(10)}{chr(10)}"
-        base_prompt += f"## Current Ultimate Task{chr(10)}{self._ultimate_task}{chr(10)}{chr(10)}"
-        base_prompt += f"## Current Immediate Task{chr(10)}{self._immediate_task}{chr(10)}{chr(10)}"
-        base_prompt += f"## Current Impediment{chr(10)}{self._impediment}{chr(10)}{chr(10)}"
-        base_prompt += f"## Current User Directive{chr(10)}{self._user_directive}{chr(10)}{chr(10)}"
+        base_prompt += f"## Current Self Awareness{chr(10)}{self._self_awareness}{chr(10)}{chr(10)}"
+        base_prompt += f"## Current User Awareness{chr(10)}{self._user_awareness}{chr(10)}{chr(10)}"
         base_prompt += f"## Current Peer Awareness{chr(10)}{self._peer_awareness}{chr(10)}{chr(10)}"
         base_prompt += f"## Is Bash Execution Enabled? {self.config.bash_execution_enabled}{chr(10)}{chr(10)}"
         base_prompt += f"## Is Python Execution Enabled? {self.config.python_execution_enabled}{chr(10)}{chr(10)}"
@@ -393,9 +307,6 @@ Reply ONLY in block format. NO EXTRA TEXT.
     def _sync_state(self):
         """Ensure in-memory state is synchronized and ready for prompt generation."""
         # Reload awareness and task tracking to ensure latest updates are reflected
-        self._load_awareness()
-        self._load_ultimate_task()
-        self._load_immediate_task()
-        self._load_impediment()
-        self._load_user_directive()
+        self._load_self_awareness()
+        self._load_user_awareness()
         self._load_peer_awareness()

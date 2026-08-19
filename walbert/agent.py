@@ -250,48 +250,46 @@ class WalbertAgent:
 
     def _execute_pending_blocks(self, provided_blocks):
         """Execute all pending blocks (SQL, Python, etc.) in order."""
-        executable_types = {"sql_execute", "python_execute", "bash_execute", "awareness", "ultimate_task", "immediate_task", "impediment", "peer_ip", "peer_message", "peer_awareness"}
+        import re
+        executable_types = {"sql_execute", "python_execute", "bash_execute", "self_awareness", "user_awareness"}
+        peer_pattern = re.compile(r'^peer_(\d+\.\d+\.\d+\.\d+)_')
+        
         with self._lock:
-            pending_blocks = [
-                b for b in provided_blocks
-                if b["type"] in executable_types
-            ]
+            pending_blocks = []
+            for b in provided_blocks:
+                btype = b["type"]
+                if btype in executable_types:
+                    pending_blocks.append(b)
+                elif peer_pattern.match(btype):
+                    pending_blocks.append(b)
 
         for block in pending_blocks:
             self.logger.debug(f"Executing block: {block}")
-            if block["type"] == "awareness":
-                self.state.update_awareness(block["content"])
-            elif block["type"] == "ultimate_task":
-                self.state._ultimate_task = block["content"]
-                self.state._save_ultimate_task()
-            elif block["type"] == "immediate_task":
-                self.state._immediate_task = block["content"]
-                self.state._save_immediate_task()
-            elif block["type"] == "impediment":
-                self.state._impediment = block["content"]
-                self.state._save_impediment()
-            elif block["type"] == "user_directive":
-                self.state._user_directive = block["content"]
-                self.state._save_user_directive()
-            elif block["type"] == "peer_awareness":
-                self.state._peer_awareness = block["content"]
-                self.state._save_peer_awareness()
-            elif block["type"] == "peer_ip":
-                self._pending_peer_ip = block["content"].strip()
-            elif block["type"] == "peer_message":
-                try:
-                    if self.config.peer_communication_enabled and hasattr(self, '_pending_peer_ip') and self._pending_peer_ip:
-                        if self.comms is not None:
-                            self.comms.send_to_peer(self._pending_peer_ip, block["content"])
-                            self.logger.info(f"Sent peer message to {self._pending_peer_ip}")
-                            self._pending_peer_ip = None
+            btype = block["type"]
+            
+            if btype == "self_awareness":
+                self.state._self_awareness = block["content"]
+                self.state._save_self_awareness()
+            elif btype == "user_awareness":
+                self.state._user_awareness = block["content"]
+                self.state._save_user_awareness()
+            elif peer_pattern.match(btype):
+                ip_match = peer_pattern.match(btype)
+                peer_ip = ip_match.group(1) if ip_match else None
+                if peer_ip:
+                    if btype == f"peer_{peer_ip}_awareness":
+                        self.state._peer_awareness[peer_ip] = block["content"]
+                        self.state._save_peer_awareness()
+                    elif btype == f"peer_{peer_ip}_message_send":
+                        if self.config.peer_communication_enabled and self.comms is not None:
+                            self.comms.send_to_peer(peer_ip, block["content"])
+                            self.logger.info(f"Sent peer message to {peer_ip}")
                         else:
                             self.logger.warning("Peer communication disabled or NetworkManager not initialized.")
-                    else:
-                        self.logger.warning("Peer communication disabled or IP not set.")
-                except Exception as e:
-                    self.logger.error(f"Failed to send peer message: {e}")
-            elif block["type"] in ("sql_execute", "python_execute", "bash_execute"):
+                    elif btype == f"peer_{peer_ip}_message_received":
+                        self.state._peer_awareness[peer_ip] = block["content"]
+                        self.state._save_peer_awareness()
+            elif btype in ("sql_execute", "python_execute", "bash_execute"):
                 result_block = self.executor.execute(block)
                 if result_block:
                     self.state.append_block(block["type"], block["content"])

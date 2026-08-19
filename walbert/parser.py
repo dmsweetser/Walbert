@@ -6,7 +6,7 @@ class BlockParser:
     def parse(text: str) -> List[Dict[str, str]]:
         blocks = []
         # Match start or end markers, with or without brackets, case-insensitive
-        pattern = re.compile(r'\[?\bwalbert_([a-zA-Z_]+(?:_[a-zA-Z_]+)?)_(?:start|end)\]?', re.IGNORECASE)
+        pattern = re.compile(r'\[?\bwalbert_([a-zA-Z0-9_.]+)_(?:start|end)\]?', re.IGNORECASE)
         
         current_type = None
         current_content = ""
