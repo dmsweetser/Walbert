@@ -267,6 +267,9 @@ class WalbertAgent:
             self.logger.debug(f"Executing block: {block}")
             btype = block["type"]
             
+            # Log emitted block
+            self._log_block_emitted(btype, block.get("content", ""))
+            
             if btype == "self_awareness":
                 self.state._self_awareness = block["content"]
                 self.state._save_self_awareness()
@@ -300,6 +303,19 @@ class WalbertAgent:
         
         # Ensure state syncs immediately after execution so next prompt reflects changes
         self.state._sync_state()
+
+    def _log_block_emitted(self, block_type: str, content: str):
+        """Log an emitted block to instance/block_logs/emitted/"""
+        try:
+            log_dir = os.path.join("instance", "block_logs", "emitted")
+            os.makedirs(log_dir, exist_ok=True)
+            timestamp = time.strftime("%Y%m%d_%H%M%S_%f")
+            safe_type = block_type.replace("/", "_").replace(" ", "_")
+            file_path = os.path.join(log_dir, f"{timestamp}_{safe_type}.txt")
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(f"Type: {block_type}\nContent:\n{content}")
+        except Exception as e:
+            self.logger.error(f"Failed to log emitted block: {e}")
 
     def _log_full_prompt_and_response(self, prompt: str, response: str):
         """Log full prompt and response to separate timestamped files in the session directory."""
@@ -353,6 +369,7 @@ class WalbertAgent:
                         print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                         continue
                     last_user_input = msg
+                    self._log_block_received("user_input", msg)
                     self.state.append_block("user_input", msg)
                     self._generate_response_block(msg, interrupt_event)
                     print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
@@ -484,6 +501,19 @@ Error: {str(e)}
         self._audio_started = False
         self.logger.info("Audio I/O thread disabled")
         print(f"{chr(10)}Audio I/O thread disabled")
+
+    def _log_block_received(self, block_type: str, content: str):
+        """Log a received block to instance/block_logs/received/"""
+        try:
+            log_dir = os.path.join("instance", "block_logs", "received")
+            os.makedirs(log_dir, exist_ok=True)
+            timestamp = time.strftime("%Y%m%d_%H%M%S_%f")
+            safe_type = block_type.replace("/", "_").replace(" ", "_")
+            file_path = os.path.join(log_dir, f"{timestamp}_{safe_type}.txt")
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(f"Type: {block_type}\nContent:\n{content}")
+        except Exception as e:
+            self.logger.error(f"Failed to log received block: {e}")
 
     def send_peer_message(self, peer_ip: str, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Send a message to a specific peer and wait for response."""

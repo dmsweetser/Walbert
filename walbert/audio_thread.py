@@ -180,7 +180,7 @@ class AudioIOThread(threading.Thread):
             while self._running:
                 try:
                     # Use select with timeout to allow periodic checks of self._running
-                    r, _, _ = select([self._hid_device], [], [], 0.1)
+                    r, _, _ = select.select([self._hid_device], [], [], 0.1)
                     if r:
                         for event in self._hid_device.read():
                             # Check for play/pause button (KEY_PLAYPAUSE = 164 in Linux)
