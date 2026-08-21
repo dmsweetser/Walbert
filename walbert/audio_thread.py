@@ -1,6 +1,7 @@
 """
 Audio Input/Output Thread for Walbert
-Handles Whisper STT, TTS, Bluetooth audio routing, and HID trigger detection.
+Handles Whisper STT, TTS, Bluetooth audio routing, HID trigger detection,
+and recording from Bluetooth microphone via PulseAudio/PipeWire (parec).
 """
 import select
 import threading
@@ -9,8 +10,8 @@ import time
 import logging
 import subprocess
 import os
-import json
-from typing import Optional, Callable
+import tempfile
+from typing import Callable
 
 import evdev
 
@@ -23,14 +24,23 @@ class AudioIOThread(threading.Thread):
         self.config = config
         self.on_console_response = on_console_response
         self._running = False
-        self._bt_device = None
+
+        self._bt_mac = getattr(config, "bluetooth_device", None)
+        self._bt_sink = getattr(config, "bluetooth_sink", None)
+        self._bt_source = getattr(config, "bluetooth_source", None)
+
         self._stt_model = None
         self._tts_engine = None
+
         self._hid_device = None
         self._hid_thread = None
+
         self._recording = False
         self._audio_buffer = []
         self._record_lock = threading.Lock()
+
+        self._capture_thread = None
+        self._capture_process = None
 
     def run(self):
         logger.info("Audio IO Thread started")
@@ -48,72 +58,46 @@ class AudioIOThread(threading.Thread):
 
     def stop(self):
         self._running = False
+        self.stop_recording()
         if self._hid_thread and self._hid_thread.is_alive():
             self._hid_thread.join(timeout=1)
         logger.info("Audio IO Thread stopping")
 
     def _setup_bluetooth(self):
-        """Use configured Bluetooth audio device and attempt pairing if needed."""
-        if self.config.bluetooth_device and self.config.bluetooth_device != "null":
-            self._bt_device = self.config.bluetooth_device
-            self._pair_and_connect_bluetooth(self._bt_device)
-            logger.info(f"Using configured Bluetooth audio device: {self._bt_device}")
-        else:
-            try:
-                # Discover Bluetooth devices
-                result = subprocess.run(['pactl', 'list', 'short', 'sources'], capture_output=True, text=True)
-                sources = result.stdout.strip().split('\n')
-                for line in sources:
-                    if 'bluez' in line.lower() or 'bluetooth' in line.lower():
-                        self._bt_device = line.split('\t')[1]
-                        logger.info(f"Discovered Bluetooth audio device: {self._bt_device}")
-                        break
-
-                if not self._bt_device:
-                    logger.warning("No Bluetooth audio device found. Falling back to default.")
-                    self._bt_device = "alsa_output.pci-0000_00_1f.3.analog-stereo"
-
-                # Attempt to pair and connect if not already connected
-                if self._bt_device and "bluez" in self._bt_device.lower():
-                    self._pair_and_connect_bluetooth(self._bt_device)
-
-            except Exception as e:
-                logger.error(f"Bluetooth setup failed: {e}")
-                self._bt_device = None
-
-    def _pair_and_connect_bluetooth(self, device_mac: str):
-        """Pair and connect to a Bluetooth device using bluetoothctl."""
+        """Ensure Bluetooth device is paired/connected; audio routing handled by PulseAudio/PipeWire."""
+        if not self._bt_mac or self._bt_mac == "null":
+            logger.info("No Bluetooth MAC configured; skipping BT setup.")
+            return
         try:
-            # Check if the device is already paired
-            check_paired = subprocess.run(
-                ['bluetoothctl', 'devices'],
-                capture_output=True, text=True
-            )
-            if device_mac not in check_paired.stdout:
-                # Pair the device
-                subprocess.run(
-                    ['bluetoothctl', 'pair', device_mac],
-                    check=True,
-                    capture_output=True, text=True
-                )
-                logger.info(f"Paired with Bluetooth device: {device_mac}")
+            logger.info(f"Configured Bluetooth MAC: {self._bt_mac}")
+            subprocess.run(["bluetoothctl", "trust", self._bt_mac], check=False,
+                           capture_output=True, text=True)
+            for i in range(2):
+                logger.info(f"Connecting to {self._bt_mac}, attempt {i+1}")
+                subprocess.run(["bluetoothctl", "connect", self._bt_mac], check=False,
+                               capture_output=True, text=True)
+                time.sleep(1.0)
 
-            # Connect to the device
-            subprocess.run(
-                ['bluetoothctl', 'connect', device_mac],
-                check=True,
-                capture_output=True, text=True
-            )
-            logger.info(f"Connected to Bluetooth device: {device_mac}")
+            info = subprocess.run(["bluetoothctl", "info", self._bt_mac],
+                                  capture_output=True, text=True)
+            logger.info(f"bluetoothctl info:\n{info.stdout}")
 
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Bluetooth pairing/connection failed: {e}")
+            if self._bt_sink and self._bt_sink != "null":
+                logger.info(f"Setting default sink to {self._bt_sink}")
+                subprocess.run(["pactl", "set-default-sink", self._bt_sink],
+                               check=False, capture_output=True, text=True)
+
+            if self._bt_source and self._bt_source != "null":
+                logger.info(f"Setting default source to {self._bt_source}")
+                subprocess.run(["pactl", "set-default-source", self._bt_source],
+                               check=False, capture_output=True, text=True)
+
         except Exception as e:
-            logger.error(f"Unexpected error during Bluetooth pairing/connection: {e}")
+            logger.error(f"Bluetooth setup failed: {e}")
 
     def _setup_stt(self):
         """Initialize Whisper STT model."""
-        if not self.config.stt_enabled:
+        if not getattr(self.config, "stt_enabled", False):
             logger.info("STT disabled in config.")
             self._stt_model = None
             return
@@ -130,15 +114,16 @@ class AudioIOThread(threading.Thread):
 
     def _setup_tts(self):
         """Initialize TTS engine."""
-        if not self.config.tts_enabled:
+        if not getattr(self.config, "tts_enabled", False):
             logger.info("TTS disabled in config.")
             self._tts_engine = None
             return
         try:
             import pyttsx3
             self._tts_engine = pyttsx3.init()
-            if self.config.tts_voice and self.config.tts_voice != "default":
-                self._tts_engine.setProperty('voice', self.config.tts_voice)
+            voice = getattr(self.config, "tts_voice", "default")
+            if voice and voice != "default":
+                self._tts_engine.setProperty('voice', voice)
             logger.info("TTS engine initialized")
         except ImportError:
             logger.warning("pyttsx3 not installed. TTS will be unavailable.")
@@ -150,23 +135,30 @@ class AudioIOThread(threading.Thread):
     def _setup_hid(self):
         """Set up HID listener for Bluetooth play/pause button detection."""
         try:
-            import evdev
-            from select import select
-
-            # Find HID devices, prioritizing Bluetooth devices
             devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
+            if not devices:
+                logger.info("No evdev input devices found for HID.")
+                return
+
             for dev in devices:
-                # Check if the device is a Bluetooth HID (e.g., headset)
-                if ('bluetooth' in dev.name.lower() or
-                    'headset' in dev.name.lower() or
-                    'audio' in dev.name.lower()):
+                logger.info(f"HID candidate: name='{dev.name}', path='{dev.path}'")
+
+            HID_KEYWORDS = [
+                "hid", "consumer", "control", "avrcp", "media", "button", "sp-002", "headset"
+            ]
+
+            for dev in devices:
+                name = dev.name.lower()
+                if any(k in name for k in HID_KEYWORDS):
                     self._hid_device = dev
-                    logger.info(f"HID listener attached to Bluetooth device: {dev.name} at {dev.path}")
+                    logger.info(f"HID listener attached to device: {dev.name} at {dev.path}")
                     break
 
             if self._hid_device:
                 self._hid_thread = threading.Thread(target=self._hid_listener, daemon=True)
                 self._hid_thread.start()
+            else:
+                logger.info("No suitable HID device found for media controls.")
         except Exception as e:
             logger.error(f"HID setup failed: {e}")
 
@@ -179,16 +171,16 @@ class AudioIOThread(threading.Thread):
             logger.info(f"Starting HID event listener on {self._hid_device.path}")
             while self._running:
                 try:
-                    # Use select with timeout to allow periodic checks of self._running
                     r, _, _ = select.select([self._hid_device], [], [], 0.1)
                     if r:
                         for event in self._hid_device.read():
-                            # Check for play/pause button (KEY_PLAYPAUSE = 164 in Linux)
                             if (event.type == evdev.ecodes.EV_KEY and
                                 event.code == 164 and  # KEY_PLAYPAUSE
-                                event.value == 1):     # Key pressed
-                                with self._record_lock:
-                                    self._recording = not self._recording
+                                event.value == 1):
+                                if self._recording:
+                                    self.stop_recording()
+                                else:
+                                    self.start_recording()
                                 status = "STARTED" if self._recording else "STOPPED"
                                 logger.info(f"Recording {status} via Bluetooth play/pause button")
                                 break
@@ -199,17 +191,62 @@ class AudioIOThread(threading.Thread):
         except Exception as e:
             logger.error(f"HID listener failed: {e}")
 
+    def _start_capture_thread(self):
+        """Start a background thread that captures audio from the Bluetooth source via parec."""
+        if self._capture_thread and self._capture_thread.is_alive():
+            return
+        if not self._bt_source or self._bt_source == "null":
+            logger.warning("No Bluetooth source configured; cannot capture audio.")
+            return
+
+        def capture_loop():
+            logger.info(f"Starting audio capture from source: {self._bt_source}")
+            try:
+                self._capture_process = subprocess.Popen(
+                    ["parec", "--device", self._bt_source, "--rate", "16000",
+                     "--format", "s16le", "--channels", "1"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                while self._running and self._recording and self._capture_process:
+                    chunk = self._capture_process.stdout.read(3200)  # 0.1s at 16kHz mono
+                    if not chunk:
+                        break
+                    with self._record_lock:
+                        self._audio_buffer.append(chunk)
+            except Exception as e:
+                logger.error(f"Audio capture failed: {e}")
+            finally:
+                if self._capture_process:
+                    self._capture_process.terminate()
+                    self._capture_process = None
+                logger.info("Audio capture thread exiting.")
+
+        self._capture_thread = threading.Thread(target=capture_loop, daemon=True)
+        self._capture_thread.start()
+
+    def _stop_capture_thread(self):
+        """Stop the background capture thread."""
+        if self._capture_process:
+            try:
+                self._capture_process.terminate()
+            except Exception:
+                pass
+            self._capture_process = None
+        if self._capture_thread and self._capture_thread.is_alive():
+            self._capture_thread.join(timeout=1)
+        self._capture_thread = None
+
     def _process_audio_chunk(self):
         """Process recorded audio through STT and queue to agent."""
         if not self._stt_model:
             return
         try:
             audio_data = b''.join(self._audio_buffer)
-            if len(audio_data) < 1000:  # Minimum threshold
+            if len(audio_data) < 16000:  # ~1s minimum
                 self._audio_buffer.clear()
                 return
 
-            import tempfile
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_f:
                 tmp_f.write(audio_data)
                 tmp_path = tmp_f.name
@@ -229,13 +266,13 @@ class AudioIOThread(threading.Thread):
             self._audio_buffer.clear()
 
     def handle_console_response(self, text: str):
-        """Route console response to TTS and Bluetooth speaker."""
+        """Route console response to TTS (Bluetooth sink is default via pactl)."""
         if not self._tts_engine or not self._running:
             return
         try:
             self._tts_engine.say(text)
             self._tts_engine.runAndWait()
-            logger.debug("TTS output sent to Bluetooth speaker")
+            logger.debug("TTS output played")
         except Exception as e:
             logger.error(f"TTS playback failed: {e}")
 
@@ -243,10 +280,13 @@ class AudioIOThread(threading.Thread):
         """Externally start recording."""
         with self._record_lock:
             self._recording = True
-        logger.info("Recording started via API")
+            self._audio_buffer.clear()
+        logger.info("Recording started via API/HID")
+        self._start_capture_thread()
 
     def stop_recording(self):
         """Externally stop recording."""
         with self._record_lock:
             self._recording = False
-        logger.info("Recording stopped via API")
+        logger.info("Recording stopped via API/HID")
+        self._stop_capture_thread()

@@ -19,7 +19,6 @@ mkdir -p instance/llama.cpp
 mkdir -p instance/llama.cpp/bin
 mkdir -p instance/models
 
-# Create virtual environment
 echo "Creating Python virtual environment..."
 python3 -m venv venv
 if [ $? -ne 0 ]; then
@@ -27,7 +26,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Activate virtual environment
 echo "Activating virtual environment..."
 source venv/bin/activate
 if [ $? -ne 0 ]; then
@@ -35,11 +33,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Install requirements
 pip install --upgrade pip setuptools wheel
 pip install -r requirements.txt
 
-# Model selection and configuration
 echo "Select a model:"
 echo "1) Devstral-24B-Instruct-GGUF (Default)"
 echo "2) Qwen3.6-35B-A3B"
@@ -120,11 +116,12 @@ else
     MIN_P=0.05
 fi
 
-# Configure Bluetooth Audio Device
 echo "Configure Bluetooth Audio Device:"
 read -p "Enable Bluetooth audio routing? (y/n) [n]: " bt_choice
 bt_enabled=${bt_choice:-n}
 BT_DEVICE="null"
+BT_SINK="null"
+BT_SOURCE="null"
 
 if [[ "$bt_enabled" == "y" ]]; then
     if command -v bluetoothctl &> /dev/null; then
@@ -134,7 +131,6 @@ if [[ "$bt_enabled" == "y" ]]; then
         echo "Discovered devices:"
         bluetoothctl devices
 
-        # Count devices
         device_count=$(bluetoothctl devices | grep -c "Device" || echo "0")
 
         if [ "$device_count" -gt 0 ]; then
@@ -145,23 +141,34 @@ if [[ "$bt_enabled" == "y" ]]; then
                 BT_MAC=$(bluetoothctl devices | grep "Device" | sed -n "${device_num}p" | awk '{print $2}')
                 echo "Pairing and connecting to $BT_MAC..."
 
-                pair_output=$(echo -e "pair $BT_MAC" | bluetoothctl 2>&1)
-                if echo "$pair_output" | grep -q "AlreadyExists"; then
-                    echo "Device already paired. Connecting..."
-                else
-                    echo "$pair_output"
-                fi
+                echo -e "pair $BT_MAC\ntrust $BT_MAC" | bluetoothctl
 
-                connect_output=$(echo -e "trust $BT_MAC\nconnect $BT_MAC" | bluetoothctl 2>&1)
-                echo "$connect_output"
+                echo "Connecting (attempt 1)..."
+                echo -e "connect $BT_MAC" | bluetoothctl
+                sleep 1
+                echo "Connecting (attempt 2)..."
+                echo -e "connect $BT_MAC" | bluetoothctl
 
-                if echo "$connect_output" | grep -q "Failed"; then
-                    echo "Connection failed. Removing stale pairing and retrying..."
-                    echo -e "remove $BT_MAC" | bluetoothctl
-                    echo -e "pair $BT_MAC\ntrust $BT_MAC\nconnect $BT_MAC" | bluetoothctl
-                fi
+                echo "Bluetooth device info:"
+                echo -e "info $BT_MAC" | bluetoothctl
 
                 BT_DEVICE="$BT_MAC"
+
+                # Try to switch card profile to headset (HFP/HSP) to expose microphone
+                CARD_NAME=$(pactl list cards short | grep -i "${BT_MAC//:/}" | awk '{print $2}' || echo "")
+                if [ -n "$CARD_NAME" ]; then
+                    echo "Detected Bluetooth card: $CARD_NAME"
+                    echo "Setting profile to headset_head_unit (if available)..."
+                    pactl set-card-profile "$CARD_NAME" headset_head_unit || true
+                    pactl set-card-profile "$CARD_NAME" handsfree_head_unit || true
+                fi
+
+                # Detect Bluetooth sink and source names
+                BT_SINK=$(pactl list short sinks | grep -i "${BT_MAC//:/}" | awk '{print $2}' | head -n1 || echo "null")
+                BT_SOURCE=$(pactl list short sources | grep -i "${BT_MAC//:/}" | awk '{print $2}' | head -n1 || echo "null")
+
+                echo "Detected Bluetooth sink: $BT_SINK"
+                echo "Detected Bluetooth source: $BT_SOURCE"
             else
                 echo "Invalid selection. Using null."
                 BT_DEVICE="null"
@@ -177,7 +184,6 @@ fi
 
 if [[ "$bt_enabled" == "y" ]]; then bt_enabled=true; else bt_enabled=false; fi
 
-# Generate config.json
 cat > instance/config.json << EOF
 {
     "model_configs": {
@@ -210,6 +216,8 @@ cat > instance/config.json << EOF
     "stt_enabled": $bt_enabled,
     "tts_enabled": $bt_enabled,
     "bluetooth_device": "$BT_DEVICE",
+    "bluetooth_sink": "$BT_SINK",
+    "bluetooth_source": "$BT_SOURCE",
     "stt_timeout": 30,
     "user_input_timeout": 60,
     "tts_voice": "default",
@@ -220,7 +228,6 @@ EOF
 echo "Created default config at instance/config.json"
 echo "Please edit this file with your specific paths and settings"
 
-# Download llama.cpp binary
 echo "Downloading llama.cpp binary..."
 if [ ! -f "instance/llama.cpp/bin/llama-server" ]; then
     wget -O llama.cpp.tar.gz \
@@ -236,5 +243,4 @@ fi
 echo "Installation complete"
 echo "Please edit instance/config.json with your specific paths before running Walbert"
 
-# Make run script executable
 chmod +x _run.sh

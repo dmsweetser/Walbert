@@ -309,7 +309,7 @@ class WalbertAgent:
         try:
             log_dir = os.path.join("instance", "block_logs", "emitted")
             os.makedirs(log_dir, exist_ok=True)
-            timestamp = time.strftime("%Y%m%d_%H%M%S_%f")
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
             safe_type = block_type.replace("/", "_").replace(" ", "_")
             file_path = os.path.join(log_dir, f"{timestamp}_{safe_type}.txt")
             with open(file_path, 'w', encoding='utf-8') as f:
@@ -322,7 +322,7 @@ class WalbertAgent:
         if not hasattr(self, 'session_dir') or not self.session_dir:
             return
         try:
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             prompt_path = os.path.join(self.session_dir, f"{timestamp}_prompt.txt")
             response_path = os.path.join(self.session_dir, f"{timestamp}_response.txt")
 
@@ -507,7 +507,7 @@ Error: {str(e)}
         try:
             log_dir = os.path.join("instance", "block_logs", "received")
             os.makedirs(log_dir, exist_ok=True)
-            timestamp = time.strftime("%Y%m%d_%H%M%S_%f")
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
             safe_type = block_type.replace("/", "_").replace(" ", "_")
             file_path = os.path.join(log_dir, f"{timestamp}_{safe_type}.txt")
             with open(file_path, 'w', encoding='utf-8') as f:

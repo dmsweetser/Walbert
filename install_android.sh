@@ -5,24 +5,10 @@ set -e
 
 echo "Setting up Walbert for Termux/Android..."
 
-# Update and install base dependencies
+# Update and install base dependencies (Termux uses clang, not gcc)
 pkg update -y
 pkg upgrade -y
-pkg install -y python git gcc make cmake clang ffmpeg libsndfile portaudio whisper
-
-# Manually compile and install additional dependencies from source
-echo "Compiling additional dependencies from source..."
-# Example: Compile and install portaudio (if not available via pkg)
-if ! pkg list-installed | grep -q "portaudio"; then
-    echo "Compiling portaudio from source..."
-    apt install -y portaudio2
-    # If Termux's portaudio is insufficient, compile from source:
-    # git clone https://gitlab.xiph.org/xiph/portaudio.git
-    # cd portaudio
-    # ./configure --prefix=$PREFIX
-    # make && make install
-    # cd ..
-fi
+pkg install -y python git clang make cmake ffmpeg libsndfile portaudio
 
 # Create project directories
 mkdir -p instance
@@ -31,7 +17,7 @@ mkdir -p instance/llama.cpp
 mkdir -p instance/llama.cpp/bin
 mkdir -p instance/models
 
-# Create virtual environment with system-site-packages to access compiled dependencies
+# Create virtual environment
 echo "Creating Python virtual environment..."
 python -m venv venv --system-site-packages
 if [ $? -ne 0 ]; then
@@ -47,9 +33,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Install Python requirements (compile from source where possible)
+# Install Python requirements (avoid forcing source builds to dodge gcc/clang issues)
 pip install --upgrade pip
-pip install --no-binary :all: -r requirements.txt
+pip install -r requirements.txt
 
 # Model selection and configuration
 echo "Select a model:"
@@ -132,11 +118,13 @@ else
     MIN_P=0.05
 fi
 
-# Configure Bluetooth Audio Device
+# Configure Bluetooth Audio Device (Termux)
 echo "Configure Bluetooth Audio Device:"
 read -p "Enable Bluetooth audio routing? (y/n) [n]: " bt_choice
 bt_enabled=${bt_choice:-n}
 BT_DEVICE="null"
+BT_SINK="null"
+BT_SOURCE="null"
 
 if [[ "$bt_enabled" == "y" ]]; then
     if command -v termux-bluetooth &> /dev/null; then
@@ -148,7 +136,6 @@ if [[ "$bt_enabled" == "y" ]]; then
         echo "Available devices:"
         termux-bluetooth list
 
-        # Count devices
         device_count=$(termux-bluetooth list | grep -c "Address:" || echo "0")
 
         if [ "$device_count" -gt 0 ]; then
@@ -178,7 +165,6 @@ fi
 
 if [[ "$bt_enabled" == "y" ]]; then bt_enabled=true; else bt_enabled=false; fi
 
-# Generate config.json
 cat > instance/config.json << EOF
 {
     "model_configs": {
@@ -211,6 +197,8 @@ cat > instance/config.json << EOF
     "stt_enabled": $bt_enabled,
     "tts_enabled": $bt_enabled,
     "bluetooth_device": "$BT_DEVICE",
+    "bluetooth_sink": "$BT_SINK",
+    "bluetooth_source": "$BT_SOURCE",
     "stt_timeout": 30,
     "user_input_timeout": 60,
     "tts_voice": "default",
@@ -221,7 +209,6 @@ EOF
 echo "Created default config at instance/config.json"
 echo "Please edit this file with your specific paths and settings"
 
-# Download llama.cpp binary for Android
 echo "Downloading llama.cpp binary..."
 if [ ! -f "instance/llama.cpp/bin/llama-server" ]; then
     wget -O llama.cpp.tar.gz \
@@ -237,5 +224,4 @@ fi
 echo "Installation complete"
 echo "Please edit instance/config.json with your specific paths before running Walbert"
 
-# Make run script executable
 chmod +x _run.sh

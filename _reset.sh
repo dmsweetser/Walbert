@@ -1,5 +1,6 @@
 rm -r ./instance/config.json 
 rm -r ./instance/conversations/*
+rm -r ./instance/block_logs/*
 rm -r ./instance/walbert.*
 rm -r ./walbert_prompt_*
 rm -r ./walbert_response_*
