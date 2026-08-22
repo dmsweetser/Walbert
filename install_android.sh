@@ -10,6 +10,12 @@ pkg update -y
 pkg upgrade -y
 pkg install -y python git clang make cmake ffmpeg libsndfile portaudio wget tar
 
+pkg install build-essential python python-pip libpulse pulseaudio
+
+curl -LO https://its-pointless.github.io/setup-pointless-repo.sh
+bash setup-pointless-repo.sh
+pkg install portaudio portaudio-dev
+
 # Project directories
 mkdir -p instance/{conversations,models,llama.cpp/bin}
 
@@ -23,6 +29,9 @@ source venv/bin/activate
 pip install --upgrade pip setuptools wheel
 
 sed -i '/openai-whisper/d' requirements.txt
+
+pip install pyaudio --global-option='build_ext' --global-option='-I$PREFIX/include' --global-option='-L$PREFIX/lib'
+
 pip install -r requirements.txt
 
 # Model selection
