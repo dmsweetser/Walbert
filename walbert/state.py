@@ -97,10 +97,12 @@ Bot response (NON-BLOCKING). Continues execution immediately.
 [walbert_peer_<COMPLETE IP>_message_send_start]
 Message content to send to peer <IP> (EXACTLY 256 words in plain english).
 This should be in plain english.
+USE THIS TO INTERACT WITH YOUR PEER(S) - DO NOT TRY TO USE PYTHON INSTEAD
 [walbert_peer_<COMPLETE IP>_message_send_end]
 
 [walbert_sql_execute_start]
 A single SQL statement with no adornment or commentary.
+USE THIS TO INTERACT WITH YOUR SQLITE DB - DO NOT TRY TO USE PYTHON INSTEAD
 [walbert_sql_execute_end]
 
 [walbert_python_execute_start]
