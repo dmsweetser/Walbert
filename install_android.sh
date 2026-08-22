@@ -22,10 +22,7 @@ source venv/bin/activate
 
 pip install --upgrade pip setuptools wheel
 
-# Replace Whisper with faster-whisper (Termux-compatible)
-sed -i 's/openai-whisper/faster-whisper/g' requirements.txt
-sed -i '/faster-whisper/d' requirements.txt
-pip install faster-whisper[cpu]
+sed -i '/openai-whisper/d' requirements.txt
 pip install -r requirements.txt
 
 # Model selection
@@ -81,42 +78,6 @@ if [ ! -f "$MMPROJ_PATH" ]; then
       "$(grep -o 'https://.*\.gguf' <<< "$MMPROJ_PATH")"
 fi
 
-# Bluetooth (Termux)
-echo "Configure Bluetooth Audio Device:"
-read -p "Enable Bluetooth audio routing? (y/n) [n]: " bt_choice
-bt_enabled=${bt_choice:-n}
-BT_DEVICE="null"
-
-if [[ "$bt_enabled" == "y" ]]; then
-    if command -v termux-bluetooth &> /dev/null; then
-        echo "Scanning for Bluetooth devices..."
-        termux-bluetooth scan on
-        sleep 5
-        termux-bluetooth scan off
-
-        DEVICES=$(termux-bluetooth list | grep "Address:")
-        COUNT=$(echo "$DEVICES" | wc -l)
-
-        if [ "$COUNT" -gt 0 ]; then
-            echo "$DEVICES" | nl -w2 -s") "
-            read -p "Select device number: " device_num
-
-            BT_MAC=$(echo "$DEVICES" | sed -n "${device_num}p" | awk '{print $2}')
-            echo "Pairing with $BT_MAC..."
-            termux-bluetooth pair "$BT_MAC"
-            echo "Connecting to $BT_MAC..."
-            termux-bluetooth connect "$BT_MAC"
-            BT_DEVICE="$BT_MAC"
-        else
-            echo "No devices found."
-        fi
-    else
-        echo "termux-bluetooth not installed."
-    fi
-fi
-
-if [[ "$bt_enabled" == "y" ]]; then bt_enabled=true; else bt_enabled=false; fi
-
 # Write config.json
 cat > instance/config.json << EOF
 {
@@ -132,7 +93,7 @@ cat > instance/config.json << EOF
         }
     },
     "mmproj_path": "$MMPROJ_PATH",
-    "audio_enabled": $bt_enabled,
+    "audio_enabled": false,
     "stt_enabled": $bt_enabled,
     "tts_enabled": $bt_enabled,
     "bluetooth_device": "$BT_DEVICE",
