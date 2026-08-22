@@ -24,7 +24,8 @@ pip install --upgrade pip setuptools wheel
 
 # Replace Whisper with faster-whisper (Termux-compatible)
 sed -i 's/openai-whisper/faster-whisper/g' requirements.txt
-
+sed -i '/faster-whisper/d' requirements.txt
+pip install faster-whisper[cpu]
 pip install -r requirements.txt
 
 # Model selection
