@@ -1,5 +1,5 @@
 #!/bin/bash
-# Walbert Installation Script
+# Walbert Installation Script (PipeWire + Bluetooth + Whisper aware)
 
 set -e
 
@@ -12,10 +12,13 @@ sudo apt install -y python3-dev
 sudo apt install -y portaudio19-dev
 sudo apt install -y libbluetooth-dev
 
+# PipeWire + Bluetooth
+sudo apt install -y pipewire-audio-client-libraries libspa-0.2-bluetooth
+systemctl --user restart pipewire pipewire-pulse || true
+
 # Create directories
 mkdir -p instance
 mkdir -p instance/conversations
-mkdir -p instance/llama.cpp
 mkdir -p instance/llama.cpp/bin
 mkdir -p instance/models
 
@@ -27,6 +30,7 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Activating virtual environment..."
+# shellcheck disable=SC1091
 source venv/bin/activate
 if [ $? -ne 0 ]; then
     echo "Error: Failed to activate virtual environment"
@@ -56,13 +60,17 @@ if [ "$model_choice" == "2" ]; then
     MMPROJ_PATH="instance/models/Qwen3.6-35B-A3B-UD-IQ3_S-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
-        wget --content-disposition "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-IQ3_S.gguf?download=true" -O "$MODEL_PATH"
+        wget --content-disposition \
+          "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-IQ3_S.gguf?download=true" \
+          -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
     fi
     if [ ! -f "$MMPROJ_PATH" ]; then
         echo "Downloading $MMPROJ_PATH..."
-        wget --content-disposition "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -O "$MMPROJ_PATH"
+        wget --content-disposition \
+          "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/mmproj-BF16.gguf?download=true" \
+          -O "$MMPROJ_PATH"
     else
         echo "$MMPROJ_PATH already exists, skipping download."
     fi
@@ -77,13 +85,17 @@ elif [ "$model_choice" == "3" ]; then
     MMPROJ_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q4_K_M-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
-        wget --content-disposition "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf?download=true" -O "$MODEL_PATH"
+        wget --content-disposition \
+          "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf?download=true" \
+          -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
     fi
     if [ ! -f "$MMPROJ_PATH" ]; then
         echo "Downloading $MMPROJ_PATH..."
-        wget --content-disposition "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-BF16-mmproj.gguf?download=true" -O "$MMPROJ_PATH"
+        wget --content-disposition \
+          "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-BF16-mmproj.gguf?download=true" \
+          -O "$MMPROJ_PATH"
     else
         echo "$MMPROJ_PATH already exists, skipping download."
     fi
@@ -98,13 +110,17 @@ else
     MMPROJ_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
-        wget --content-disposition "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true" -O "$MODEL_PATH"
+        wget --content-disposition \
+          "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true" \
+          -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
     fi
     if [ ! -f "$MMPROJ_PATH" ]; then
         echo "Downloading $MMPROJ_PATH..."
-        wget --content-disposition "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true" -O "$MMPROJ_PATH"
+        wget --content-disposition \
+          "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true" \
+          -O "$MMPROJ_PATH"
     else
         echo "$MMPROJ_PATH already exists, skipping download."
     fi
@@ -129,54 +145,48 @@ if [[ "$bt_enabled" == "y" ]]; then
         bluetoothctl --timeout 10 scan on
 
         echo "Discovered devices:"
-        bluetoothctl devices
+        RAW_DEVICES=$(bluetoothctl devices)
 
-        device_count=$(bluetoothctl devices | grep -c "Device" || echo "0")
+        # Parse into arrays
+        mapfile -t DEV_LINES < <(echo "$RAW_DEVICES" | grep "^Device ")
 
-        if [ "$device_count" -gt 0 ]; then
-            echo "Select a device by number (1-$device_count):"
-            read -p "Enter choice: " device_num
+        if [ ${#DEV_LINES[@]} -eq 0 ]; then
+            echo "No Bluetooth devices found."
+            BT_DEVICE="null"
+        else
+            echo "Available devices:"
+            i=1
+            for line in "${DEV_LINES[@]}"; do
+                MAC=$(echo "$line" | awk '{print $2}')
+                NAME=$(echo "$line" | cut -d' ' -f3-)
+                echo "  $i) $NAME ($MAC)"
+                i=$((i+1))
+            done
 
-            if [ "$device_num" -ge 1 ] && [ "$device_num" -le "$device_count" ]; then
-                BT_MAC=$(bluetoothctl devices | grep "Device" | sed -n "${device_num}p" | awk '{print $2}')
+            read -p "Select a device by number (1-${#DEV_LINES[@]}): " device_num
+
+            if [[ "$device_num" =~ ^[0-9]+$ ]] && [ "$device_num" -ge 1 ] && [ "$device_num" -le ${#DEV_LINES[@]} ]; then
+                SELECTED="${DEV_LINES[$((device_num-1))]}"
+                BT_MAC=$(echo "$SELECTED" | awk '{print $2}')
+                BT_DEVICE="$BT_MAC"
+
                 echo "Pairing and connecting to $BT_MAC..."
-
                 echo -e "pair $BT_MAC\ntrust $BT_MAC" | bluetoothctl
-
-                echo "Connecting (attempt 1)..."
                 echo -e "connect $BT_MAC" | bluetoothctl
                 sleep 1
-                echo "Connecting (attempt 2)..."
                 echo -e "connect $BT_MAC" | bluetoothctl
 
                 echo "Bluetooth device info:"
                 echo -e "info $BT_MAC" | bluetoothctl
 
-                BT_DEVICE="$BT_MAC"
-
-                # Try to switch card profile to headset (HFP/HSP) to expose microphone
-                CARD_NAME=$(pactl list cards short | grep -i "${BT_MAC//:/}" | awk '{print $2}' || echo "")
-                if [ -n "$CARD_NAME" ]; then
-                    echo "Detected Bluetooth card: $CARD_NAME"
-                    echo "Setting profile to headset_head_unit (if available)..."
-                    pactl set-card-profile "$CARD_NAME" headset_head_unit || true
-                    pactl set-card-profile "$CARD_NAME" handsfree_head_unit || true
-                fi
-
-                # Detect Bluetooth sink and source names
-                BT_SINK=$(pactl list short sinks | grep -i "${BT_MAC//:/}" | awk '{print $2}' | head -n1 || echo "null")
-                BT_SOURCE=$(pactl list short sources | grep -i "${BT_MAC//:/}" | awk '{print $2}' | head -n1 || echo "null")
-
-                echo "Detected Bluetooth sink: $BT_SINK"
-                echo "Detected Bluetooth source: $BT_SOURCE"
+                BT_SINK="null"
+                BT_SOURCE="null"
             else
-                echo "Invalid selection. Using null."
+                echo "Invalid selection."
                 BT_DEVICE="null"
             fi
-        else
-            echo "No devices found."
-            BT_DEVICE="null"
         fi
+        
     else
         echo "bluetoothctl not found. Please configure manually in config.json."
     fi
@@ -231,7 +241,7 @@ echo "Please edit this file with your specific paths and settings"
 echo "Downloading llama.cpp binary..."
 if [ ! -f "instance/llama.cpp/bin/llama-server" ]; then
     wget -O llama.cpp.tar.gz \
-    "https://github.com/ggml-org/llama.cpp/releases/download/b9279/llama-b9279-bin-ubuntu-x64.tar.gz"
+      "https://github.com/ggml-org/llama.cpp/releases/download/b9279/llama-b9279-bin-ubuntu-x64.tar.gz"
 
     echo "Extracting llama.cpp binary..."
     tar -xzf llama.cpp.tar.gz -C instance/llama.cpp/bin --strip-components=1
