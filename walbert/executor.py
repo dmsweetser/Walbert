@@ -22,8 +22,11 @@ class BlockExecutor:
         elif block_type == "bash_execute":
             return self._execute_bash(content)
 
-        elif block_type == "console_response":
-            return {"type": "console_response", "content": f"Walbert:\n{content}\n"}
+        elif block_type == "console_response_blocking":
+            return {"type": "console_response_blocking", "content": f"Walbert:\n{content}\n"}
+
+        elif block_type == "console_response_nonblocking":
+            return {"type": "console_response_nonblocking", "content": f"Walbert:\n{content}\n"}
 
         return None
 

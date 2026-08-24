@@ -236,13 +236,14 @@ class WalbertAgent:
 
         console_content = ""
         for block in blocks:
-            if block["type"] == "console_response":
+            if block["type"] == "console_response_blocking" or block["type"] == "console_response_nonblocking":
                 console_content = block["content"]
         
         if console_content:
-            self.write_output(console_content, "console_response")
+            self.write_output(console_content, block["type"])
             print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
-            self.waiting_for_user = True
+            if block["type"] == "console_response_blocking":
+                self.waiting_for_user = True
         else:
             self.waiting_for_user = False
 
@@ -335,7 +336,7 @@ class WalbertAgent:
 
     def write_output(self, text: str, block_type: str = None) -> None:
         """Write output to console."""
-        if block_type == "console_response" or self.print_raw:
+        if block_type == "console_response_blocking" or block_type == "console_response_nonblocking" or self.print_raw:
             if block_type in ("awareness", "context_blocks"):
                 formatted_text = f"{chr(10)}".join(f"**** {line}" for line in text.split(f"{chr(10)}"))
                 print(formatted_text, end='', flush=True)

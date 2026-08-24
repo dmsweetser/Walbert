@@ -44,6 +44,7 @@ echo "Select a model:"
 echo "1) Devstral-24B-Instruct-GGUF (Default)"
 echo "2) Qwen3.6-35B-A3B"
 echo "3) Ministral 3 - 8B"
+echo "4) Ministral 3 - 3B"
 read -p "Enter choice: " model_choice
 
 MODEL_PATH=""
@@ -98,6 +99,23 @@ elif [ "$model_choice" == "3" ]; then
           -O "$MMPROJ_PATH"
     else
         echo "$MMPROJ_PATH already exists, skipping download."
+    fi
+    CONTEXT_SIZE=8192
+    OUTPUT_TOKENS=4096
+    TEMPERATURE=0.7
+    TOP_P=0.9
+    TOP_K=40
+    MIN_P=0.00
+elif [ "$model_choice" == "4" ]; then
+    MODEL_PATH="instance/models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
+    MMPROJ_PATH=""
+    if [ ! -f "$MODEL_PATH" ]; then
+        echo "Downloading $MODEL_PATH..."
+        wget --content-disposition \
+          "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf?download=true" \
+          -O "$MODEL_PATH"
+    else
+        echo "$MODEL_PATH already exists, skipping download."
     fi
     CONTEXT_SIZE=8192
     OUTPUT_TOKENS=4096

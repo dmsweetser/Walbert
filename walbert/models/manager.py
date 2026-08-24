@@ -82,6 +82,8 @@ class ModelManager:
                         token = None
                     
                     if not token:
+                        with open(response_file, 'w', encoding='utf-8') as f:
+                            f.write(response_content)
                         break
                         
                     response_content += token
