@@ -3,8 +3,7 @@ requests
 numpy
 readchar
 pyaudio
-bleak
 evdev
 openai-whisper
 pyttsx3
-pydbus
+pynput

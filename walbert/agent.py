@@ -115,6 +115,9 @@ class WalbertAgent:
         self.logger = logging.getLogger('walbert.agent')
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
 
+        if self.config.audio_enabled:
+            self.enable_audio()
+
     def _init_components(self):
         """Initialize components that depend on DB connection."""
         from walbert.database.manager import DatabaseManager

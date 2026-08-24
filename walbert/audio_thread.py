@@ -1,3 +1,6 @@
+import numpy as np
+import pyaudio
+from pynput import keyboard
 import threading
 import queue
 import time
@@ -8,17 +11,11 @@ import tempfile
 
 logger = logging.getLogger("walbert.audio_thread")
 
-WAKE_WORD = "walbert"
-
-
 class AudioIOThread(threading.Thread):
     """
-    Drop-in replacement for your AudioIOThread class.
-    - Continuous listening
-    - Rolling audio buffer
-    - Rolling text buffer
-    - Wake word detection at any moment
-    - STT recording triggered immediately
+    Drop-in replacement for AudioIOThread using play/pause key to toggle recording.
+    - Beeps once when recording starts
+    - Beeps twice when recording stops
     """
 
     def __init__(self, input_queue: queue.Queue, config, on_console_response):
@@ -35,19 +32,13 @@ class AudioIOThread(threading.Thread):
         self._bt_source = getattr(config, "bluetooth_source", None)
 
         self._stt_model = None
-        self._wake_model = None
         self._tts_engine = None
 
         self._capture_proc = None
-        self._wake_proc = None
-
         self._capture_thread = None
-        self._wake_thread = None
 
         # Rolling buffers
-        self._audio_buffer = b""          # For wake-word detection
-        self._rolling_text = ""           # For wake-word detection
-        self._record_buffer = []          # For STT recording
+        self._record_buffer = []
         self._record_lock = threading.Lock()
 
     # ----------------------------------------------------------------------
@@ -61,10 +52,7 @@ class AudioIOThread(threading.Thread):
         self._setup_bluetooth()
         self._resolve_pipewire_bt_nodes()
         self._setup_stt()
-        self._setup_wake_word()
         self._setup_tts()
-
-        self._start_wake_word_listener()
 
         while self._running:
             # Process STT recording buffer
@@ -76,7 +64,6 @@ class AudioIOThread(threading.Thread):
     def stop(self):
         self._running = False
         self.stop_recording()
-        self._stop_wake_word_listener()
         logger.info("Audio IO Thread stopping")
 
     # ----------------------------------------------------------------------
@@ -144,18 +131,6 @@ class AudioIOThread(threading.Thread):
             logger.error(f"STT setup failed: {e}")
             self._stt_model = None
 
-    def _setup_wake_word(self):
-        if not getattr(self.config, "stt_enabled", False):
-            logger.info("Wake word disabled because STT is disabled.")
-            return
-        try:
-            import whisper
-            self._wake_model = whisper.load_model("tiny")
-            logger.info("Wake word Whisper model loaded (tiny)")
-        except Exception as e:
-            logger.error(f"Wake word setup failed: {e}")
-            self._wake_model = None
-
     def _setup_tts(self):
         if not getattr(self.config, "tts_enabled", False):
             logger.info("TTS disabled.")
@@ -172,94 +147,49 @@ class AudioIOThread(threading.Thread):
             self._tts_engine = None
 
     # ----------------------------------------------------------------------
-    # Wake-word listener (continuous)
+    # Beep helper
     # ----------------------------------------------------------------------
 
-    def _start_wake_word_listener(self):
-        if not self._bt_source or self._bt_source == "null":
-            logger.info("No BT source; wake word listener not started.")
-            return
-        if not self._wake_model:
-            logger.info("No wake word model; wake word listener not started.")
-            return
+    def _beep(self, times=1):
+        for _ in range(times):
+            self.tone()
 
-        def wake_loop():
-            logger.info(f"Starting continuous wake word listener on: {self._bt_source}")
+    def tone(self, freq=1000, duration=0.2):
+        import numpy as np
+        import tempfile
+        import subprocess
+        import os
 
+        rate = 44100
+        t = np.linspace(0, duration, int(rate * duration), False)
+        tone = np.sin(freq * t * 2 * np.pi).astype(np.float32)
+
+        # Write WAV file
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            import wave
+            wf = wave.open(f, 'wb')
+            wf.setnchannels(1)
+            wf.setsampwidth(4)
+            wf.setframerate(rate)
+            wf.writeframes(tone.tobytes())
+            wf.close()
+            wav_path = f.name
+
+        # Play through Bluetooth sink
+        subprocess.run(["pw-play", wav_path, "--target", self._bt_sink], check=False)
+
+        os.unlink(wav_path)
+
+    def on_press(self, key):
             try:
-                self._wake_proc = subprocess.Popen(
-                    ["pw-record", "--rate", "16000", "--channels", "1",
-                     "--target", self._bt_source],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
-
-                last_transcribe = time.time()
-
-                while self._running:
-                    chunk = self._wake_proc.stdout.read(3200)
-                    if not chunk:
-                        continue
-
-                    # Append chunk to rolling audio buffer
-                    self._audio_buffer += chunk
-
-                    # Keep last 6 seconds (96000 bytes)
-                    if len(self._audio_buffer) > 96000:
-                        self._audio_buffer = self._audio_buffer[-96000:]
-
-                    # Transcribe every 0.5 seconds
-                    if time.time() - last_transcribe >= 0.5:
-                        last_transcribe = time.time()
-
-                        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_f:
-                            tmp_f.write(self._audio_buffer)
-                            tmp_path = tmp_f.name
-
-                        try:
-                            result = self._wake_model.transcribe(tmp_path, fp16=False)
-                            text = result.get("text", "").strip()
-                        except Exception as e:
-                            logger.error(f"Wake word transcription failed: {e}")
-                            text = ""
-                        finally:
-                            os.unlink(tmp_path)
-
-                        if text:
-                            self._rolling_text += " " + text
-                            self._rolling_text = self._rolling_text[-500:]
-
-                            logger.info("Rolling text: " + self._rolling_text)
-
-                            if WAKE_WORD in self._rolling_text.lower():
-                                logger.info("Wake word detected!")
-                                self._rolling_text = ""
-                                self.start_recording()
-
+                if key == keyboard.Key.media_play_pause:
+                    logger.info("Play/Pause key pressed!")
+                    if self._recording:
+                        self.stop_recording()
+                    else:
+                        self.start_recording()
             except Exception as e:
-                logger.error(f"Wake word listener failed: {e}")
-            finally:
-                if self._wake_proc:
-                    try:
-                        self._wake_proc.terminate()
-                    except Exception:
-                        pass
-                    self._wake_proc = None
-                logger.info("Wake word listener exiting.")
-
-        self._wake_thread = threading.Thread(target=wake_loop, daemon=True)
-        self._wake_thread.start()
-
-    def _stop_wake_word_listener(self):
-        if self._wake_proc:
-            try:
-                self._wake_proc.terminate()
-            except Exception:
-                pass
-            self._wake_proc = None
-        if self._wake_thread and self._wake_thread.is_alive():
-            self._wake_thread.join(timeout=1)
-        self._wake_thread = None
+                logger.error(f"Error in keyboard listener: {e}")
 
     # ----------------------------------------------------------------------
     # Recording (STT)
@@ -270,6 +200,7 @@ class AudioIOThread(threading.Thread):
             self._recording = True
             self._record_buffer.clear()
         logger.info("Recording STARTED")
+        self._beep(1)  # Single beep
 
         if self._capture_thread and self._capture_thread.is_alive():
             return
@@ -309,6 +240,7 @@ class AudioIOThread(threading.Thread):
         with self._record_lock:
             self._recording = False
         logger.info("Recording STOPPED")
+        self._beep(5)
 
         if self._capture_proc:
             try:
