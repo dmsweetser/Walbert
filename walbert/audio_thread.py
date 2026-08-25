@@ -19,9 +19,6 @@ def is_display_available():
     except Exception:
         return False
 
-if is_display_available():
-    from pynput import keyboard
-
 
 logger = logging.getLogger("walbert.audio_thread")
 
@@ -207,12 +204,14 @@ class AudioIOThread(threading.Thread):
 
     def on_press(self, key):
             try:
-                if key == keyboard.Key.media_play_pause:
-                    logger.info("Play/Pause key pressed!")
-                    if self._recording:
-                        self.stop_recording()
-                    else:
-                        self.start_recording()
+                if is_display_available():
+                    from pynput import keyboard
+                    if key == keyboard.Key.media_play_pause:
+                        logger.info("Play/Pause key pressed!")
+                        if self._recording:
+                            self.stop_recording()
+                        else:
+                            self.start_recording()
             except Exception as e:
                 logger.error(f"Error in keyboard listener: {e}")
 
