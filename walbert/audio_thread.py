@@ -245,32 +245,24 @@ class AudioIOThread(threading.Thread):
                 self._capture_proc = subprocess.Popen(
                     cmd,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
+                    stderr=subprocess.PIPE
                 )
                 
-                # Wait for the process to start successfully
-                self._capture_proc.wait(timeout=5)
-                logger.info("Audio capture process started successfully.")
+                logger.info("Attempting to start audio capture process...")
+                # Small wait to ensure process starts
+                time.sleep(1)
+                
+                self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
+                self._capture_thread.start()
 
             except FileNotFoundError:
                 logger.error("pw-record command not found. Check pipewire configuration.")
                 with self._record_lock:
                     self._recording = False
-            except subprocess.TimeoutExpired:
-                logger.error("Failed to start audio capture process within timeout.")
-                with self._record_lock:
-                    self._recording = False
             except Exception as e:
-                logger.error(f"Audio capture failed unexpectedly: {e}")
+                logger.error(f"Error setting up audio capture: {e}")
                 with self._record_lock:
                     self._recording = False
-            finally:
-                if self._capture_proc:
-                    self._capture_proc.terminate()
-                    self._capture_proc.wait(timeout=1)
-                    self._capture_proc = None
-                logger.info("Audio capture thread exiting.")
 
         self._capture_thread = threading.Thread(target=capture_loop, daemon=True)
         self._capture_thread.start()

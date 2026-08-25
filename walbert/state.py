@@ -272,7 +272,10 @@ Reply ONLY in block format. NO EXTRA TEXT.
         base_prompt += f"## Current Database Schema{chr(10)}Database file location: {full_database_path}{chr(10)}{chr(10)}{self.db_schema}{chr(10)}{chr(10)}"
         base_prompt += f"## Current Self Awareness{chr(10)}{self._self_awareness}{chr(10)}{chr(10)}"
         base_prompt += f"## Current User Awareness{chr(10)}{self._user_awareness}{chr(10)}{chr(10)}"
-        base_prompt += f"## Current Peer Awareness{chr(10)}{self._peer_awareness}{chr(10)}{chr(10)}"
+        # Filter peer awareness to only include currently active peers to avoid confusion
+        active_peers_set = set(peers) if peers else set()
+        filtered_peer_awareness = {ip: text for ip, text in self._peer_awareness.items() if ip in active_peers_set}
+        base_prompt += f"## Current Peer Awareness{chr(10)}{filtered_peer_awareness}{chr(10)}{chr(10)}"
         base_prompt += f"## Is Bash Execution Enabled? {self.config.bash_execution_enabled}{chr(10)}{chr(10)}"
         base_prompt += f"## Is Python Execution Enabled? {self.config.python_execution_enabled}{chr(10)}{chr(10)}"
         base_prompt += f"## Is Peer Communication Enabled? {self.config.peer_communication_enabled}{chr(10)}{chr(10)}"
@@ -284,9 +287,19 @@ Reply ONLY in block format. NO EXTRA TEXT.
             base_prompt += f"## Pending Peer Responses: {', '.join(self._pending_peer_responses)}{chr(10)}{chr(10)}"
         else:
             base_prompt += f"## Pending Peer Responses: None{chr(10)}{chr(10)}"
-        if peers:
-            for peer_ip in peers:
-                base_prompt += f"[walbert_peer_{peer_ip}_message_send_start]{chr(10)}Message content to send to peer {peer_ip} (EXACTLY 256 words in plain english).{chr(10)}This should be in plain english.{chr(10)}!!! CRITICAL INSTRUCTION: ONLY send this message if self._pending_peer_responses is empty. If a response is pending, DO NOT send.!!!{chr(10)}USE THIS TO INTERACT WITH YOUR PEER(S) - DO NOT TRY TO USE PYTHON INSTEAD{chr(10)}[walbert_peer_{peer_ip}_message_send_end]{chr(10)}{chr(10)}"
+        # Only include peer messaging if there are peers AND no responses are pending
+        if peers and self._pending_peer_responses:
+            base_prompt += f"## Active Peers{chr(10)}{', '.join(peers)}{chr(10)}{chr(10)}[STATUS: WAITING FOR PEER RESPONSES]"
+        elif peers:
+            base_prompt += f"## Active Peers{chr(10)}{', '.join(peers)}{chr(10)}{chr(10)}[STATUS: IDLE - READY TO COMMUNICATE]"
+        else:
+            base_prompt += f"## Active Peers{chr(10)}None{chr(10)}{chr(10)}"
+
+        # Peer sending instruction block - only included if no responses are pending
+        if peers and not self._pending_peer_responses:
+            base_prompt += f"[walbert_peer_communication_instructions_start]{chr(10)}Available Peers: {', '.join(peers)}. You may send messages to any of these peers.{chr(10)}Message format should use the 'peer_IP_message_send' block. Ensure your message is exactly 256 words in plain english.{chr(10)}CRITICAL: DO NOT SEND a message if self._pending_peer_responses is not empty.{chr(10)}[walbert_peer_communication_instructions_end]{chr(10)}{chr(10)}"
+        elif peers and self._pending_peer_responses:
+            base_prompt += f"[walbert_peer_communication_instructions_start]{chr(10)}Available Peers: {', '.join(peers)}. WARNING: You are currently waiting for responses from the following peers: {', '.join(self._pending_peer_responses)}. Do not send new messages.{chr(10)}[walbert_peer_communication_instructions_end]{chr(10)}{chr(10)}"
 
         if self._recent_blocks:
             base_prompt += f"## Recent Execution Blocks and Results{chr(10)}"
