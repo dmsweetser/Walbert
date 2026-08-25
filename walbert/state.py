@@ -286,7 +286,7 @@ Reply ONLY in block format. NO EXTRA TEXT.
             base_prompt += f"## Pending Peer Responses: None{chr(10)}{chr(10)}"
         if peers:
             for peer_ip in peers:
-                base_prompt += f"[walbert_peer_{peer_ip}_message_send_start]{chr(10)}Message content to send to peer {peer_ip} (EXACTLY 256 words in plain english).{chr(10)}This should be in plain english.{chr(10)}USE THIS TO INTERACT WITH YOUR PEER(S) - DO NOT TRY TO USE PYTHON INSTEAD{chr(10)}[walbert_peer_{peer_ip}_message_send_end]{chr(10)}{chr(10)}"
+                base_prompt += f"[walbert_peer_{peer_ip}_message_send_start]{chr(10)}Message content to send to peer {peer_ip} (EXACTLY 256 words in plain english).{chr(10)}This should be in plain english.{chr(10)}!!! CRITICAL INSTRUCTION: ONLY send this message if self._pending_peer_responses is empty. If a response is pending, DO NOT send.!!!{chr(10)}USE THIS TO INTERACT WITH YOUR PEER(S) - DO NOT TRY TO USE PYTHON INSTEAD{chr(10)}[walbert_peer_{peer_ip}_message_send_end]{chr(10)}{chr(10)}"
 
         if self._recent_blocks:
             base_prompt += f"## Recent Execution Blocks and Results{chr(10)}"

@@ -218,36 +218,44 @@ class AudioIOThread(threading.Thread):
 
         def capture_loop():
             source = self._bt_source if self._bt_source and self._bt_source != "null" else None
+            
             if source:
                 logger.info(f"Starting STT capture from: {source}")
             else:
                 logger.info("Starting STT capture from default microphone")
-            try:
-                if source:
-                    self._capture_proc = subprocess.Popen(
-                        ["pw-record", "--rate", "16000", "--channels", "1",
-                         "--target", source],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE
-                    )
-                else:
-                    # Fallback to default microphone
-                    self._capture_proc = subprocess.Popen(
-                        ["pw-record", "--rate", "16000", "--channels", "1"],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE
-                    )
 
+            try:
+                cmd = ["pw-record", "--rate", "16000", "--channels", "1"]
+                if source:
+                    cmd.extend(["--target", source])
+                
+                self._capture_proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                
+                # Wait for the process to start successfully
+                self._capture_proc.wait(timeout=5)
+                logger.info("Audio capture process started successfully.")
+
+            except FileNotFoundError:
+                logger.error("pw-record command not found. Check pipewire configuration.")
+                with self._record_lock:
+                    self._recording = False
+            except subprocess.TimeoutExpired:
+                logger.error("Failed to start audio capture process within timeout.")
+                with self._record_lock:
+                    self._recording = False
             except Exception as e:
-                logger.error(f"Audio capture failed: {e}")
+                logger.error(f"Audio capture failed unexpectedly: {e}")
                 with self._record_lock:
                     self._recording = False
             finally:
                 if self._capture_proc:
-                    try:
-                        self._capture_proc.terminate()
-                    except Exception as e:
-                        logger.warning(f"Error terminating capture process in finally: {e}")
+                    self._capture_proc.terminate()
+                    self._capture_proc.wait(timeout=1)
                     self._capture_proc = None
                 logger.info("Audio capture thread exiting.")
 
