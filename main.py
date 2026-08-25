@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Walbert - Local AI Agent
-Main entry point for the Walbert AI agent system
+Main entry point for the Walbert AI agent system (headless-aware)
 """
 
 import sys
@@ -9,28 +9,29 @@ import os
 import logging
 import json
 import threading
-import time
 import queue
 
-from pynput import keyboard
 from walbert.agent import WalbertAgent
 from walbert.config import Config
 from walbert.model_config import ModelConfig
 
+
+def is_display_available():
+    """Check if a display server is available (X11/Wayland)."""
+    display = os.environ.get('DISPLAY')
+    if display:
+        return True
+    try:
+        # Fallback: Check for X11/Wayland sockets
+        return os.path.exists('/tmp/.X11-unix') or os.path.exists('/run/user/1000/wayland-0')
+    except Exception:
+        return False
+
+
 def dummy_on_press(key):
-    """Dummy key press handler for when audio is disabled."""
+    """Dummy key press handler for when audio is disabled or no display is available."""
     pass
 
-# Initialize logging
-os.makedirs('instance', exist_ok=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('instance/walbert.log')
-    ]
-)
-logger = logging.getLogger('walbert')
 
 def load_config() -> Config:
     """Load system configuration"""
@@ -74,6 +75,7 @@ def load_config() -> Config:
         logger.error(f"Error loading config: {e}")
         sys.exit(1)
 
+
 def get_nonblocking_input(prompt: str = ">>>>> ") -> str:
     """
     Read input from stdin in a non-blocking way, echoing characters as they are typed.
@@ -100,6 +102,7 @@ def get_nonblocking_input(prompt: str = ">>>>> ") -> str:
             print(f"{chr(10)}Interrupting...")
             raise
     return ''.join(user_input)
+
 
 def print_welcome_message(agent):
     # Print welcome message and ASCII art
@@ -135,7 +138,8 @@ def print_welcome_message(agent):
     print("- Any other input will be treated as a request to Walbert")
     print(f"{chr(10)}Status: Python={'ON' if agent.config.python_execution_enabled else 'OFF'}, Bash={'ON' if agent.config.bash_execution_enabled else 'OFF'}, Peer={'ON' if agent.config.peer_communication_enabled else 'OFF'}, Audio_On={'ON' if agent.config.audio_enabled == True else 'OFF'}, Waiting_For_User={'YES' if agent.waiting_for_user else 'NO'}")
     print("")
-    
+
+
 def _paged_output(text):
     import readchar
     lines = text.split('\n')
@@ -165,8 +169,109 @@ def _paged_output(text):
             break
     print(f"{chr(10)}")
 
+
+def run_main_loop(agent, input_queue):
+    """Shared main loop logic for both headless and non-headless modes."""
+    try:
+        while True:
+            user_input = get_nonblocking_input()
+
+            if user_input.lower() in ['exit', 'quit']:
+                input_queue.put(("exit",))
+                break
+            elif user_input.lower() == 'help':
+                print_welcome_message(agent)
+            elif user_input.lower() == 'python on':
+                agent.config.python_execution_enabled = True
+                print(f"{chr(10)}Python execution enabled.")
+            elif user_input.lower() == 'python off':
+                agent.config.python_execution_enabled = False
+                print(f"{chr(10)}Python execution disabled.")
+            elif user_input.lower() == 'bash on':
+                agent.config.bash_execution_enabled = True
+                print(f"{chr(10)}Bash execution enabled.")
+            elif user_input.lower() == 'bash off':
+                agent.config.bash_execution_enabled = False
+                print(f"{chr(10)}Bash execution disabled.")
+            elif user_input.lower() == 'peer on':
+                agent.enable_peer_communication()
+            elif user_input.lower() == 'peer off':
+                agent.disable_peer_communication()
+            elif user_input.lower() in ['audio on']:
+                agent.enable_audio()
+            elif user_input.lower() in ['audio off']:
+                agent.disable_audio()
+            elif user_input.lower() == 'log on':
+                agent.print_raw = True
+                print(f"{chr(10)}Raw log output enabled. All block executions will be printed.")
+            elif user_input.lower() == 'log off':
+                agent.print_raw = False
+                print(f"{chr(10)}Raw log output disabled. Only console responses will be shown.")
+            elif user_input.lower() == 'show awareness':
+                if hasattr(agent, 'state') and agent.state:
+                    _paged_output(f"--- AWARENESS ---\n{agent.state.awareness_text}\n--- END ---")
+                else:
+                    print(f"{chr(10)}No awareness data available yet.")
+            elif user_input.lower() == 'show ultimate_task':
+                if hasattr(agent, 'state') and agent.state:
+                    _paged_output(f"--- ULTIMATE_TASK ---\n{agent.state._ultimate_task}\n--- END ---")
+                else:
+                    print(f"{chr(10)}No ultimate task data available yet.")
+            elif user_input.lower() == 'show immediate_task':
+                if hasattr(agent, 'state') and agent.state:
+                    _paged_output(f"--- IMMEDIATE_TASK ---\n{agent.state._immediate_task}\n--- END ---")
+                else:
+                    print(f"{chr(10)}No immediate task data available yet.")
+            elif user_input.lower() == 'show impediment':
+                if hasattr(agent, 'state') and agent.state:
+                    _paged_output(f"--- IMPEDIMENT ---\n{agent.state._impediment}\n--- END ---")
+                else:
+                    print(f"{chr(10)}No impediment data available yet.")
+            elif user_input.lower() == 'show user_directive':
+                if hasattr(agent, 'state') and agent.state:
+                    _paged_output(f"--- USER DIRECTIVE ---\n{agent.state._user_directive}\n--- END ---")
+                else:
+                    print(f"{chr(10)}No user directive data available yet.")
+            elif user_input.lower() == 'show schema':
+                if hasattr(agent, 'state') and agent.state:
+                    _paged_output(f"--- DB SCHEMA ---\n{agent.state.db_schema}\n--- END ---")
+                else:
+                    print(f"{chr(10)}No schema data available yet.")
+            elif user_input.lower().startswith('pip_install '):
+                package = user_input[12:].strip()
+                if package:
+                    agent._install_python_package(package)
+                    print(f"{chr(10)}Package installation command executed.")
+            elif user_input == "":
+                continue
+            else:
+                # Put user input into queue for agent
+                print(f"{chr(10)}Walbert has received your request.")
+                print("Press ENTER to interrupt Walbert at any time.")
+                input_queue.put(("user_input", user_input))
+    except KeyboardInterrupt:
+        print(f"{chr(10)}Goodbye!")
+        input_queue.put(("exit",))
+    except Exception as e:
+        logger.error(f"Error in main loop: {e}", exc_info=True)
+    finally:
+        agent.shutdown()
+
+
 def main():
     """Main entry point"""
+    # Initialize logging
+    os.makedirs('instance', exist_ok=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler('instance/walbert.log')
+        ]
+    )
+    global logger
+    logger = logging.getLogger('walbert')
+
     config = load_config()
     log_level = getattr(logging, config.log_level.upper(), logging.INFO)
     logger.setLevel(log_level)
@@ -178,8 +283,6 @@ def main():
     # Create agent
     agent = WalbertAgent(config, input_queue=input_queue)
 
-    # Audio thread will be initialized dynamically via runtime commands
-
     # Start agent in autonomous mode in separate thread
     agent_thread = threading.Thread(target=agent.run_autonomous, args=(input_queue, interrupt_event))
     agent_thread.daemon = True
@@ -187,92 +290,20 @@ def main():
 
     print_welcome_message(agent)
 
-    with keyboard.Listener(on_press=agent.audio_thread.on_press if agent.audio_thread else dummy_on_press) as listener:
+    # Only initialize keyboard listener if display is available
+    if is_display_available():
         try:
-            while True:
-                # Get user input in a non-blocking way
-                user_input = get_nonblocking_input()
-
-                if user_input.lower() in ['exit', 'quit']:
-                    input_queue.put(("exit",))
-                    break
-                elif user_input.lower() == 'help':
-                    print_welcome_message(agent)
-                elif user_input.lower() == 'python on':
-                    agent.config.python_execution_enabled = True
-                    print(f"{chr(10)}Python execution enabled.")
-                elif user_input.lower() == 'python off':
-                    agent.config.python_execution_enabled = False
-                    print(f"{chr(10)}Python execution disabled.")
-                elif user_input.lower() == 'bash on':
-                    agent.config.bash_execution_enabled = True
-                    print(f"{chr(10)}Bash execution enabled.")
-                elif user_input.lower() == 'bash off':
-                    agent.config.bash_execution_enabled = False
-                    print(f"{chr(10)}Bash execution disabled.")
-                elif user_input.lower() == 'peer on':
-                    agent.enable_peer_communication()
-                elif user_input.lower() == 'peer off':
-                    agent.disable_peer_communication()
-                elif user_input.lower() in ['audio on']:
-                    agent.enable_audio()
-                elif user_input.lower() in ['audio off']:
-                    agent.disable_audio()
-                elif user_input.lower() == 'log on':
-                    agent.print_raw = True
-                    print(f"{chr(10)}Raw log output enabled. All block executions will be printed.")
-                elif user_input.lower() == 'log off':
-                    agent.print_raw = False
-                    print(f"{chr(10)}Raw log output disabled. Only console responses will be shown.")
-                elif user_input.lower() == 'show awareness':
-                    if hasattr(agent, 'state') and agent.state:
-                        _paged_output(f"--- AWARENESS ---\n{agent.state.awareness_text}\n--- END ---")
-                    else:
-                        print(f"{chr(10)}No awareness data available yet.")
-                elif user_input.lower() == 'show ultimate_task':
-                    if hasattr(agent, 'state') and agent.state:
-                        _paged_output(f"--- ULTIMATE_TASK ---\n{agent.state._ultimate_task}\n--- END ---")
-                    else:
-                        print(f"{chr(10)}No ultimate task data available yet.")
-                elif user_input.lower() == 'show immediate_task':
-                    if hasattr(agent, 'state') and agent.state:
-                        _paged_output(f"--- IMMEDIATE_TASK ---\n{agent.state._immediate_task}\n--- END ---")
-                    else:
-                        print(f"{chr(10)}No immediate task data available yet.")
-                elif user_input.lower() == 'show impediment':
-                    if hasattr(agent, 'state') and agent.state:
-                        _paged_output(f"--- IMPEDIMENT ---\n{agent.state._impediment}\n--- END ---")
-                    else:
-                        print(f"{chr(10)}No impediment data available yet.")
-                elif user_input.lower() == 'show user_directive':
-                    if hasattr(agent, 'state') and agent.state:
-                        _paged_output(f"--- USER DIRECTIVE ---\n{agent.state._user_directive}\n--- END ---")
-                    else:
-                        print(f"{chr(10)}No user directive data available yet.")
-                elif user_input.lower() == 'show schema':
-                    if hasattr(agent, 'state') and agent.state:
-                        _paged_output(f"--- DB SCHEMA ---\n{agent.state.db_schema}\n--- END ---")
-                    else:
-                        print(f"{chr(10)}No schema data available yet.")
-                elif user_input.lower().startswith('pip_install '):
-                    package = user_input[12:].strip()
-                    if package:
-                        agent._install_python_package(package)
-                        print(f"{chr(10)}Package installation command executed.")
-                elif user_input == "":
-                    continue
-                else:
-                    # Put user input into queue for agent
-                    print(f"{chr(10)}Walbert has received your request.")
-                    print("Press ENTER to interrupt Walbert at any time.")
-                    input_queue.put(("user_input", user_input))
-        except KeyboardInterrupt:
-            print(f"{chr(10)}Goodbye!")
-            input_queue.put(("exit",))
+            from pynput import keyboard
+            logger.info("Display detected. Starting keyboard listener.")
+            with keyboard.Listener(on_press=agent.audio_thread.on_press if agent.audio_thread else dummy_on_press) as listener:
+                run_main_loop(agent, input_queue)
         except Exception as e:
-            logger.error(f"Error in main loop: {e}", exc_info=True)
-        finally:
-            agent.shutdown()
+            logger.warning(f"Keyboard listener failed: {e}. Falling back to stdin only.")
+            run_main_loop(agent, input_queue)
+    else:
+        logger.info("No display detected. Running in headless mode (stdin only).")
+        run_main_loop(agent, input_queue)
+
 
 if __name__ == "__main__":
     main()
