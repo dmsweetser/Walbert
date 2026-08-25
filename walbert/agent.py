@@ -107,6 +107,7 @@ class WalbertAgent:
         self.comms = NetworkManager(config) if config.peer_communication_enabled else None
         self.audio_thread = None
         self._pending_peer_ip = None
+        self._pending_peer_responses = set()
         self._comms_started = False
         self._audio_started = False
 
@@ -170,6 +171,7 @@ class WalbertAgent:
         peers = None
         if self.comms is not None:
             peers = self.comms.get_peer_list()
+        self.state.set_pending_peer_responses(self._pending_peer_responses)
         prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size, user_input=user_input, peers=peers)
         prompt += f"{chr(10)}Please respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
 
@@ -215,9 +217,10 @@ class WalbertAgent:
         peers = None
         if self.comms is not None:
             peers = self.comms.get_peer_list()
+        self.state.set_pending_peer_responses(self._pending_peer_responses)
         prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size, user_input=None, peers=peers)
         prompt += (
-            f"{chr(10)}You are operating autonomously. Please review your Current Ultimate Task, Current Immediate Task, and Current Impediment blocks. Synthesize your progress, update these tracking blocks as needed, and maintain awareness of your database state. If no objectives have been provided, explore the world around you as safely as you can.\n"
+            f"{chr(10)}You are operating autonomously. Please review your current context. Synthesize your progress, update these tracking blocks as needed, and maintain awareness of your database state. If no objectives have been provided, explore the world around you as safely as you can.\n"
         )
 
         model_response = self.model_manager.execute_model(
@@ -289,8 +292,12 @@ class WalbertAgent:
                         self.state._save_peer_awareness()
                     elif btype == f"peer_{peer_ip}_message_send":
                         if self.config.peer_communication_enabled and self.comms is not None:
+                            if peer_ip in self._pending_peer_responses:
+                                self.logger.warning(f"Already waiting for response from {peer_ip}, skipping message")
+                                continue
+                            self._pending_peer_responses.add(peer_ip)
                             self.comms.send_to_peer(peer_ip, block["content"])
-                            self.logger.info(f"Sent peer message to {peer_ip}")
+                            self.logger.info(f"Sent peer message to {peer_ip}, waiting for response")
                         else:
                             self.logger.warning("Peer communication disabled or NetworkManager not initialized.")
                     elif btype == f"peer_{peer_ip}_message_received":
@@ -405,7 +412,10 @@ class WalbertAgent:
                         for msg in pending_msgs:
                             self.state.append_block("peer_message_received", json.dumps(msg))
                             self.logger.info(f"Processed peer message from {msg['peer_ip']}")
-                    
+                            # Clear pending response flag for this peer
+                            if msg['peer_ip'] in self._pending_peer_responses:
+                                self._pending_peer_responses.remove(msg['peer_ip'])
+
                     if not test_mode:
                         self._generate_autonomous_block(interrupt_event)
                         time.sleep(self.AUTONOMOUS_LOOP_DELAY)

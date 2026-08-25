@@ -128,7 +128,7 @@ class AudioIOThread(threading.Thread):
             self._stt_model = whisper.load_model("base")
             logger.info("Whisper STT model loaded (base)")
         except Exception as e:
-            logger.error(f"STT setup failed: {e}")
+            logger.error(f"STT setup failed: {e}. Audio recording will not work without STT model.")
             self._stt_model = None
 
     def _setup_tts(self):
@@ -143,7 +143,7 @@ class AudioIOThread(threading.Thread):
                 self._tts_engine.setProperty("voice", voice)
             logger.info("TTS engine initialized")
         except Exception as e:
-            logger.error(f"TTS setup failed: {e}")
+            logger.error(f"TTS setup failed: {e}. Text-to-speech will not work.")
             self._tts_engine = None
 
     # ----------------------------------------------------------------------
@@ -175,8 +175,19 @@ class AudioIOThread(threading.Thread):
             wf.close()
             wav_path = f.name
 
-        # Play through Bluetooth sink
-        subprocess.run(["pw-play", wav_path, "--target", self._bt_sink], check=False)
+        # Play through Bluetooth sink or fallback
+        if self._bt_sink and self._bt_sink != "null":
+            subprocess.run(["pw-play", wav_path, "--target", self._bt_sink], check=False)
+        else:
+            # Fallback to default audio output
+            for player in ["aplay", "paplay", "pw-play"]:
+                try:
+                    subprocess.run([player, wav_path], check=True)
+                    break
+                except Exception:
+                    continue
+            else:
+                logger.warning("No working audio player found for beep")
 
         os.unlink(wav_path)
 
@@ -206,30 +217,37 @@ class AudioIOThread(threading.Thread):
             return
 
         def capture_loop():
-            logger.info(f"Starting STT capture from: {self._bt_source}")
+            source = self._bt_source if self._bt_source and self._bt_source != "null" else None
+            if source:
+                logger.info(f"Starting STT capture from: {source}")
+            else:
+                logger.info("Starting STT capture from default microphone")
             try:
-                self._capture_proc = subprocess.Popen(
-                    ["pw-record", "--rate", "16000", "--channels", "1",
-                     "--target", self._bt_source],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
-
-                while self._running and self._recording:
-                    chunk = self._capture_proc.stdout.read(3200)
-                    if not chunk:
-                        break
-                    with self._record_lock:
-                        self._record_buffer.append(chunk)
+                if source:
+                    self._capture_proc = subprocess.Popen(
+                        ["pw-record", "--rate", "16000", "--channels", "1",
+                         "--target", source],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
+                else:
+                    # Fallback to default microphone
+                    self._capture_proc = subprocess.Popen(
+                        ["pw-record", "--rate", "16000", "--channels", "1"],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
 
             except Exception as e:
                 logger.error(f"Audio capture failed: {e}")
+                with self._record_lock:
+                    self._recording = False
             finally:
                 if self._capture_proc:
                     try:
                         self._capture_proc.terminate()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"Error terminating capture process in finally: {e}")
                     self._capture_proc = None
                 logger.info("Audio capture thread exiting.")
 
@@ -245,8 +263,8 @@ class AudioIOThread(threading.Thread):
         if self._capture_proc:
             try:
                 self._capture_proc.terminate()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Error terminating capture process: {e}")
             self._capture_proc = None
 
         if self._capture_thread and self._capture_thread.is_alive():
@@ -259,6 +277,7 @@ class AudioIOThread(threading.Thread):
 
     def _process_recording_buffer(self):
         if not self._stt_model:
+            logger.warning("STT model not loaded, cannot process recording")
             self._record_buffer.clear()
             return
 
@@ -289,6 +308,8 @@ class AudioIOThread(threading.Thread):
 
     def handle_console_response(self, text: str):
         if not self._tts_engine or not self._running:
+            if not self._tts_engine:
+                logger.warning("TTS engine not loaded, cannot speak response")
             return
         try:
             self._tts_engine.say(text)

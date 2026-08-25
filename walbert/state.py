@@ -31,6 +31,7 @@ class AgentState:
         self._user_awareness: str = "No user directive detected."
         self._peer_awareness: Dict[str, str] = {}
         self._recent_blocks: List[Dict[str, str]] = []
+        self._pending_peer_responses: set = set()
 
         # Load all components
         self._load_all()
@@ -93,12 +94,6 @@ Bot response (BLOCKING). Waits for user input or timeout.
 [walbert_console_response_nonblocking_start]
 Bot response (NON-BLOCKING). Continues execution immediately.
 [walbert_console_response_nonblocking_end]
-
-[walbert_peer_<COMPLETE IP>_message_send_start]
-Message content to send to peer <IP> (EXACTLY 256 words in plain english).
-This should be in plain english.
-USE THIS TO INTERACT WITH YOUR PEER(S) - DO NOT TRY TO USE PYTHON INSTEAD
-[walbert_peer_<COMPLETE IP>_message_send_end]
 
 [walbert_sql_execute_start]
 A single SQL statement with no adornment or commentary.
@@ -285,6 +280,13 @@ Reply ONLY in block format. NO EXTRA TEXT.
             base_prompt += f"## Active Peers{chr(10)}{', '.join(peers)}{chr(10)}{chr(10)}"
         else:
             base_prompt += f"## Active Peers{chr(10)}None{chr(10)}{chr(10)}"
+        if self._pending_peer_responses:
+            base_prompt += f"## Pending Peer Responses: {', '.join(self._pending_peer_responses)}{chr(10)}{chr(10)}"
+        else:
+            base_prompt += f"## Pending Peer Responses: None{chr(10)}{chr(10)}"
+        if peers:
+            for peer_ip in peers:
+                base_prompt += f"[walbert_peer_{peer_ip}_message_send_start]{chr(10)}Message content to send to peer {peer_ip} (EXACTLY 256 words in plain english).{chr(10)}This should be in plain english.{chr(10)}USE THIS TO INTERACT WITH YOUR PEER(S) - DO NOT TRY TO USE PYTHON INSTEAD{chr(10)}[walbert_peer_{peer_ip}_message_send_end]{chr(10)}{chr(10)}"
 
         if self._recent_blocks:
             base_prompt += f"## Recent Execution Blocks and Results{chr(10)}"
@@ -302,6 +304,10 @@ Reply ONLY in block format. NO EXTRA TEXT.
     def append_block(self, block_type: str, content: str) -> None:
         """Append a block to recent execution history."""
         self._recent_blocks.append({"type": block_type, "content": content.strip()})
+
+    def set_pending_peer_responses(self, peers: set):
+        """Set the set of peers we are waiting for responses from."""
+        self._pending_peer_responses = peers
 
     def _sync_state(self):
         """Ensure in-memory state is synchronized and ready for prompt generation."""

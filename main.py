@@ -17,6 +17,10 @@ from walbert.agent import WalbertAgent
 from walbert.config import Config
 from walbert.model_config import ModelConfig
 
+def dummy_on_press(key):
+    """Dummy key press handler for when audio is disabled."""
+    pass
+
 # Initialize logging
 os.makedirs('instance', exist_ok=True)
 logging.basicConfig(
@@ -183,7 +187,7 @@ def main():
 
     print_welcome_message(agent)
 
-    with keyboard.Listener(on_press=agent.audio_thread.on_press) as listener:
+    with keyboard.Listener(on_press=agent.audio_thread.on_press if agent.audio_thread else dummy_on_press) as listener:
         try:
             while True:
                 # Get user input in a non-blocking way
