@@ -1,6 +1,5 @@
 import numpy as np
 import pyaudio
-from pynput import keyboard
 import threading
 import queue
 import time
@@ -8,6 +7,21 @@ import logging
 import subprocess
 import os
 import tempfile
+
+def is_display_available():
+    """Check if a display server is available (X11/Wayland)."""
+    display = os.environ.get('DISPLAY')
+    if display:
+        return True
+    try:
+        # Fallback: Check for X11/Wayland sockets
+        return os.path.exists('/tmp/.X11-unix') or os.path.exists('/run/user/1000/wayland-0')
+    except Exception:
+        return False
+
+if is_display_available():
+    from pynput import keyboard
+
 
 logger = logging.getLogger("walbert.audio_thread")
 
