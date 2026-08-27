@@ -1,5 +1,4 @@
 import numpy as np
-import pyaudio
 import threading
 import queue
 import time
@@ -7,26 +6,18 @@ import logging
 import subprocess
 import os
 import tempfile
-
-def is_display_available():
-    """Check if a display server is available (X11/Wayland)."""
-    display = os.environ.get('DISPLAY')
-    if display:
-        return True
-    try:
-        # Fallback: Check for X11/Wayland sockets
-        return os.path.exists('/tmp/.X11-unix') or os.path.exists('/run/user/1000/wayland-0')
-    except Exception:
-        return False
-
+import wave
+import fcntl
 
 logger = logging.getLogger("walbert.audio_thread")
 
 class AudioIOThread(threading.Thread):
     """
-    Drop-in replacement for AudioIOThread using play/pause key to toggle recording.
-    - Beeps once when recording starts
-    - Beeps twice when recording stops
+    Drop-in replacement for AudioIOThread using wake word "computer".
+    - Listens continuously
+    - One quiet beep when wake word is detected
+    - Two quiet beeps when silence is detected and utterance is complete
+    - Sends captured text to input_queue as ("user_input", text)
     """
 
     def __init__(self, input_queue: queue.Queue, config, on_console_response):
@@ -36,7 +27,6 @@ class AudioIOThread(threading.Thread):
         self.on_console_response = on_console_response
 
         self._running = False
-        self._recording = False
 
         self._bt_mac = getattr(config, "bluetooth_device", None)
         self._bt_sink = getattr(config, "bluetooth_sink", None)
@@ -46,11 +36,15 @@ class AudioIOThread(threading.Thread):
         self._tts_engine = None
 
         self._capture_proc = None
-        self._capture_thread = None
 
-        # Rolling buffers
+        # Rolling buffer for raw audio
         self._record_buffer = []
         self._record_lock = threading.Lock()
+
+        # Wake-word + speech state
+        self._state = "idle"
+        self._user_buffer = ""
+        self._silence_counter = 0
 
     # ----------------------------------------------------------------------
     # Thread lifecycle
@@ -65,17 +59,19 @@ class AudioIOThread(threading.Thread):
         self._setup_stt()
         self._setup_tts()
 
-        while self._running:
-            # Process STT recording buffer
-            with self._record_lock:
-                if self._recording and self._record_buffer:
-                    self._process_recording_buffer()
-            time.sleep(0.05)
+        self._capture_loop()
+
+        logger.info("Audio IO Thread exiting")
 
     def stop(self):
-        self._running = False
-        self.stop_recording()
         logger.info("Audio IO Thread stopping")
+        self._running = False
+        if self._capture_proc:
+            try:
+                self._capture_proc.terminate()
+            except Exception as e:
+                logger.warning(f"Error terminating capture process: {e}")
+            self._capture_proc = None
 
     # ----------------------------------------------------------------------
     # Setup
@@ -136,8 +132,8 @@ class AudioIOThread(threading.Thread):
             return
         try:
             import whisper
-            self._stt_model = whisper.load_model("base")
-            logger.info("Whisper STT model loaded (base)")
+            self._stt_model = whisper.load_model("tiny")
+            logger.info("Whisper STT model loaded (tiny)")
         except Exception as e:
             logger.error(f"STT setup failed: {e}. Audio recording will not work without STT model.")
             self._stt_model = None
@@ -161,23 +157,17 @@ class AudioIOThread(threading.Thread):
     # Beep helper
     # ----------------------------------------------------------------------
 
-    def _beep(self, times=1):
+    def _quiet_beep(self, times=1, freq=20, duration=0.15):
         for _ in range(times):
-            self.tone()
+            self._tone_quiet(freq=freq, duration=duration)
+            time.sleep(0.05)
 
-    def tone(self, freq=1000, duration=0.2):
-        import numpy as np
-        import tempfile
-        import subprocess
-        import os
-
+    def _tone_quiet(self, freq=20, duration=0.15):
         rate = 44100
         t = np.linspace(0, duration, int(rate * duration), False)
-        tone = np.sin(freq * t * 2 * np.pi).astype(np.float32)
+        tone = (0.1 * np.sin(freq * t * 2 * np.pi)).astype(np.float32)
 
-        # Write WAV file
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-            import wave
             wf = wave.open(f, 'wb')
             wf.setnchannels(1)
             wf.setsampwidth(4)
@@ -186,137 +176,145 @@ class AudioIOThread(threading.Thread):
             wf.close()
             wav_path = f.name
 
-        # Play through Bluetooth sink or fallback
         if self._bt_sink and self._bt_sink != "null":
             subprocess.run(["pw-play", wav_path, "--target", self._bt_sink], check=False)
         else:
-            # Fallback to default audio output
-            for player in ["aplay", "paplay", "pw-play"]:
-                try:
-                    subprocess.run([player, wav_path], check=True)
-                    break
-                except Exception:
-                    continue
-            else:
-                logger.warning("No working audio player found for beep")
+            subprocess.run(["pw-play", wav_path], check=False)
 
         os.unlink(wav_path)
 
-    def on_press(self, key):
-            try:
-                if is_display_available():
-                    from pynput import keyboard
-                    if key == keyboard.Key.media_play_pause:
-                        logger.info("Play/Pause key pressed!")
-                        if self._recording:
-                            self.stop_recording()
-                        else:
-                            self.start_recording()
-            except Exception as e:
-                logger.error(f"Error in keyboard listener: {e}")
-
     # ----------------------------------------------------------------------
-    # Recording (STT)
+    # Continuous capture + STT
     # ----------------------------------------------------------------------
 
-    def start_recording(self):
-        with self._record_lock:
-            self._recording = True
-            self._record_buffer.clear()
-        logger.info("Recording STARTED")
-        self._beep(1)  # Single beep
-
-        if self._capture_thread and self._capture_thread.is_alive():
-            return
-
-        def capture_loop():
-            source = self._bt_source if self._bt_source and self._bt_source != "null" else None
-            
-            if source:
-                logger.info(f"Starting STT capture from: {source}")
-            else:
-                logger.info("Starting STT capture from default microphone")
-
-            try:
-                cmd = ["pw-record", "--rate", "16000", "--channels", "1"]
-                if source:
-                    cmd.extend(["--target", source])
-                
-                self._capture_proc = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
-                
-                logger.info("Attempting to start audio capture process...")
-                # Small wait to ensure process starts
-                time.sleep(1)
-                
-                self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
-                self._capture_thread.start()
-
-            except FileNotFoundError:
-                logger.error("pw-record command not found. Check pipewire configuration.")
-                with self._record_lock:
-                    self._recording = False
-            except Exception as e:
-                logger.error(f"Error setting up audio capture: {e}")
-                with self._record_lock:
-                    self._recording = False
-
-        self._capture_thread = threading.Thread(target=capture_loop, daemon=True)
-        self._capture_thread.start()
-
-    def stop_recording(self):
-        with self._record_lock:
-            self._recording = False
-        logger.info("Recording STOPPED")
-        self._beep(5)
-
-        if self._capture_proc:
-            try:
-                self._capture_proc.terminate()
-            except Exception as e:
-                logger.warning(f"Error terminating capture process: {e}")
-            self._capture_proc = None
-
-        if self._capture_thread and self._capture_thread.is_alive():
-            self._capture_thread.join(timeout=1)
-        self._capture_thread = None
-
-    # ----------------------------------------------------------------------
-    # STT processing
-    # ----------------------------------------------------------------------
-
-    def _process_recording_buffer(self):
+    def _capture_loop(self):
         if not self._stt_model:
-            logger.warning("STT model not loaded, cannot process recording")
-            self._record_buffer.clear()
+            logger.warning("No STT model loaded; capture loop will not process audio.")
+        source = self._bt_source if self._bt_source and self._bt_source != "null" else None
+
+        if source:
+            logger.info(f"Starting continuous capture from: {source}")
+        else:
+            logger.info("Starting continuous capture from default microphone")
+
+        try:
+            cmd = ["pw-record", "--rate", "16000", "--channels", "1"]
+            if source:
+                cmd.extend(["--target", source])
+            cmd.extend(["-"])
+
+            self._capture_proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+
+            fd = self._capture_proc.stdout.fileno()
+            fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+            fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+            last_transcribe = time.time()
+
+            while self._running:
+                try:
+                    chunk = os.read(fd, 4096)
+                    if chunk:
+                        with self._record_lock:
+                            self._record_buffer.append(chunk)
+                except BlockingIOError:
+                    pass
+
+                if time.time() - last_transcribe > 2.0:
+                    last_transcribe = time.time()
+                    self._transcribe_chunk()
+
+                time.sleep(0.01)
+
+        except FileNotFoundError:
+            logger.error("pw-record command not found. Check PipeWire configuration.")
+        except Exception as e:
+            logger.error(f"Error in capture loop: {e}")
+        finally:
+            if self._capture_proc:
+                try:
+                    self._capture_proc.terminate()
+                except Exception:
+                    pass
+                self._capture_proc = None
+
+    def _transcribe_chunk(self):
+        if not self._stt_model:
             return
 
-        audio_data = b"".join(self._record_buffer)
-        if len(audio_data) < 16000:
+        with self._record_lock:
+            if not self._record_buffer:
+                return
+            audio_data = b"".join(self._record_buffer)
             self._record_buffer.clear()
+
+        if len(audio_data) < 16000:
             return
 
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_f:
-            tmp_f.write(audio_data)
+            with wave.open(tmp_f, 'wb') as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(16000)
+                wf.writeframes(audio_data)
             tmp_path = tmp_f.name
 
         try:
             result = self._stt_model.transcribe(tmp_path, fp16=False)
-            text = result.get("text", "").strip()
+            text = result.get("text", "").strip().lower()
+            logger.info(f"STT: {text}")
+            self._handle_transcript(text)
+        except Exception as e:
+            logger.error(f"STT error: {e}")
         finally:
             os.unlink(tmp_path)
 
-        if text:
-            logger.info(f"STT Output: {text}")
-            self.input_queue.put(("user_input", text))
+    # ----------------------------------------------------------------------
+    # Wake-word + silence handling
+    # ----------------------------------------------------------------------
 
-        self._record_buffer.clear()
+    def _handle_transcript(self, text: str):
+        # Wake word detection
+        if self._state == "idle":
+            if "computer" in text:
+                logger.info("Wake word detected — starting capture.")
+                self._quiet_beep(times=1)
+                self._state = "recording"
+                self._user_buffer = ""
+                self._silence_counter = 0
+            return
+
+        # Recording mode
+        if self._state == "recording":
+            if text:
+                self._user_buffer += " " + text
+                self._silence_counter = 0
+            else:
+                self._silence_counter += 1
+
+            # End-of-speech detection: ~3 empty chunks
+            if self._silence_counter >= 5:
+                logger.info("Silence detected — finishing capture.")
+                self._quiet_beep(times=2)
+                self._process_user_buffer()
+                self._state = "idle"
+
+    def _process_user_buffer(self):
+        cleaned = self._user_buffer.strip()
+        if not cleaned:
+            logger.info("No content captured.")
+            return
+
+        logger.info(f"Captured user content: {cleaned}")
+        # Send to main app via queue
+        self.input_queue.put(("user_input", cleaned))
 
     # ----------------------------------------------------------------------
-    # TTS
+    # TTS (still available for console responses)
     # ----------------------------------------------------------------------
 
     def handle_console_response(self, text: str):

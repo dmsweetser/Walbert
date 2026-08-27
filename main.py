@@ -16,18 +16,6 @@ from walbert.config import Config
 from walbert.model_config import ModelConfig
 
 
-def is_display_available():
-    """Check if a display server is available (X11/Wayland)."""
-    display = os.environ.get('DISPLAY')
-    if display:
-        return True
-    try:
-        # Fallback: Check for X11/Wayland sockets
-        return os.path.exists('/tmp/.X11-unix') or os.path.exists('/run/user/1000/wayland-0')
-    except Exception:
-        return False
-
-
 def dummy_on_press(key):
     """Dummy key press handler for when audio is disabled or no display is available."""
     pass
@@ -290,19 +278,7 @@ def main():
 
     print_welcome_message(agent)
 
-    # Only initialize keyboard listener if display is available
-    if is_display_available():
-        try:
-            from pynput import keyboard
-            logger.info("Display detected. Starting keyboard listener.")
-            with keyboard.Listener(on_press=agent.audio_thread.on_press if agent.audio_thread else dummy_on_press) as listener:
-                run_main_loop(agent, input_queue)
-        except Exception as e:
-            logger.warning(f"Keyboard listener failed: {e}. Falling back to stdin only.")
-            run_main_loop(agent, input_queue)
-    else:
-        logger.info("No display detected. Running in headless mode (stdin only).")
-        run_main_loop(agent, input_queue)
+    run_main_loop(agent, input_queue)
 
 
 if __name__ == "__main__":
