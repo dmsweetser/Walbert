@@ -265,6 +265,8 @@ class WalbertAgent:
             pending_blocks = []
             for b in provided_blocks:
                 btype = b["type"]
+                # Log emitted block
+                self._log_block_emitted(btype, block.get("content", ""))
                 if btype in executable_types:
                     pending_blocks.append(b)
                 elif peer_pattern.match(btype):
@@ -273,9 +275,6 @@ class WalbertAgent:
         for block in pending_blocks:
             self.logger.debug(f"Executing block: {block}")
             btype = block["type"]
-            
-            # Log emitted block
-            self._log_block_emitted(btype, block.get("content", ""))
             
             if btype == "self_awareness":
                 self.state._self_awareness = block["content"]
