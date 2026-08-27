@@ -131,8 +131,8 @@ class AudioIOThread(threading.Thread):
             return
         try:
             import whisper
-            self._stt_model = whisper.load_model("tiny")
-            logger.info("Whisper STT model loaded (tiny)")
+            self._stt_model = whisper.load_model("base")
+            logger.info("Whisper STT model loaded (base)")
         except Exception as e:
             logger.error(f"STT setup failed: {e}. Audio recording will not work without STT model.")
             self._stt_model = None
