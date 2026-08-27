@@ -13,6 +13,7 @@ sudo apt install -y portaudio19-dev
 sudo apt install -y libbluetooth-dev
 
 sudo apt install pulseaudio
+sudo apt install espeak-ng  # Debian/Ubuntu
 
 # PipeWire + Bluetooth
 sudo apt install -y pipewire-audio-client-libraries libspa-0.2-bluetooth
