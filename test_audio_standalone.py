@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Standalone Audio Test Script for Walbert
+Standalone Audio Test Script for Walbert (evdev version)
 Drop-in replacement for audio_thread.py to validate Bluetooth, STT, TTS, and PipeWire.
-Fixed: Non-blocking capture loop using select() to avoid hanging.
+Uses evdev instead of pynput so media keys still work in HFP mode.
 """
 
 import os
@@ -18,7 +18,7 @@ import threading
 import queue
 import fcntl
 import select
-from pynput import keyboard
+from evdev import InputDevice, categorize, ecodes
 
 # Configure logging
 logging.basicConfig(
@@ -35,16 +35,6 @@ def load_config():
         sys.exit(1)
     with open(config_path, 'r') as f:
         return json.load(f)
-
-
-def is_display_available():
-    display = os.environ.get('DISPLAY')
-    if display:
-        return True
-    try:
-        return os.path.exists('/tmp/.X11-unix') or os.path.exists('/run/user/1000/wayland-0')
-    except Exception:
-        return False
 
 
 def setup_bluetooth(bt_mac):
@@ -169,87 +159,91 @@ class AudioTestController:
         self._capture_thread = None
         self._record_buffer = []
         self._record_lock = threading.Lock()
-        self._listener = None
+        self._listener_thread = None
+        self._input_device = None
 
     @property
     def recording(self):
         return self._recording.is_set()
 
-    def on_press(self, key):
-        try:
-            print(key)
-            if is_display_available() and (key == keyboard.Key.media_play_pause or key.vk == 269025073):
-                logger.info("Play/Pause key pressed!")
-                if self.recording:
-                    self.stop_recording()
-                else:
-                    self.start_recording()
-        except Exception as e:
-            logger.error(f"Error in keyboard listener: {e}")
+    def _find_media_device(self):
+        """Find the /dev/input/event* device that reports KEY_PLAYPAUSE."""
+        for dev_path in os.listdir("/dev/input"):
+            if not dev_path.startswith("event"):
+                continue
+            full = f"/dev/input/{dev_path}"
+            try:
+                dev = InputDevice(full)
+                caps = dev.capabilities().get(ecodes.EV_KEY, [])
+                if ecodes.KEY_PLAYPAUSE in caps:
+                    logger.info(f"Found media key device: {full}")
+                    return dev
+            except Exception:
+                continue
+        logger.warning("No media key device found.")
+        return None
+
+    def _evdev_listener(self):
+        logger.info("evdev listener started. Press Play/Pause to toggle recording.")
+        for event in self._input_device.read_loop():
+            if event.type == ecodes.EV_KEY and event.value == 1:
+                print(event)
+                if event.code == ecodes.KEY_PLAYPAUSE:
+                    logger.info("Play/Pause key pressed!")
+                    if self.recording:
+                        self.stop_recording()
+                    else:
+                        self.start_recording()
 
     def start_listener(self):
-        self._listener = keyboard.Listener(on_press=self.on_press)
-        self._listener.start()
-        logger.info("Keyboard listener started. Press Play/Pause to toggle recording.")
+        self._input_device = self._find_media_device()
+        if not self._input_device:
+            logger.error("No input device for media keys. Listener not started.")
+            return
+        self._listener_thread = threading.Thread(target=self._evdev_listener, daemon=True)
+        self._listener_thread.start()
 
     def start_recording(self):
-        logger.info("start_recording() called. Current recording state: %s", self.recording)
+        logger.info("start_recording() called.")
         if self.recording:
-            logger.info("Already recording, returning.")
+            logger.info("Already recording.")
             return
-        logger.info("Setting _recording event...")
+
         self._recording.set()
-        logger.info("Clearing _stop_event...")
         self._stop_event.clear()
         logger.info("Recording STARTED")
-        # Play start beep in a non-blocking thread
-        logger.info("Playing start beep...")
+
         threading.Thread(target=lambda: tone(freq=1000, duration=0.2, bt_sink=self.bt_sink), daemon=True).start()
 
         if self._capture_thread and self._capture_thread.is_alive():
-            logger.info("Capture thread already alive, returning.")
             return
 
-        logger.info("Starting capture thread...")
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
-        logger.info("Capture thread started. Alive: %s", self._capture_thread.is_alive())
 
     def stop_recording(self):
-        logger.info("stop_recording() called. Current recording state: %s", self.recording)
+        logger.info("stop_recording() called.")
         if not self.recording:
-            logger.info("Not recording, returning.")
             return
-        logger.info("Clearing _recording event...")
+
         self._recording.clear()
-        logger.info("Setting _stop_event...")
         self._stop_event.set()
         logger.info("Recording STOPPED")
 
-        # Terminate pw-record immediately
         if self._capture_proc:
-            logger.info("Terminating capture process...")
             try:
                 self._capture_proc.terminate()
                 self._capture_proc.wait(timeout=1)
-                logger.info("Capture process terminated successfully.")
-            except Exception as e:
-                logger.warning(f"Error terminating capture process: {e}")
+            except Exception:
+                pass
             finally:
                 self._capture_proc = None
-        else:
-            logger.info("No capture process to terminate.")
 
-        # Play stop beeps in a non-blocking thread
-        logger.info("Playing stop beeps...")
         threading.Thread(target=lambda: [tone(freq=1000, duration=0.2, bt_sink=self.bt_sink) for _ in range(2)], daemon=True).start()
 
     def _capture_loop(self):
         source = self.bt_source if self.bt_source and self.bt_source != "null" else None
-        if source:
-            logger.info(f"Starting STT capture from: {source}")
-        else:
-            logger.info("Starting STT capture from default microphone")
+        logger.info(f"Starting STT capture from: {source or 'default microphone'}")
 
         try:
             cmd = ["pw-record", "--rate", "16000", "--channels", "1"]
@@ -263,29 +257,24 @@ class AudioTestController:
                 stderr=subprocess.PIPE
             )
 
-            # Set stdout to non-blocking
             fd = self._capture_proc.stdout.fileno()
             fl = fcntl.fcntl(fd, fcntl.F_GETFL)
             fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
 
-            logger.info("Audio capture process started.")
             while self._recording.is_set() and not self._stop_event.is_set():
                 try:
                     chunk = os.read(fd, 4096)
-                    if not chunk:  # Pipe closed
+                    if not chunk:
                         break
                     with self._record_lock:
                         self._record_buffer.append(chunk)
                 except BlockingIOError:
-                    time.sleep(0.01)  # Yield to check recording state
+                    time.sleep(0.01)
                     continue
 
-            # Process buffer if we have data and STT is enabled
             if self._record_buffer and self.stt_model:
                 self._process_recording_buffer()
 
-        except FileNotFoundError:
-            logger.error("pw-record command not found. Check PipeWire configuration.")
         except Exception as e:
             logger.error(f"Error in capture loop: {e}")
         finally:
@@ -295,18 +284,12 @@ class AudioTestController:
                 self._capture_proc = None
 
     def _process_recording_buffer(self):
-        if not self.stt_model:
-            logger.warning("STT model not loaded, cannot process recording")
-            with self._record_lock:
-                self._record_buffer.clear()
-            return
-
         with self._record_lock:
             audio_data = b"".join(self._record_buffer)
             self._record_buffer.clear()
 
         if len(audio_data) < 16000:
-            logger.warning("Audio data too short to process.")
+            logger.warning("Audio data too short.")
             return
 
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_f:
@@ -319,34 +302,22 @@ class AudioTestController:
             if text:
                 logger.info(f"STT Output: {text}")
                 if self.tts_engine:
-                    self._speak_text(text)
+                    self.tts_engine.say(text)
+                    self.tts_engine.runAndWait()
         except Exception as e:
-            logger.error(f"STT processing error: {e}")
+            logger.error(f"STT error: {e}")
         finally:
-            if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
-
-    def _speak_text(self, text):
-        if not self.tts_engine:
-            logger.warning("TTS engine not loaded, cannot speak response")
-            return
-        try:
-            self.tts_engine.say(text)
-            self.tts_engine.runAndWait()
-            logger.debug("TTS output played")
-        except Exception as e:
-            logger.error(f"TTS playback failed: {e}")
+            os.unlink(tmp_path)
 
     def stop(self):
         self._recording.clear()
         self._stop_event.set()
-        if self._listener:
-            self._listener.stop()
         if self._capture_proc:
             self._capture_proc.terminate()
             self._capture_proc.wait(timeout=1)
         if self._capture_thread and self._capture_thread.is_alive():
             self._capture_thread.join(timeout=1)
+
 
 def main():
     config = load_config()
@@ -357,7 +328,7 @@ def main():
     tts_enabled = config.get("tts_enabled", False)
     tts_voice = config.get("tts_voice", "default")
 
-    print("=== Walbert Audio Test Standalone Script ===")
+    print("=== Walbert Audio Test Standalone Script (evdev) ===")
     print(f"BT MAC: {bt_mac}")
     print(f"BT Sink: {bt_sink}")
     print(f"BT Source: {bt_source}")
@@ -381,7 +352,7 @@ def main():
     print("\n[5] Setting up TTS...")
     tts_engine = setup_tts(tts_enabled, tts_voice)
 
-    print("\n[6] Starting Audio Capture (Press Play/Pause to toggle recording)...")
+    print("\n[6] Starting Audio Capture (Press Play/Pause)...")
     controller = AudioTestController(
         bt_sink=sink,
         bt_source=source,
@@ -397,6 +368,7 @@ def main():
         print("\nStopping...")
         controller.stop()
         logger.info("Test complete. Exiting.")
+
 
 if __name__ == "__main__":
     main()
