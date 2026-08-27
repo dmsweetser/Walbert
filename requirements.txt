@@ -3,7 +3,5 @@ requests
 numpy
 readchar
 pyaudio
-evdev
 openai-whisper
-pynput
-TTS
+pyttsx3

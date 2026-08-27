@@ -8,19 +8,16 @@ import os
 import tempfile
 import wave
 import fcntl
-from TTS.api import TTS  # Coqui TTS
 
 logger = logging.getLogger("walbert.audio_thread")
-logger.setLevel("WARN")
 
 class AudioIOThread(threading.Thread):
     """
-    Drop-in replacement for AudioIOThread using Coqui TTS.
+    Drop-in replacement for AudioIOThread using wake word "hey".
     - Listens continuously
     - One quiet beep when wake word is detected
     - Two quiet beeps when silence is detected and utterance is complete
     - Sends captured text to input_queue as ("user_input", text)
-    - Uses Coqui TTS for high-quality offline speech synthesis
     """
 
     def __init__(self, input_queue: queue.Queue, config):
@@ -35,7 +32,7 @@ class AudioIOThread(threading.Thread):
         self._bt_source = getattr(config, "bluetooth_source", None)
 
         self._stt_model = None
-        self._tts_engine = None  # Will hold Coqui TTS model
+        self._tts_engine = None
 
         self._capture_proc = None
 
@@ -59,7 +56,7 @@ class AudioIOThread(threading.Thread):
         self._setup_bluetooth()
         self._resolve_pipewire_bt_nodes()
         self._setup_stt()
-        self._setup_tts()  # Updated to use Coqui TTS
+        self._setup_tts()
 
         self._capture_loop()
 
@@ -145,11 +142,14 @@ class AudioIOThread(threading.Thread):
             logger.info("TTS disabled.")
             return
         try:
-            # Initialize Coqui TTS (offline, neural model)
-            self._tts_engine = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC")
-            logger.info("Coqui TTS initialized (model: tacotron2-DDC)")
+            import pyttsx3
+            self._tts_engine = pyttsx3.init()
+            voice = getattr(self.config, "tts_voice", "default")
+            if voice != "default":
+                self._tts_engine.setProperty("voice", voice)
+            logger.info("TTS engine initialized")
         except Exception as e:
-            logger.error(f"Coqui TTS setup failed: {e}. Falling back to no TTS.")
+            logger.error(f"TTS setup failed: {e}. Text-to-speech will not work.")
             self._tts_engine = None
 
     # ----------------------------------------------------------------------
@@ -314,27 +314,17 @@ class AudioIOThread(threading.Thread):
         self.input_queue.put(("user_input", cleaned))
 
     # ----------------------------------------------------------------------
-    # TTS (Coqui TTS)
+    # TTS (still available for console responses)
     # ----------------------------------------------------------------------
 
     def handle_console_response(self, text: str):
         if not self._tts_engine or not self._running:
-            logger.warning("TTS engine not loaded, cannot speak response")
+            if not self._tts_engine:
+                logger.warning("TTS engine not loaded, cannot speak response")
             return
         try:
-            # Generate TTS audio to a temp file
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-                tts_output = f.name
-            self._tts_engine.tts_to_file(text=text, file_path=tts_output)
-
-            # Play via pw-play (consistent with beeps)
-            if self._bt_sink and self._bt_sink != "null":
-                subprocess.run(["pw-play", tts_output, "--target", self._bt_sink], check=False)
-            else:
-                subprocess.run(["pw-play", tts_output], check=False)
-
-            # Clean up
-            os.unlink(tts_output)
-            logger.debug("TTS output played and cleaned up")
+            self._tts_engine.say(text)
+            self._tts_engine.runAndWait()
+            logger.debug("TTS output played")
         except Exception as e:
             logger.error(f"TTS playback failed: {e}")
