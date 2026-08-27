@@ -304,21 +304,22 @@ class AudioIOThread(threading.Thread):
             return
         try:
             # Build espeak-ng command
-            cmd = ["espeak-ng", "-v", "en-us", "-p", "40", "-s", "160", text]
+            espeak_cmd = ["espeak-ng", "-v", "en-us", "-p", "40", "-s", "160", text]
+            pw_play_cmd = ["pw-play", "-"]  # '-' tells pw-play to read from stdin
             if self._bt_sink and self._bt_sink != "null":
-                # Pipe espeak-ng output to pw-play for Bluetooth
-                subprocess.run(
-                    f"{' '.join(cmd)} | pw-play --target {self._bt_sink}",
-                    shell=True,
-                    check=True
-                )
-            else:
-                # Default output (PipeWire)
-                subprocess.run(
-                    f"{' '.join(cmd)} | pw-play",
-                    shell=True,
-                    check=True
-                )
+                pw_play_cmd.extend(["--target", self._bt_sink])
+
+            # Create a pipeline: espeak-ng -> pw-play
+            espeak_proc = subprocess.Popen(espeak_cmd, stdout=subprocess.PIPE)
+            pw_play_proc = subprocess.Popen(
+                pw_play_cmd,
+                stdin=espeak_proc.stdout,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            espeak_proc.stdout.close()  # Allow espeak_proc to receive SIGPIPE if pw_play_proc exits
+            pw_play_proc.communicate()  # Wait for both processes to finish
+
             logger.debug("TTS output played via espeak-ng + pw-play")
         except Exception as e:
             logger.error(f"TTS playback failed: {e}")
