@@ -282,7 +282,7 @@ class AudioIOThread(threading.Thread):
             # End-of-speech detection: ~2 empty chunks
             if self._silence_counter >= 2:
                 logger.info("Silence detected — finishing capture.")
-                self._quiet_beep(1, 250)
+                self._quiet_beep(2, 200)
                 self._process_user_buffer()
                 self._state = "idle"
 

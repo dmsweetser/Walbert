@@ -275,10 +275,10 @@ Reply ONLY in block format. NO EXTRA TEXT.
         # Filter peer awareness to only include currently active peers to avoid confusion
         active_peers_set = set(peers) if peers else set()
         filtered_peer_awareness = {ip: text for ip, text in self._peer_awareness.items() if ip in active_peers_set}
-        base_prompt += f"## Current Peer Awareness{chr(10)}{filtered_peer_awareness}{chr(10)}{chr(10)}"
         base_prompt += f"## Is Bash Execution Enabled? {self.config.bash_execution_enabled}{chr(10)}{chr(10)}"
         base_prompt += f"## Is Python Execution Enabled? {self.config.python_execution_enabled}{chr(10)}{chr(10)}"
         base_prompt += f"## Is Peer Communication Enabled? {self.config.peer_communication_enabled}{chr(10)}{chr(10)}"
+        base_prompt += f"## Current Peer Awareness{chr(10)}{filtered_peer_awareness}{chr(10)}{chr(10)}"
         if peers:
             base_prompt += f"## Active Peers{chr(10)}{', '.join(peers)}{chr(10)}{chr(10)}"
         else:
@@ -287,13 +287,7 @@ Reply ONLY in block format. NO EXTRA TEXT.
             base_prompt += f"## Pending Peer Responses: {', '.join(self._pending_peer_responses)}{chr(10)}{chr(10)}"
         else:
             base_prompt += f"## Pending Peer Responses: None{chr(10)}{chr(10)}"
-        # Only include peer messaging if there are peers AND no responses are pending
-        if peers and self._pending_peer_responses:
-            base_prompt += f"## Active Peers{chr(10)}{', '.join(peers)}{chr(10)}{chr(10)}[STATUS: WAITING FOR PEER RESPONSES]"
-        elif peers:
-            base_prompt += f"## Active Peers{chr(10)}{', '.join(peers)}{chr(10)}{chr(10)}[STATUS: IDLE - READY TO COMMUNICATE]"
-        else:
-            base_prompt += f"## Active Peers{chr(10)}None{chr(10)}{chr(10)}"
+        
 
         # Peer sending instruction block - only included if no responses are pending
         if peers and not self._pending_peer_responses:
