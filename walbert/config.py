@@ -20,6 +20,7 @@ class Config:
     server_startup_timeout: int = 60
     python_execution_timeout: int = 60
     bash_execution_timeout: int = 60
+    autonomous_mode_on: bool = True
     autonomous_operation_timeout: int = 120
     conversation_log_dir: str = "instance/conversations"
     temp_dir_prefix: str = "walbert_python_"

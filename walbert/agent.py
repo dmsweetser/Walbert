@@ -61,6 +61,7 @@ def load_config() -> Config:
                 udp_port=config_data.get('udp_port', 9999),
                 be_presbyterian=bool(config_data.get('be_presbyterian', True)),
                 peer_communication_enabled=bool(config_data.get('peer_communication_enabled', False)),
+                autonomous_mode_on=bool(config_data.get('autonomous_mode_on', True)),
                 python_execution_enabled=bool(config_data.get('python_execution_enabled', False)),
                 bash_execution_enabled=bool(config_data.get('bash_execution_enabled', False)),
                 audio_enabled=bool(config_data.get('audio_enabled', False)),
@@ -351,6 +352,8 @@ class WalbertAgent:
                 formatted_text = f"{chr(10)}".join(f"**** {line}" for line in text.split(f"{chr(10)}"))
                 print(formatted_text, end='', flush=True)
             else:
+                if hasattr(self, 'audio_thread') and self.audio_thread:
+                    self.audio_thread.handle_console_response(text)            
                 print(text, end='', flush=True)
 
     def run_autonomous(self, input_queue, interrupt_event=None, test_mode=False):
@@ -416,7 +419,7 @@ class WalbertAgent:
                             if msg['peer_ip'] in self._pending_peer_responses:
                                 self._pending_peer_responses.remove(msg['peer_ip'])
 
-                    if not test_mode:
+                    if not test_mode and self.config.autonomous_mode_on:
                         self._generate_autonomous_block(interrupt_event)
                         time.sleep(self.AUTONOMOUS_LOOP_DELAY)
                     else:
@@ -493,10 +496,7 @@ Error: {str(e)}
         if not self.input_queue:
             import queue
             self.input_queue = queue.Queue()
-        def on_response(text):
-            if hasattr(self, 'audio_thread') and self.audio_thread:
-                self.audio_thread.handle_console_response(text)
-        self.audio_thread = AudioIOThread(self.input_queue, self.config, on_response)
+        self.audio_thread = AudioIOThread(self.input_queue, self.config)
         self.audio_thread.start()
         self._audio_started = True
         self.logger.info("Audio I/O thread enabled")

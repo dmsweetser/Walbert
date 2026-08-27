@@ -13,18 +13,17 @@ logger = logging.getLogger("walbert.audio_thread")
 
 class AudioIOThread(threading.Thread):
     """
-    Drop-in replacement for AudioIOThread using wake word "computer".
+    Drop-in replacement for AudioIOThread using wake word "hey".
     - Listens continuously
     - One quiet beep when wake word is detected
     - Two quiet beeps when silence is detected and utterance is complete
     - Sends captured text to input_queue as ("user_input", text)
     """
 
-    def __init__(self, input_queue: queue.Queue, config, on_console_response):
+    def __init__(self, input_queue: queue.Queue, config):
         super().__init__(daemon=True)
         self.input_queue = input_queue
         self.config = config
-        self.on_console_response = on_console_response
 
         self._running = False
 
@@ -157,12 +156,12 @@ class AudioIOThread(threading.Thread):
     # Beep helper
     # ----------------------------------------------------------------------
 
-    def _quiet_beep(self, times=1, freq=20, duration=0.15):
+    def _quiet_beep(self, times=1, freq=100, duration=0.05):
         for _ in range(times):
             self._tone_quiet(freq=freq, duration=duration)
             time.sleep(0.05)
 
-    def _tone_quiet(self, freq=20, duration=0.15):
+    def _tone_quiet(self, freq=100, duration=0.05):
         rate = 44100
         t = np.linspace(0, duration, int(rate * duration), False)
         tone = (0.1 * np.sin(freq * t * 2 * np.pi)).astype(np.float32)
@@ -192,6 +191,7 @@ class AudioIOThread(threading.Thread):
             logger.warning("No STT model loaded; capture loop will not process audio.")
         source = self._bt_source if self._bt_source and self._bt_source != "null" else None
 
+        self._quiet_beep(1, 250)
         if source:
             logger.info(f"Starting continuous capture from: {source}")
         else:
@@ -280,7 +280,7 @@ class AudioIOThread(threading.Thread):
     def _handle_transcript(self, text: str):
         # Wake word detection
         if self._state == "idle":
-            if "computer" in text:
+            if "hey" in text:
                 logger.info("Wake word detected — starting capture.")
                 self._quiet_beep(times=1)
                 self._state = "recording"
@@ -297,7 +297,7 @@ class AudioIOThread(threading.Thread):
                 self._silence_counter += 1
 
             # End-of-speech detection: ~3 empty chunks
-            if self._silence_counter >= 5:
+            if self._silence_counter >= 3:
                 logger.info("Silence detected — finishing capture.")
                 self._quiet_beep(times=2)
                 self._process_user_buffer()

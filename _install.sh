@@ -212,6 +212,9 @@ fi
 
 if [[ "$bt_enabled" == "y" ]]; then bt_enabled=true; else bt_enabled=false; fi
 
+autonomous_mode_enabled=true
+if [[ bt_enabled=true ]]; then autonomous_mode_enabled=false; else autonomous_mode_enabled=true; fi
+
 cat > instance/config.json << EOF
 {
     "model_configs": {
@@ -232,6 +235,7 @@ cat > instance/config.json << EOF
     "server_health_check_timeout": 2,
     "server_startup_timeout": 60,
     "python_execution_timeout": 30,
+    "autonomous_mode_on":$autonomous_mode_enabled,
     "autonomous_operation_timeout": 120,
     "conversation_log_dir": "instance/conversations",
     "walbert_port": 8081,
