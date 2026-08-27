@@ -128,7 +128,7 @@ def setup_tts(tts_enabled, tts_voice):
         return None
 
 
-def tone(freq=1000, duration=0.2, bt_sink=None):
+def tone(freq=150, duration=0.2, bt_sink=None):
     rate = 44100
     t = np.linspace(0, duration, int(rate * duration), False)
     tone_signal = np.sin(freq * t * 2 * np.pi).astype(np.float32)
@@ -177,7 +177,8 @@ class AudioTestController:
 
     def on_press(self, key):
         try:
-            if is_display_available() and key == keyboard.Key.media_play_pause:
+            print(key)
+            if is_display_available() and (key == keyboard.Key.media_play_pause or key.vk == 269025073):
                 logger.info("Play/Pause key pressed!")
                 if self.recording:
                     self.stop_recording()
@@ -192,38 +193,55 @@ class AudioTestController:
         logger.info("Keyboard listener started. Press Play/Pause to toggle recording.")
 
     def start_recording(self):
+        logger.info("start_recording() called. Current recording state: %s", self.recording)
         if self.recording:
+            logger.info("Already recording, returning.")
             return
+        logger.info("Setting _recording event...")
         self._recording.set()
+        logger.info("Clearing _stop_event...")
         self._stop_event.clear()
         logger.info("Recording STARTED")
         # Play start beep in a non-blocking thread
+        logger.info("Playing start beep...")
         threading.Thread(target=lambda: tone(freq=1000, duration=0.2, bt_sink=self.bt_sink), daemon=True).start()
 
         if self._capture_thread and self._capture_thread.is_alive():
+            logger.info("Capture thread already alive, returning.")
             return
 
+        logger.info("Starting capture thread...")
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
+        logger.info("Capture thread started. Alive: %s", self._capture_thread.is_alive())
 
     def stop_recording(self):
+        logger.info("stop_recording() called. Current recording state: %s", self.recording)
         if not self.recording:
+            logger.info("Not recording, returning.")
             return
+        logger.info("Clearing _recording event...")
         self._recording.clear()
+        logger.info("Setting _stop_event...")
         self._stop_event.set()
         logger.info("Recording STOPPED")
 
         # Terminate pw-record immediately
         if self._capture_proc:
+            logger.info("Terminating capture process...")
             try:
                 self._capture_proc.terminate()
                 self._capture_proc.wait(timeout=1)
+                logger.info("Capture process terminated successfully.")
             except Exception as e:
                 logger.warning(f"Error terminating capture process: {e}")
             finally:
                 self._capture_proc = None
+        else:
+            logger.info("No capture process to terminate.")
 
         # Play stop beeps in a non-blocking thread
+        logger.info("Playing stop beeps...")
         threading.Thread(target=lambda: [tone(freq=1000, duration=0.2, bt_sink=self.bt_sink) for _ in range(2)], daemon=True).start()
 
     def _capture_loop(self):
@@ -331,7 +349,6 @@ class AudioTestController:
             self._capture_thread.join(timeout=1)
 
 def main():
-    # --- (Keep your existing main() setup code) ---
     config = load_config()
     bt_mac = config.get("bluetooth_device", "null")
     bt_sink = config.get("bluetooth_sink", "null")
