@@ -61,7 +61,6 @@ def load_config() -> Config:
                 udp_port=config_data.get('udp_port', 9999),
                 be_presbyterian=bool(config_data.get('be_presbyterian', True)),
                 peer_communication_enabled=bool(config_data.get('peer_communication_enabled', False)),
-                autonomous_mode_on=bool(config_data.get('autonomous_mode_on', True)),
                 python_execution_enabled=bool(config_data.get('python_execution_enabled', False)),
                 bash_execution_enabled=bool(config_data.get('bash_execution_enabled', False)),
                 audio_enabled=bool(config_data.get('audio_enabled', False)),
@@ -419,7 +418,7 @@ class WalbertAgent:
                             if msg['peer_ip'] in self._pending_peer_responses:
                                 self._pending_peer_responses.remove(msg['peer_ip'])
 
-                    if not test_mode and self.config.autonomous_mode_on:
+                    if not test_mode and last_user_input is not None:
                         self._generate_autonomous_block(interrupt_event)
                         time.sleep(self.AUTONOMOUS_LOOP_DELAY)
                     else:

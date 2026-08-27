@@ -46,7 +46,6 @@ def load_config() -> Config:
                 udp_port=config_data.get('udp_port', 9999),
                 be_presbyterian=bool(config_data.get('be_presbyterian', True)),
                 peer_communication_enabled=bool(config_data.get('peer_communication_enabled', False)),
-                autonomous_mode_on=bool(config_data.get('autonomous_mode_on', True)),
                 python_execution_enabled=bool(config_data.get('python_execution_enabled', False)),
                 bash_execution_enabled=bool(config_data.get('bash_execution_enabled', False)),
                 audio_enabled=bool(config_data.get('audio_enabled', False)),
@@ -113,7 +112,6 @@ def print_welcome_message(agent):
     print("Welcome to Walbert! The local-first AI agent.")
     print("Available commands:")
     print("- exit/quit: Exit the program")
-    print("- auto on/off: Operate autonomously when no user input is detected")
     print("- python on/off: Toggle Python execution")
     print("- bash on/off: Toggle Bash execution")
     print("- audio on/off: Toggle STT/TTS")
@@ -126,7 +124,7 @@ def print_welcome_message(agent):
     print("- pip_install <package>: Install a Python package in the main environment")
     print("- help: Show these options again")
     print("- Any other input will be treated as a request to Walbert")
-    print(f"{chr(10)}Status: Auto={'ON' if agent.config.autonomous_mode_on else 'OFF'}, Python={'ON' if agent.config.python_execution_enabled else 'OFF'}, Bash={'ON' if agent.config.bash_execution_enabled else 'OFF'}, Peer={'ON' if agent.config.peer_communication_enabled else 'OFF'}, Audio_On={'ON' if agent.config.audio_enabled == True else 'OFF'}, Waiting_For_User={'YES' if agent.waiting_for_user else 'NO'}")
+    print(f"{chr(10)}Status: Python={'ON' if agent.config.python_execution_enabled else 'OFF'}, Bash={'ON' if agent.config.bash_execution_enabled else 'OFF'}, Peer={'ON' if agent.config.peer_communication_enabled else 'OFF'}, Audio_On={'ON' if agent.config.audio_enabled == True else 'OFF'}, Waiting_For_User={'YES' if agent.waiting_for_user else 'NO'}")
     print("")
 
 
@@ -171,12 +169,6 @@ def run_main_loop(agent, input_queue):
                 break
             elif user_input.lower() == 'help':
                 print_welcome_message(agent)
-            elif user_input.lower() == 'auto on':
-                agent.config.autonomous_mode_on = True
-                print(f"{chr(10)}Autonomous mode enabled.")
-            elif user_input.lower() == 'auto off':
-                agent.config.autonomous_mode_on = False
-                print(f"{chr(10)}Autonomous mode disabled.")
             elif user_input.lower() == 'python on':
                 agent.config.python_execution_enabled = True
                 print(f"{chr(10)}Python execution enabled.")

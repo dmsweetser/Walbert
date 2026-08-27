@@ -143,11 +143,12 @@ class AudioIOThread(threading.Thread):
             return
         try:
             import pyttsx3
-            self._tts_engine = pyttsx3.init()
+            # Force PulseAudio driver to work with PipeWire
+            self._tts_engine = pyttsx3.init(driverName='pulse')
             voice = getattr(self.config, "tts_voice", "default")
             if voice != "default":
                 self._tts_engine.setProperty("voice", voice)
-            logger.info("TTS engine initialized")
+            logger.info("TTS engine initialized (using PulseAudio driver)")
         except Exception as e:
             logger.error(f"TTS setup failed: {e}. Text-to-speech will not work.")
             self._tts_engine = None
