@@ -266,7 +266,7 @@ class WalbertAgent:
             for b in provided_blocks:
                 btype = b["type"]
                 # Log emitted block
-                self._log_block_emitted(btype, block.get("content", ""))
+                self._log_block_emitted(btype, b.get("content", ""))
                 if btype in executable_types:
                     pending_blocks.append(b)
                 elif peer_pattern.match(btype):
