@@ -212,13 +212,13 @@ class WalbertAgent:
             
         return console_content
 
-    def _generate_autonomous_block(self, interrupt_event) -> str:
+    def _generate_autonomous_block(self, last_user_input, interrupt_event) -> str:
         """Generate an autonomous instruction block."""
         peers = None
         if self.comms is not None:
             peers = self.comms.get_peer_list()
         self.state.set_pending_peer_responses(self._pending_peer_responses)
-        prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size, user_input=None, peers=peers)
+        prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size, user_input=last_user_input, peers=peers)
         prompt += (
             f"{chr(10)}You are operating autonomously. Please review your current context. Synthesize your progress, update these tracking blocks as needed, and maintain awareness of your database state. If no objectives have been provided, explore the world around you as safely as you can.\n"
         )
@@ -418,7 +418,7 @@ class WalbertAgent:
                                 self._pending_peer_responses.remove(msg['peer_ip'])
 
                     if not test_mode and last_user_input is not None:
-                        self._generate_autonomous_block(interrupt_event)
+                        self._generate_autonomous_block(last_user_input, interrupt_event)
                         time.sleep(self.AUTONOMOUS_LOOP_DELAY)
                     else:
                         time.sleep(0.1)
