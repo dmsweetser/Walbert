@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-Walbert Continuous Audio Listener
-Listens constantly, transcribes constantly, and reacts to wake-words:
-    "walbert start" → begin buffering
-    "walbert stop"  → end buffering and process
+Walbert Continuous Wake-Word Listener
+Wake word: "computer"
+After wake word, listens until silence is detected, then processes the captured speech.
 """
 
 import os
@@ -116,7 +115,30 @@ def setup_tts(tts_enabled, tts_voice):
         return None
 
 
-class ContinuousAudioController:
+def quiet_beep(freq=1000, duration=0.15, bt_sink=None):
+    """Quiet beep at 10% volume."""
+    rate = 44100
+    t = np.linspace(0, duration, int(rate * duration), False)
+    tone_signal = (0.1 * np.sin(freq * t * 2 * np.pi)).astype(np.float32)
+
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+        wf = wave.open(f, 'wb')
+        wf.setnchannels(1)
+        wf.setsampwidth(4)
+        wf.setframerate(rate)
+        wf.writeframes(tone_signal.tobytes())
+        wf.close()
+        wav_path = f.name
+
+    if bt_sink and bt_sink != "null":
+        subprocess.run(["pw-play", wav_path, "--target", bt_sink], check=False)
+    else:
+        subprocess.run(["pw-play", wav_path], check=False)
+
+    os.unlink(wav_path)
+
+
+class WakeWordController:
     def __init__(self, bt_sink=None, bt_source=None, stt_model=None, tts_engine=None):
         self.bt_sink = bt_sink
         self.bt_source = bt_source
@@ -128,12 +150,13 @@ class ContinuousAudioController:
         self._record_buffer = []
         self._record_lock = threading.Lock()
 
-        # Wake-word state
+        # Wake-word + speech state
         self.state = "idle"
         self.user_buffer = ""
+        self.silence_counter = 0
 
     def start(self):
-        logger.info("Starting continuous audio capture...")
+        logger.info("Starting continuous wake-word listener...")
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
 
@@ -200,29 +223,40 @@ class ContinuousAudioController:
         try:
             result = self.stt_model.transcribe(tmp_path, fp16=False)
             text = result.get("text", "").strip().lower()
-            if text:
-                logger.info(f"STT: {text}")
-                self._handle_transcript(text)
+            logger.info(f"STT: {text}")
+            self._handle_transcript(text)
         except Exception as e:
             logger.error(f"STT error: {e}")
         finally:
             os.unlink(tmp_path)
 
     def _handle_transcript(self, text):
-        if "computer" in text:
-            logger.info("Wake-word START detected.")
-            self.state = "recording"
-            self.user_buffer = ""
+        # Wake word detection
+        if self.state == "idle":
+            if "computer" in text:
+                logger.info("Wake word detected — starting capture.")
+                quiet_beep(bt_sink=self.bt_sink)
+                self.state = "recording"
+                self.user_buffer = ""
+                self.silence_counter = 0
             return
 
-        if "proceed" in text:
-            logger.info("Wake-word STOP detected.")
-            self.state = "idle"
-            self._process_user_buffer()
-            return
-
+        # Recording mode
         if self.state == "recording":
-            self.user_buffer += " " + text
+            if text:
+                self.user_buffer += " " + text
+                self.silence_counter = 0
+            else:
+                self.silence_counter += 1
+
+            # End-of-speech detection
+            if self.silence_counter >= 3:
+                logger.info("Silence detected — finishing capture.")
+                quiet_beep(bt_sink=self.bt_sink)
+                time.sleep(0.1)
+                quiet_beep(bt_sink=self.bt_sink)
+                self._process_user_buffer()
+                self.state = "idle"
 
     def _process_user_buffer(self):
         cleaned = self.user_buffer.strip()
@@ -246,7 +280,7 @@ def main():
     tts_enabled = config.get("tts_enabled", False)
     tts_voice = config.get("tts_voice", "default")
 
-    print("=== Walbert Continuous Listener ===")
+    print("=== Walbert Wake-Word Listener ===")
     print(f"BT MAC: {bt_mac}")
     print(f"BT Sink: {bt_sink}")
     print(f"BT Source: {bt_source}")
@@ -260,7 +294,7 @@ def main():
     stt_model = setup_stt(stt_enabled)
     tts_engine = setup_tts(tts_enabled, tts_voice)
 
-    controller = ContinuousAudioController(
+    controller = WakeWordController(
         bt_sink=sink,
         bt_source=source,
         stt_model=stt_model,
