@@ -5,5 +5,5 @@ readchar
 pyaudio
 evdev
 openai-whisper
-pyttsx3
 pynput
+TTS
