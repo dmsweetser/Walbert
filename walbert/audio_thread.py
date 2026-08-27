@@ -13,11 +13,12 @@ logger = logging.getLogger("walbert.audio_thread")
 
 class AudioIOThread(threading.Thread):
     """
-    Drop-in replacement for AudioIOThread using wake word "hey".
+    Drop-in replacement for AudioIOThread using espeak-ng + pw-play for TTS.
     - Listens continuously
     - One quiet beep when wake word is detected
     - Two quiet beeps when silence is detected and utterance is complete
     - Sends captured text to input_queue as ("user_input", text)
+    - Uses espeak-ng + pw-play for TTS (PipeWire-compatible)
     """
 
     def __init__(self, input_queue: queue.Queue, config):
@@ -32,8 +33,6 @@ class AudioIOThread(threading.Thread):
         self._bt_source = getattr(config, "bluetooth_source", None)
 
         self._stt_model = None
-        self._tts_engine = None
-
         self._capture_proc = None
 
         # Rolling buffer for raw audio
@@ -56,7 +55,6 @@ class AudioIOThread(threading.Thread):
         self._setup_bluetooth()
         self._resolve_pipewire_bt_nodes()
         self._setup_stt()
-        self._setup_tts()
 
         self._capture_loop()
 
@@ -136,22 +134,6 @@ class AudioIOThread(threading.Thread):
         except Exception as e:
             logger.error(f"STT setup failed: {e}. Audio recording will not work without STT model.")
             self._stt_model = None
-
-    def _setup_tts(self):
-        if not getattr(self.config, "tts_enabled", False):
-            logger.info("TTS disabled.")
-            return
-        try:
-            import pyttsx3
-            # Force PulseAudio driver to work with PipeWire
-            self._tts_engine = pyttsx3.init(driverName='pulse')
-            voice = getattr(self.config, "tts_voice", "default")
-            if voice != "default":
-                self._tts_engine.setProperty("voice", voice)
-            logger.info("TTS engine initialized (using PulseAudio driver)")
-        except Exception as e:
-            logger.error(f"TTS setup failed: {e}. Text-to-speech will not work.")
-            self._tts_engine = None
 
     # ----------------------------------------------------------------------
     # Beep helper
@@ -297,10 +279,10 @@ class AudioIOThread(threading.Thread):
             else:
                 self._silence_counter += 1
 
-            # End-of-speech detection: ~3 empty chunks
-            if self._silence_counter >= 3:
+            # End-of-speech detection: ~2 empty chunks
+            if self._silence_counter >= 2:
                 logger.info("Silence detected — finishing capture.")
-                self._quiet_beep(times=2)
+                self._quiet_beep(1, 250)
                 self._process_user_buffer()
                 self._state = "idle"
 
@@ -311,21 +293,32 @@ class AudioIOThread(threading.Thread):
             return
 
         logger.info(f"Captured user content: {cleaned}")
-        # Send to main app via queue
         self.input_queue.put(("user_input", cleaned))
 
     # ----------------------------------------------------------------------
-    # TTS (still available for console responses)
+    # TTS (espeak-ng + pw-play)
     # ----------------------------------------------------------------------
 
     def handle_console_response(self, text: str):
-        if not self._tts_engine or not self._running:
-            if not self._tts_engine:
-                logger.warning("TTS engine not loaded, cannot speak response")
+        if not self._running:
             return
         try:
-            self._tts_engine.say(text)
-            self._tts_engine.runAndWait()
-            logger.debug("TTS output played")
+            # Build espeak-ng command
+            cmd = ["espeak-ng", "-v", "en-us", "-p", "40", "-s", "160", text]
+            if self._bt_sink and self._bt_sink != "null":
+                # Pipe espeak-ng output to pw-play for Bluetooth
+                subprocess.run(
+                    f"{' '.join(cmd)} | pw-play --target {self._bt_sink}",
+                    shell=True,
+                    check=True
+                )
+            else:
+                # Default output (PipeWire)
+                subprocess.run(
+                    f"{' '.join(cmd)} | pw-play",
+                    shell=True,
+                    check=True
+                )
+            logger.debug("TTS output played via espeak-ng + pw-play")
         except Exception as e:
             logger.error(f"TTS playback failed: {e}")
