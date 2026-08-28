@@ -8,18 +8,17 @@ import os
 import tempfile
 import wave
 import fcntl
-import pyttsx3
 
 logger = logging.getLogger("walbert.audio_thread")
 
 class AudioIOThread(threading.Thread):
     """
-    Drop-in replacement for AudioIOThread using espeak-ng + pw-play for TTS.
+    Drop-in replacement for AudioIOThread using Piper TTS + pw-play.
     - Listens continuously
     - One quiet beep when wake word is detected
     - Two quiet beeps when silence is detected and utterance is complete
     - Sends captured text to input_queue as ("user_input", text)
-    - Uses espeak-ng + pw-play for TTS (PipeWire-compatible)
+    - Uses Piper TTS + pw-play for speech output (PipeWire-compatible)
     """
 
     def __init__(self, input_queue: queue.Queue, config):
@@ -32,6 +31,7 @@ class AudioIOThread(threading.Thread):
         self._bt_mac = getattr(config, "bluetooth_device", None)
         self._bt_sink = getattr(config, "bluetooth_sink", None)
         self._bt_source = getattr(config, "bluetooth_source", None)
+        self._piper_model = getattr(config, "piper_model", "en_US-libritts-r-medium.onnx")
 
         self._stt_model = None
         self._capture_proc = None
@@ -297,20 +297,66 @@ class AudioIOThread(threading.Thread):
         self.input_queue.put(("user_input", cleaned))
 
     # ----------------------------------------------------------------------
-    # TTS (espeak-ng + pw-play)
+    # TTS (Piper + pw-play)
     # ----------------------------------------------------------------------
 
     def handle_console_response(self, text: str):
+        """
+        Speak text using Piper TTS, streaming output directly to pw-play.
+        No intermediate files needed.
+        """
         if not self._running:
             return
+
         try:
-            if not hasattr(self, 'tts_engine') or self.tts_engine is None:
-                self.tts_engine = pyttsx3.init()
-                self.tts_engine.setProperty('rate', 180)
-                self.tts_engine.setProperty('volume', 0.9)
-            
-            self.tts_engine.say(text)
-            self.tts_engine.runAndWait()
-            logger.debug("TTS output played via pyttsx3")
+            # Build Piper command
+            # --output_raw: Output raw 16-bit PCM to stdout (22050 Hz, mono)
+            piper_cmd = [
+                "piper",
+                "--model", self._piper_model,
+                "--output_raw"
+            ]
+
+            # Build pw-play command
+            play_cmd = [
+                "pw-play",
+                "--rate", "22050",
+                "--channels", "1",
+                "--format", "S16LE",
+                "--process", "true",  # Keep process alive for streaming
+                "-"
+            ]
+
+            if self._bt_sink and self._bt_sink != "null":
+                play_cmd.extend(["--target", self._bt_sink])
+
+            # Pipe Piper -> pw-play
+            piper_proc = subprocess.Popen(
+                piper_cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+
+            play_proc = subprocess.Popen(
+                play_cmd,
+                stdin=piper_proc.stdout,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+
+            # Close piper_proc's stdout in parent to allow play_proc to receive EOF
+            piper_proc.stdout.close()
+
+            # Write text to Piper
+            piper_proc.communicate(input=text.encode())
+
+            # Wait for both processes to finish
+            play_proc.communicate()
+
+            logger.debug("TTS output played via Piper + pw-play")
+
+        except FileNotFoundError as e:
+            logger.error(f"Piper or pw-play not found. Install with: pip install piper-tts (or use system package). Error: {e}")
         except Exception as e:
             logger.error(f"TTS playback failed: {e}")

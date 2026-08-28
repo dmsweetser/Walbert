@@ -4,4 +4,4 @@ numpy
 readchar
 pyaudio
 openai-whisper
-pyttsx3
+piper-tts
