@@ -8,6 +8,7 @@ import os
 import tempfile
 import wave
 import fcntl
+import pyttsx3
 
 logger = logging.getLogger("walbert.audio_thread")
 
@@ -303,23 +304,13 @@ class AudioIOThread(threading.Thread):
         if not self._running:
             return
         try:
-            # Build espeak-ng command
-            espeak_cmd = ["espeak-ng", "-v", "en-us", "-p", "40", "-s", "160", text]
-            pw_play_cmd = ["pw-play", "-"]  # '-' tells pw-play to read from stdin
-            if self._bt_sink and self._bt_sink != "null":
-                pw_play_cmd.extend(["--target", self._bt_sink])
-
-            # Create a pipeline: espeak-ng -> pw-play
-            espeak_proc = subprocess.Popen(espeak_cmd, stdout=subprocess.PIPE)
-            pw_play_proc = subprocess.Popen(
-                pw_play_cmd,
-                stdin=espeak_proc.stdout,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            espeak_proc.stdout.close()  # Allow espeak_proc to receive SIGPIPE if pw_play_proc exits
-            pw_play_proc.communicate()  # Wait for both processes to finish
-
-            logger.debug("TTS output played via espeak-ng + pw-play")
+            if not hasattr(self, 'tts_engine') or self.tts_engine is None:
+                self.tts_engine = pyttsx3.init()
+                self.tts_engine.setProperty('rate', 180)
+                self.tts_engine.setProperty('volume', 0.9)
+            
+            self.tts_engine.say(text)
+            self.tts_engine.runAndWait()
+            logger.debug("TTS output played via pyttsx3")
         except Exception as e:
             logger.error(f"TTS playback failed: {e}")

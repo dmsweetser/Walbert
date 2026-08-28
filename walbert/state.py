@@ -296,15 +296,14 @@ Reply ONLY in block format. NO EXTRA TEXT.
             base_prompt += f"[walbert_peer_communication_instructions_start]{chr(10)}Available Peers: {', '.join(peers)}. WARNING: You are currently waiting for responses from the following peers: {', '.join(self._pending_peer_responses)}. Do not send new messages.{chr(10)}[walbert_peer_communication_instructions_end]{chr(10)}{chr(10)}"
 
         if self._recent_blocks:
-            base_prompt += f"## Recent Execution Blocks and Results{chr(10)}"
+            base_prompt += f"## Last Execution Round{chr(10)}"
             base_prompt += f"{chr(10)}".join(
                 f"[walbert_{b['type']}_start]{chr(10)}{b['content']}{chr(10)}[walbert_{b['type']}_end]{chr(10)}{chr(10)}" for b in self._recent_blocks
             )
 
         if user_input:
             base_prompt += f"## Latest User Input{chr(10)}{user_input}{chr(10)}{chr(10)}"
-        else:
-            self._recent_blocks = []
+        # Retain blocks for next round context instead of clearing them
 
         return base_prompt
 
