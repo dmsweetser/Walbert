@@ -1,5 +1,4 @@
 import sys
-
 import numpy as np
 import threading
 import queue
@@ -33,7 +32,11 @@ class AudioIOThread(threading.Thread):
         self._bt_mac = getattr(config, "bluetooth_device", None)
         self._bt_sink = getattr(config, "bluetooth_sink", None)
         self._bt_source = getattr(config, "bluetooth_source", None)
-        self._piper_model = getattr(config, "piper_model", "instance/models/en_GB-northern_english_male-medium.onnx")
+        self._piper_model = getattr(
+            config,
+            "piper_model",
+            "instance/models/en_GB-northern_english_male-medium.onnx"
+        )
 
         self._stt_model = None
         self._capture_proc = None
@@ -89,8 +92,11 @@ class AudioIOThread(threading.Thread):
                 subprocess.run(["bluetoothctl", "connect", self._bt_mac], check=False)
                 time.sleep(1)
 
-            info = subprocess.run(["bluetoothctl", "info", self._bt_mac],
-                                  capture_output=True, text=True)
+            info = subprocess.run(
+                ["bluetoothctl", "info", self._bt_mac],
+                capture_output=True,
+                text=True
+            )
             logger.info(f"bluetoothctl info:\n{info.stdout}")
         except Exception as e:
             logger.error(f"Bluetooth setup failed: {e}")
@@ -299,41 +305,35 @@ class AudioIOThread(threading.Thread):
         self.input_queue.put(("user_input", "[TRANSCRIPTION] " + cleaned))
 
     # ----------------------------------------------------------------------
-    # TTS (Piper + pw-play)
+    # TTS (Piper + pw-play) — FILE-BASED VERSION
     # ----------------------------------------------------------------------
 
     def handle_console_response(self, text: str):
         """
-        Speak text using Piper TTS, streaming output directly to pw-play.
-        No intermediate files needed.
+        Speak text using Piper TTS, writing raw PCM to a temporary file,
+        then playing that file with pw-play. No stdout piping.
         """
         if not self._running:
             return
 
+        raw_path = None
+
         try:
-            # Build Piper command
-            # --output_raw: Output raw 16-bit PCM to stdout (22050 Hz, mono)
+            # Piper binary inside venv
             venv_bin = os.path.join(os.path.dirname(sys.executable), "piper")
+
+            # Temporary file for raw PCM output
+            with tempfile.NamedTemporaryFile(suffix=".raw", delete=False) as raw_f:
+                raw_path = raw_f.name
+
+            # 1. Run Piper → write raw PCM to file
             piper_cmd = [
                 venv_bin,
                 "-m", os.path.abspath(self._piper_model),
-                "--output_raw"
+                "--output_raw",
+                "--output", raw_path
             ]
 
-            # Build pw-play command
-            play_cmd = [
-                "pw-play",
-                "--rate", "22050",
-                "--channels", "1",
-                "--format", "S16LE",
-                "--process", "true",  # Keep process alive for streaming
-                "-"
-            ]
-
-            if self._bt_sink and self._bt_sink != "null":
-                play_cmd.extend(["--target", self._bt_sink])
-
-            # Pipe Piper -> pw-play
             piper_proc = subprocess.Popen(
                 piper_cmd,
                 stdin=subprocess.PIPE,
@@ -341,25 +341,46 @@ class AudioIOThread(threading.Thread):
                 stderr=subprocess.PIPE
             )
 
+            # Feed text to Piper
+            piper_proc.communicate(input=text.encode())
+
+            # 2. Play raw PCM file using pw-play
+            play_cmd = [
+                "pw-play",
+                "--rate", "22050",
+                "--channels", "1",
+                "--format", "S16LE",
+                "--process", "true",
+                raw_path
+            ]
+
+            # Add Bluetooth sink if available
+            if self._bt_sink and self._bt_sink != "null":
+                play_cmd.extend(["--target", self._bt_sink])
+
             play_proc = subprocess.Popen(
                 play_cmd,
-                stdin=piper_proc.stdout,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
 
-            # Close piper_proc's stdout in parent to allow play_proc to receive EOF
-            piper_proc.stdout.close()
-
-            # Write text to Piper
-            piper_proc.communicate(input=text.encode())
-
-            # Wait for both processes to finish
             play_proc.communicate()
 
-            logger.debug("TTS output played via Piper + pw-play")
+            logger.debug("TTS output played via Piper + pw-play (file-based)")
 
         except FileNotFoundError as e:
-            logger.error(f"Piper or pw-play not found. Install with: pip install piper-tts (or use system package). Error: {e}")
+            logger.error(
+                f"Piper or pw-play not found. Install with: pip install piper-tts "
+                f"(or use system package). Error: {e}"
+            )
+
         except Exception as e:
             logger.error(f"TTS playback failed: {e}")
+
+        finally:
+            # Cleanup temp file
+            try:
+                if raw_path and os.path.exists(raw_path):
+                    os.unlink(raw_path)
+            except Exception as cleanup_err:
+                logger.warning(f"Failed to delete temp TTS file: {cleanup_err}")
