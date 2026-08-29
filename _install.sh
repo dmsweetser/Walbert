@@ -259,6 +259,10 @@ EOF
 echo "Created default config at instance/config.json"
 echo "Please edit this file with your specific paths and settings"
 
+echo "Downloading Piper model..."
+wget -O instance/models/en_GB-northern_english_male-medium.onnx \
+    https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/northern_english_male/medium/en_GB-northern_english_male-medium.onnx?download=true
+
 echo "Downloading llama.cpp binary..."
 if [ ! -f "instance/llama.cpp/bin/llama-server" ]; then
     wget -O llama.cpp.tar.gz \

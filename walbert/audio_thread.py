@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 import threading
 import queue
@@ -31,7 +33,7 @@ class AudioIOThread(threading.Thread):
         self._bt_mac = getattr(config, "bluetooth_device", None)
         self._bt_sink = getattr(config, "bluetooth_sink", None)
         self._bt_source = getattr(config, "bluetooth_source", None)
-        self._piper_model = getattr(config, "piper_model", "en_US-libritts-r-medium.onnx")
+        self._piper_model = getattr(config, "piper_model", "instance/models/en_GB-northern_english_male-medium.onnx")
 
         self._stt_model = None
         self._capture_proc = None
@@ -294,7 +296,7 @@ class AudioIOThread(threading.Thread):
             return
 
         logger.info(f"Captured user content: {cleaned}")
-        self.input_queue.put(("user_input", cleaned))
+        self.input_queue.put(("user_input", "[TRANSCRIPTION] " + cleaned))
 
     # ----------------------------------------------------------------------
     # TTS (Piper + pw-play)
@@ -311,9 +313,10 @@ class AudioIOThread(threading.Thread):
         try:
             # Build Piper command
             # --output_raw: Output raw 16-bit PCM to stdout (22050 Hz, mono)
+            venv_bin = os.path.join(os.path.dirname(sys.executable), "piper")
             piper_cmd = [
-                "piper",
-                "--model", self._piper_model,
+                venv_bin,
+                "-m", os.path.abspath(self._piper_model),
                 "--output_raw"
             ]
 
