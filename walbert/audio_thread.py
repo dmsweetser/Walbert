@@ -1,3 +1,4 @@
+import re
 import sys
 import numpy as np
 import threading
@@ -14,7 +15,7 @@ logger = logging.getLogger("walbert.audio_thread")
 
 class AudioIOThread(threading.Thread):
     """
-    Drop-in replacement for AudioIOThread using Piper TTS + pw-play.
+    Drop-in replacement for AudioIOThread using Piper TTS + pw-play and Faster-Whisper for STT.
     - Listens continuously
     - One quiet beep when wake word is detected
     - Two quiet beeps when silence is detected and utterance is complete
@@ -173,9 +174,17 @@ class AudioIOThread(threading.Thread):
             logger.info("STT disabled.")
             return
         try:
-            import whisper
-            self._stt_model = whisper.load_model("base")
-            logger.info("Whisper STT model loaded (base)")
+            from faster_whisper import WhisperModel
+            self._stt_model = WhisperModel(
+                "base",
+                device="cpu",
+                compute_type="int8",
+                download_root="instance/models"
+            )
+            logger.info("Faster-Whisper STT model loaded (base, int8)")
+        except ImportError:
+            logger.error("Faster-Whisper not installed. Install with: pip install faster-whisper")
+            self._stt_model = None
         except Exception as e:
             logger.error(f"STT setup failed: {e}. Audio recording will not work without STT model.")
             self._stt_model = None
@@ -292,8 +301,8 @@ class AudioIOThread(threading.Thread):
             tmp_path = tmp_f.name
 
         try:
-            result = self._stt_model.transcribe(tmp_path, fp16=False)
-            text = result.get("text", "").strip().lower()
+            segments, _ = self._stt_model.transcribe(tmp_path)
+            text = " ".join(segment.text for segment in segments).strip().lower()
             logger.info(f"STT: {text}")
             self._handle_transcript(text)
         except Exception as e:
@@ -305,7 +314,8 @@ class AudioIOThread(threading.Thread):
     # Wake-word + silence handling
     # ----------------------------------------------------------------------
 
-    def _handle_transcript(self, text: str):
+    def _handle_transcript(self, input_text: str):
+        text = re.sub(r'[^a-zA-Z ?]', '', input_text)
         # Wake word detection
         if self._state == "idle":
             if "hey" in text:
@@ -318,7 +328,7 @@ class AudioIOThread(threading.Thread):
 
         # Recording mode
         if self._state == "recording":
-            if text:
+            if len(text) > 0:
                 self._user_buffer += " " + text
                 self._silence_counter = 0
             else:
@@ -355,19 +365,17 @@ class AudioIOThread(threading.Thread):
         raw_path = None
 
         try:
-            # Piper command (should be in PATH)
+            # Temporary file for raw PCM output
+            with tempfile.NamedTemporaryFile(suffix=".raw", delete=False) as raw_f:
+                raw_path = raw_f.name
+
+            # 1. Run Piper → write raw PCM to file
             piper_cmd = [
                 "piper",
                 "-m", os.path.abspath(self._piper_model),
                 "--output_raw",
                 "--output", raw_path
             ]
-
-            # Temporary file for raw PCM output
-            with tempfile.NamedTemporaryFile(suffix=".raw", delete=False) as raw_f:
-                raw_path = raw_f.name
-
-            piper_cmd[-1] = raw_path  # Update the output path
 
             piper_proc = subprocess.Popen(
                 piper_cmd,

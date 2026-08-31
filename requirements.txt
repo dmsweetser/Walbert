@@ -3,5 +3,5 @@ requests
 numpy
 readchar
 pyaudio
-openai-whisper
+faster-whisper
 piper-tts
