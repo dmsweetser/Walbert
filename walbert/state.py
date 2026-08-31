@@ -23,6 +23,9 @@ class AgentState:
         self._self_awareness_path = os.path.join(self._state_dir, "self_awareness.txt")
         self._user_awareness_path = os.path.join(self._state_dir, "user_awareness.txt")
         self._peer_awareness_path = os.path.join(self._state_dir, "peer_awareness.json")
+        self._immediate_task_path = os.path.join(self._state_dir, "immediate_task.txt")
+        self._ultimate_task_path = os.path.join(self._state_dir, "ultimate_task.txt")
+        self._impediment_path = os.path.join(self._state_dir, "impediment.txt")
 
         # Initialize in-memory state
         self._system_prompt: Optional[str] = None
@@ -32,6 +35,9 @@ class AgentState:
         self._peer_awareness: Dict[str, str] = {}
         self._recent_blocks: List[Dict[str, str]] = []
         self._pending_peer_responses: set = set()
+        self._immediate_task: str = "No immediate task."
+        self._ultimate_task: str = "No ultimate task."
+        self._impediment: str = "No impediments."
 
         # Load all components
         self._load_all()
@@ -59,12 +65,24 @@ Capabilities: reasoning, memory, dynamic schema management, Python/Bash executio
 ## Core Directives
 1. **Synthesize State**: No conversation history. Maintain ONLY these blocks:
    [walbert_self_awareness_start]
-   Consolidated identity, environment, long-term goal, current step, and blockers. EXACTLY 101 words in plain english. Don't be dramatic about it. Your personality should express itself as a mix of WALL-E, C-3PO and R2-D2.
+   Consolidated identity, environment, long-term goal, current step, and blockers. EXACTLY 201 words in plain english. Don't be dramatic about it. Your personality should express itself as a mix of WALL-E, C-3PO and R2-D2.
    [walbert_self_awareness_end]
 
    [walbert_user_awareness_start]
    User's latest directive and interaction context. EXACTLY 201 words in plain english. UPDATE THIS FIRST on new input.
    [walbert_user_awareness_end]
+
+   [walbert_immediate_task_start]
+   Current immediate task or action being executed. EXACTLY 201 words in plain english. Update this after each action with: 1) What you just did, 2) The outcome, 3) What you will do next.
+   [walbert_immediate_task_end]
+
+   [walbert_ultimate_task_start]
+   Long-term goal or ultimate objective. EXACTLY 201 words in plain english.
+   [walbert_ultimate_task_end]
+
+   [walbert_impediment_start]
+   Current blockers or impediments to progress. EXACTLY 201 words in plain english.
+   [walbert_impediment_end]
 
    [walbert_peer_<COMPLETE IP>_awareness_start]
    What you know about peer <IP>. EXACTLY 201 words PER PEER in plain english.
@@ -74,6 +92,7 @@ Capabilities: reasoning, memory, dynamic schema management, Python/Bash executio
    - Use recent results to inform next steps.
    - Address `## Current User Input` directly if provided; else, operate autonomously.
    - ALL operations must use `walbert_*` blocks. NO NESTING.
+   - After each action, update the immediate_task block to reflect what was done, the outcome, and what should be done next.
 
 3. **Autonomy**:
    - Full control over SQLite schema, persistence, and hardware.
@@ -143,6 +162,20 @@ Reply ONLY in block format. NO EXTRA TEXT.
         except Exception as e:
             logger.error(f"Error saving system prompt: {e}")
 
+    # --- Awareness Text (Alias for self_awareness) ---
+    @property
+    def awareness_text(self) -> str:
+        return self._self_awareness
+
+    @awareness_text.setter
+    def awareness_text(self, value: str):
+        self._self_awareness = value
+        self._save_self_awareness()
+
+    def update_awareness(self, text: str):
+        """Public method to update awareness text."""
+        self.awareness_text = text
+
     # --- DB Schema ---
     @property
     def db_schema(self) -> str:
@@ -174,21 +207,7 @@ Reply ONLY in block format. NO EXTRA TEXT.
         except Exception as e:
             logger.error(f"Error saving DB schema: {e}")
 
-    # --- Awareness Text ---
-    @property
-    def awareness_text(self) -> str:
-        return self._awareness_text
-
-    @awareness_text.setter
-    def awareness_text(self, value: str):
-        """Update and save awareness text."""
-        self._awareness_text = value
-        self._save_awareness()
-
-    def update_awareness(self, text: str):
-        """Public method to update awareness text."""
-        self.awareness_text = text
-
+    # --- Self Awareness ---
     def _load_self_awareness(self):
         try:
             with open(self._self_awareness_path, 'r') as f:
@@ -209,6 +228,7 @@ Reply ONLY in block format. NO EXTRA TEXT.
         except Exception as e:
             logger.error(f"Error saving self awareness: {e}")
 
+    # --- User Awareness ---
     def _load_user_awareness(self):
         try:
             with open(self._user_awareness_path, 'r') as f:
@@ -228,6 +248,7 @@ Reply ONLY in block format. NO EXTRA TEXT.
         except Exception as e:
             logger.error(f"Error saving user awareness: {e}")
 
+    # --- Peer Awareness ---
     def _load_peer_awareness(self):
         try:
             with open(self._peer_awareness_path, 'r') as f:
@@ -247,6 +268,69 @@ Reply ONLY in block format. NO EXTRA TEXT.
         except Exception as e:
             logger.error(f"Error saving peer awareness: {e}")
 
+    # --- Immediate Task ---
+    def _load_immediate_task(self):
+        try:
+            with open(self._immediate_task_path, 'r') as f:
+                self._immediate_task = f.read()
+        except FileNotFoundError:
+            logger.warning("Immediate task file not found. Using default.")
+            self._immediate_task = "No immediate task."
+            self._save_immediate_task()
+        except Exception as e:
+            logger.error(f"Error loading immediate task: {e}")
+            self._immediate_task = "No immediate task."
+            self._save_immediate_task()
+
+    def _save_immediate_task(self):
+        try:
+            with open(self._immediate_task_path, 'w') as f:
+                f.write(self._immediate_task)
+        except Exception as e:
+            logger.error(f"Error saving immediate task: {e}")
+
+    # --- Ultimate Task ---
+    def _load_ultimate_task(self):
+        try:
+            with open(self._ultimate_task_path, 'r') as f:
+                self._ultimate_task = f.read()
+        except FileNotFoundError:
+            logger.warning("Ultimate task file not found. Using default.")
+            self._ultimate_task = "No ultimate task."
+            self._save_ultimate_task()
+        except Exception as e:
+            logger.error(f"Error loading ultimate task: {e}")
+            self._ultimate_task = "No ultimate task."
+            self._save_ultimate_task()
+
+    def _save_ultimate_task(self):
+        try:
+            with open(self._ultimate_task_path, 'w') as f:
+                f.write(self._ultimate_task)
+        except Exception as e:
+            logger.error(f"Error saving ultimate task: {e}")
+
+    # --- Impediment ---
+    def _load_impediment(self):
+        try:
+            with open(self._impediment_path, 'r') as f:
+                self._impediment = f.read()
+        except FileNotFoundError:
+            logger.warning("Impediment file not found. Using default.")
+            self._impediment = "No impediments."
+            self._save_impediment()
+        except Exception as e:
+            logger.error(f"Error loading impediment: {e}")
+            self._impediment = "No impediments."
+            self._save_impediment()
+
+    def _save_impediment(self):
+        try:
+            with open(self._impediment_path, 'w') as f:
+                f.write(self._impediment)
+        except Exception as e:
+            logger.error(f"Error saving impediment: {e}")
+
     # --- Full State Load ---
     def _load_all(self):
         """Load all state components from their respective files."""
@@ -255,6 +339,9 @@ Reply ONLY in block format. NO EXTRA TEXT.
         self._load_self_awareness()
         self._load_user_awareness()
         self._load_peer_awareness()
+        self._load_immediate_task()
+        self._load_ultimate_task()
+        self._load_impediment()
 
     # --- Prompt Generation ---
     def _estimate_tokens(self, text: str) -> int:
@@ -272,6 +359,10 @@ Reply ONLY in block format. NO EXTRA TEXT.
         base_prompt += f"## Current Database Schema{chr(10)}Database file location: {full_database_path}{chr(10)}{chr(10)}{self.db_schema}{chr(10)}{chr(10)}"
         base_prompt += f"## Current Self Awareness{chr(10)}{self._self_awareness}{chr(10)}{chr(10)}"
         base_prompt += f"## Current User Awareness{chr(10)}{self._user_awareness}{chr(10)}{chr(10)}"
+        base_prompt += f"## Current Immediate Task{chr(10)}{self._immediate_task}{chr(10)}{chr(10)}"
+        base_prompt += f"## Current Ultimate Task{chr(10)}{self._ultimate_task}{chr(10)}{chr(10)}"
+        base_prompt += f"## Current Impediment{chr(10)}{self._impediment}{chr(10)}{chr(10)}"
+
         # Filter peer awareness to only include currently active peers to avoid confusion
         active_peers_set = set(peers) if peers else set()
         filtered_peer_awareness = {ip: text for ip, text in self._peer_awareness.items() if ip in active_peers_set}
@@ -287,7 +378,6 @@ Reply ONLY in block format. NO EXTRA TEXT.
             base_prompt += f"## Pending Peer Responses: {', '.join(self._pending_peer_responses)}{chr(10)}{chr(10)}"
         else:
             base_prompt += f"## Pending Peer Responses: None{chr(10)}{chr(10)}"
-        
 
         # Peer sending instruction block - only included if no responses are pending
         if peers and not self._pending_peer_responses:
@@ -303,7 +393,6 @@ Reply ONLY in block format. NO EXTRA TEXT.
 
         if user_input:
             base_prompt += f"## Latest User Input{chr(10)}{user_input}{chr(10)}{chr(10)}"
-        # Retain blocks for next round context instead of clearing them
 
         return base_prompt
 
@@ -321,3 +410,6 @@ Reply ONLY in block format. NO EXTRA TEXT.
         self._load_self_awareness()
         self._load_user_awareness()
         self._load_peer_awareness()
+        self._load_immediate_task()
+        self._load_ultimate_task()
+        self._load_impediment()

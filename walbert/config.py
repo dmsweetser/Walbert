@@ -3,11 +3,10 @@ Configuration classes for Walbert
 """
 
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Optional
 
 from walbert.model_config import ModelConfig
 
-from typing import Dict, Optional
 @dataclass
 class Config:
     """System configuration"""
@@ -37,3 +36,4 @@ class Config:
     user_input_timeout: int = 60
     tts_voice: str = "default"
     database_path: str = "instance/walbert.db"
+    piper_model: str = "instance/models/en_GB-northern_english_male-medium.onnx"

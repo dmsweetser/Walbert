@@ -87,6 +87,16 @@ if [ ! -f "$MMPROJ_PATH" ]; then
       "$(grep -o 'https://.*\.gguf' <<< "$MMPROJ_PATH")"
 fi
 
+# Download Piper TTS model
+PIPER_MODEL="instance/models/en_GB-northern_english_male-medium.onnx"
+if [ ! -f "$PIPER_MODEL" ]; then
+    echo "Downloading Piper TTS model..."
+    wget -O "$PIPER_MODEL" \
+      "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/GB/northern_english/male/medium/en_GB-northern_english-male-medium.onnx"
+else
+    echo "$PIPER_MODEL already exists, skipping download."
+fi
+
 # Write config.json
 cat > instance/config.json << EOF
 {
@@ -102,12 +112,24 @@ cat > instance/config.json << EOF
         }
     },
     "mmproj_path": "$MMPROJ_PATH",
+    "piper_model": "$PIPER_MODEL",
     "audio_enabled": false,
-    "stt_enabled": $bt_enabled,
-    "tts_enabled": $bt_enabled,
-    "bluetooth_device": "$BT_DEVICE",
+    "stt_enabled": false,
+    "tts_enabled": false,
+    "bluetooth_device": "null",
     "bluetooth_sink": "null",
-    "bluetooth_source": "null"
+    "bluetooth_source": "null",
+    "log_level": "DEBUG",
+    "walbert_port": 8081,
+    "udp_port": 9999,
+    "be_presbyterian": true,
+    "peer_communication_enabled": false,
+    "python_execution_enabled": false,
+    "bash_execution_enabled": false,
+    "stt_timeout": 30,
+    "user_input_timeout": 60,
+    "tts_voice": "default",
+    "database_path": "instance/walbert.db"
 }
 EOF
 

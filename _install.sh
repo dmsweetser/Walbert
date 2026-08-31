@@ -1,5 +1,5 @@
 #!/bin/bash
-# Walbert Installation Script (PipeWire + Bluetooth + Whisper aware)
+# Walbert Installation Script (PipeWire + Bluetooth + Whisper + Piper TTS aware)
 
 set -e
 
@@ -153,6 +153,16 @@ else
     MIN_P=0.05
 fi
 
+# Download Piper TTS model
+PIPER_MODEL="instance/models/en_GB-northern_english_male-medium.onnx"
+if [ ! -f "$PIPER_MODEL" ]; then
+    echo "Downloading Piper TTS model..."
+    wget -O "$PIPER_MODEL" \
+      "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/GB/northern_english/male/medium/en_GB-northern_english-male-medium.onnx"
+else
+    echo "$PIPER_MODEL already exists, skipping download."
+fi
+
 echo "Configure Bluetooth Audio Device:"
 read -p "Enable Bluetooth audio routing? (y/n) [n]: " bt_choice
 bt_enabled=${bt_choice:-n}
@@ -230,6 +240,7 @@ cat > instance/config.json << EOF
     },
     "llama_binary_path": "instance/llama.cpp/bin/llama-completion",
     "mmproj_path": "$MMPROJ_PATH",
+    "piper_model": "$PIPER_MODEL",
     "log_level": "DEBUG",
     "server_port": 8080,
     "server_health_check_timeout": 2,
@@ -257,11 +268,7 @@ cat > instance/config.json << EOF
 EOF
 
 echo "Created default config at instance/config.json"
-echo "Please edit this file with your specific paths and settings"
-
-echo "Downloading Piper model..."
-wget -O instance/models/en_GB-northern_english_male-medium.onnx \
-    https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/northern_english_male/medium/en_GB-northern_english_male-medium.onnx?download=true
+echo "Please edit this file with your specific paths before running Walbert"
 
 echo "Downloading llama.cpp binary..."
 if [ ! -f "instance/llama.cpp/bin/llama-server" ]; then

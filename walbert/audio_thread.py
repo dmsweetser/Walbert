@@ -28,15 +28,12 @@ class AudioIOThread(threading.Thread):
         self.config = config
 
         self._running = False
+        self._tts_ready = False
 
         self._bt_mac = getattr(config, "bluetooth_device", None)
         self._bt_sink = getattr(config, "bluetooth_sink", None)
         self._bt_source = getattr(config, "bluetooth_source", None)
-        self._piper_model = getattr(
-            config,
-            "piper_model",
-            "instance/models/en_GB-northern_english_male-medium.onnx"
-        )
+        self._piper_model = getattr(config, "piper_model", "instance/models/en_GB-northern_english_male-medium.onnx")
 
         self._stt_model = None
         self._capture_proc = None
@@ -61,6 +58,7 @@ class AudioIOThread(threading.Thread):
         self._setup_bluetooth()
         self._resolve_pipewire_bt_nodes()
         self._setup_stt()
+        self._setup_tts()
 
         self._capture_loop()
 
@@ -79,6 +77,44 @@ class AudioIOThread(threading.Thread):
     # ----------------------------------------------------------------------
     # Setup
     # ----------------------------------------------------------------------
+
+    def _setup_tts(self):
+        """Setup TTS components and validate dependencies."""
+        if not getattr(self.config, "tts_enabled", False):
+            logger.info("TTS disabled.")
+            self._tts_ready = False
+            return
+
+        self._tts_ready = False
+
+        # Check if piper model exists
+        if not os.path.isfile(self._piper_model):
+            logger.error(f"Piper TTS model not found at {self._piper_model}. TTS will not work.")
+            return
+
+        # Check if piper command is available
+        try:
+            subprocess.run(["piper", "--help"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            logger.info("Piper TTS command found")
+        except FileNotFoundError:
+            logger.error("Piper TTS command not found. Install with: pip install piper-tts")
+            return
+        except Exception as e:
+            logger.error(f"Piper TTS check failed: {e}")
+            return
+
+        # Check if pw-play is available
+        try:
+            subprocess.run(["pw-play", "--help"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            logger.info("pw-play command found")
+        except FileNotFoundError:
+            logger.error("pw-play command not found. Install PipeWire audio.")
+            return
+        except Exception as e:
+            logger.error(f"pw-play check failed: {e}")
+            return
+
+        self._tts_ready = True
 
     def _setup_bluetooth(self):
         if not self._bt_mac or self._bt_mac == "null":
@@ -313,26 +349,25 @@ class AudioIOThread(threading.Thread):
         Speak text using Piper TTS, writing raw PCM to a temporary file,
         then playing that file with pw-play. No stdout piping.
         """
-        if not self._running:
+        if not self._running or not self._tts_ready:
             return
 
         raw_path = None
 
         try:
-            # Piper binary inside venv
-            venv_bin = os.path.join(os.path.dirname(sys.executable), "piper")
+            # Piper command (should be in PATH)
+            piper_cmd = [
+                "piper",
+                "-m", os.path.abspath(self._piper_model),
+                "--output_raw",
+                "--output", raw_path
+            ]
 
             # Temporary file for raw PCM output
             with tempfile.NamedTemporaryFile(suffix=".raw", delete=False) as raw_f:
                 raw_path = raw_f.name
 
-            # 1. Run Piper → write raw PCM to file
-            piper_cmd = [
-                venv_bin,
-                "-m", os.path.abspath(self._piper_model),
-                "--output_raw",
-                "--output", raw_path
-            ]
+            piper_cmd[-1] = raw_path  # Update the output path
 
             piper_proc = subprocess.Popen(
                 piper_cmd,

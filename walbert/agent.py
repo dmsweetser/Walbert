@@ -258,9 +258,9 @@ class WalbertAgent:
     def _execute_pending_blocks(self, provided_blocks):
         """Execute all pending blocks (SQL, Python, etc.) in order."""
         import re
-        executable_types = {"sql_execute", "python_execute", "bash_execute", "self_awareness", "user_awareness"}
+        executable_types = {"sql_execute", "python_execute", "bash_execute", "self_awareness", "user_awareness", "immediate_task", "ultimate_task", "impediment"}
         peer_pattern = re.compile(r'^peer_(\d+\.\d+\.\d+\.\d+)_')
-        
+
         with self._lock:
             pending_blocks = []
             for b in provided_blocks:
@@ -275,13 +275,22 @@ class WalbertAgent:
         for block in pending_blocks:
             self.logger.debug(f"Executing block: {block}")
             btype = block["type"]
-            
+
             if btype == "self_awareness":
                 self.state._self_awareness = block["content"]
                 self.state._save_self_awareness()
             elif btype == "user_awareness":
                 self.state._user_awareness = block["content"]
                 self.state._save_user_awareness()
+            elif btype == "immediate_task":
+                self.state._immediate_task = block["content"]
+                self.state._save_immediate_task()
+            elif btype == "ultimate_task":
+                self.state._ultimate_task = block["content"]
+                self.state._save_ultimate_task()
+            elif btype == "impediment":
+                self.state._impediment = block["content"]
+                self.state._save_impediment()
             elif peer_pattern.match(btype):
                 ip_match = peer_pattern.match(btype)
                 peer_ip = ip_match.group(1) if ip_match else None
@@ -308,9 +317,9 @@ class WalbertAgent:
                     self.state.append_block(block["type"], block["content"])
                     self.state.append_block("execution_result", result_block["content"])
                     self.write_output(json.dumps(result_block, indent=2), result_block["type"])
-                        
+
             block["executed"] = True
-        
+
         # Ensure state syncs immediately after execution so next prompt reflects changes
         self.state._sync_state()
 
