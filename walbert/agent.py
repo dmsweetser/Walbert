@@ -314,6 +314,7 @@ class WalbertAgent:
             elif btype in ("sql_execute", "python_execute", "bash_execute"):
                 result_block = self.executor.execute(block)
                 if result_block:
+                    self._log_block_emitted(result_block["type"], result_block["content"])
                     self.state.append_block(block["type"], block["content"])
                     self.state.append_block("execution_result", result_block["content"])
                     self.write_output(json.dumps(result_block, indent=2), result_block["type"])
