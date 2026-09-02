@@ -9,15 +9,15 @@ sudo apt install -y build-essential libssl-dev zlib1g-dev \
                  libbz2-dev libreadline-dev libsqlite3-dev \
                  libffi-dev liblzma-dev libudev-dev
 sudo apt install -y python3-dev
-sudo apt install -y portaudio19-dev
-sudo apt install -y libbluetooth-dev
 
-sudo apt install pulseaudio
-sudo apt install ffmpeg
+# You might need the items below for audio
 
-# PipeWire + Bluetooth
-sudo apt install -y pipewire-audio-client-libraries libspa-0.2-bluetooth
-systemctl --user restart pipewire pipewire-pulse || true
+# sudo apt install -y portaudio19-dev
+# sudo apt install -y libbluetooth-dev
+# sudo apt install pulseaudio
+# sudo apt install ffmpeg
+# sudo apt install -y pipewire-audio-client-libraries libspa-0.2-bluetooth
+# systemctl --user restart pipewire pipewire-pulse || true
 
 # Create directories
 mkdir -p instance
