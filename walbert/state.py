@@ -391,6 +391,9 @@ Reply ONLY in block format. NO EXTRA TEXT.
                 f"[walbert_{b['type']}_start]{chr(10)}{b['content']}{chr(10)}[walbert_{b['type']}_end]{chr(10)}{chr(10)}" for b in self._recent_blocks
             )
 
+        if user_input:
+            base_prompt += f"## Latest User Input{chr(10)}{user_input}{chr(10)}{chr(10)}"
+
         return base_prompt
 
     def append_block(self, block_type: str, content: str) -> None:
