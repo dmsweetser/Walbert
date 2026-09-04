@@ -7,7 +7,7 @@ export ALSA_CONFIG_PATH=/dev/null
 
 source venv/bin/activate
 if [ "$1" = "test" ]; then
-    sudo -E python3 -m unittest discover -v
+    python3 -m unittest discover -v
 else
-    sudo -E python3 main.py
+    python3 main.py
 fi
