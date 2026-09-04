@@ -4,13 +4,16 @@ Each state component is stored in a separate file and persisted on update.
 """
 import json
 import os
-import socket
-from sys import platform
 import time
 import logging
 from typing import List, Dict, Any, Optional
 
-import psutil
+import platform
+import socket
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 logger = logging.getLogger('walbert.state')
 
@@ -428,6 +431,9 @@ Reply ONLY in block format. NO EXTRA TEXT.
         """Fetch basic details about the current machine."""
         details = []
 
+        # Debug: Check if platform is the module
+        print(f"platform type: {type(platform)}")  # Should be <class 'module'>
+
         # OS and version
         os_name = platform.system()
         os_version = platform.version()
@@ -445,13 +451,14 @@ Reply ONLY in block format. NO EXTRA TEXT.
             details.append("IP Address: Not available")
 
         # CPU and RAM (if psutil is available)
-        try:
-            cpu_cores = psutil.cpu_count(logical=True)
-            total_ram = psutil.virtual_memory().total / (1024 ** 3)  # Convert to GB
-            details.append(f"CPU Cores: {cpu_cores}, RAM: {total_ram:.2f} GB")
-        except ImportError:
+        if psutil:
+            try:
+                cpu_cores = psutil.cpu_count(logical=True)
+                total_ram = psutil.virtual_memory().total / (1024 ** 3)  # Convert to GB
+                details.append(f"CPU Cores: {cpu_cores}, RAM: {total_ram:.2f} GB")
+            except Exception as e:
+                details.append(f"Hardware specs: Error fetching details ({e})")
+        else:
             details.append("Hardware specs: psutil not installed")
-        except Exception as e:
-            details.append(f"Hardware specs: Error fetching details ({e})")
 
         return "\n".join(details)
