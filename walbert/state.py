@@ -10,6 +10,8 @@ import time
 import logging
 from typing import List, Dict, Any, Optional
 
+import psutil
+
 logger = logging.getLogger('walbert.state')
 
 class AgentState:
