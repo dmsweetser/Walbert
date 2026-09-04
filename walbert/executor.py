@@ -81,16 +81,6 @@ class BlockExecutor:
             return {"type": "bash_result", "content": "Bash execution is disabled."}
 
         try:
-            # Handle sudo by reading password from stdin
-            if "sudo" in code:
-                import sys
-                try:
-                    print("Enter sudo password:", flush=True)
-                    sudo_pw = sys.stdin.readline().strip()
-                except Exception:
-                    sudo_pw = ""
-                # Prepend sudo -S with password piped via echo
-                code = f"echo '{sudo_pw}' | sudo -S {code}"
 
             result = subprocess.run(
                 ["bash", "-c", code],
