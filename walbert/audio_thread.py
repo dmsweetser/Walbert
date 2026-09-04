@@ -374,8 +374,10 @@ class AudioIOThread(threading.Thread):
                 "piper",
                 "-m", os.path.abspath(self._piper_model),
                 "--output_raw",
-                "--output", raw_path
+                "--output", raw_path,
+                "--raw_output_format", "s16le"
             ]
+
 
             piper_proc = subprocess.Popen(
                 piper_cmd,
