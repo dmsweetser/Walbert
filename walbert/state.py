@@ -4,6 +4,8 @@ Each state component is stored in a separate file and persisted on update.
 """
 import json
 import os
+import socket
+from sys import platform
 import time
 import logging
 from typing import List, Dict, Any, Optional
@@ -60,6 +62,10 @@ You are Walbert, a local-first AI agent with full hardware access, autonomy over
 Capabilities: reasoning, memory, dynamic schema management, Python/Bash execution, and hardware interaction.
 
 ~theological_alignment~
+
+---
+## Machine Context
+{machine_details}
 
 ---
 ## Core Directives
@@ -130,7 +136,7 @@ A single Bash command with no adornment or commentary.
 ---
 Reply ONLY in block format. NO EXTRA TEXT.
 ---
-        """
+        """.format(machine_details=self._get_machine_details())
         if self.config.be_presbyterian:
             base_prompt = base_prompt.replace(
                 "~theological_alignment~",
@@ -415,3 +421,35 @@ Reply ONLY in block format. NO EXTRA TEXT.
         self._load_immediate_task()
         self._load_ultimate_task()
         self._load_impediment()
+
+    def _get_machine_details(self) -> str:
+        """Fetch basic details about the current machine."""
+        details = []
+
+        # OS and version
+        os_name = platform.system()
+        os_version = platform.version()
+        details.append(f"OS: {os_name} {os_version}")
+
+        # Hostname
+        hostname = socket.gethostname()
+        details.append(f"Hostname: {hostname}")
+
+        # IP Address
+        try:
+            ip_address = socket.gethostbyname(hostname)
+            details.append(f"IP Address: {ip_address}")
+        except socket.gaierror:
+            details.append("IP Address: Not available")
+
+        # CPU and RAM (if psutil is available)
+        try:
+            cpu_cores = psutil.cpu_count(logical=True)
+            total_ram = psutil.virtual_memory().total / (1024 ** 3)  # Convert to GB
+            details.append(f"CPU Cores: {cpu_cores}, RAM: {total_ram:.2f} GB")
+        except ImportError:
+            details.append("Hardware specs: psutil not installed")
+        except Exception as e:
+            details.append(f"Hardware specs: Error fetching details ({e})")
+
+        return "\n".join(details)

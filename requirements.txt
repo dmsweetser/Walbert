@@ -5,3 +5,4 @@ readchar
 pyaudio
 faster-whisper
 piper-tts
+psutil
