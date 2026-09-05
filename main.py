@@ -118,7 +118,8 @@ def print_welcome_message(agent):
     print("- peer on/off: Toggle peer communication")
     print("- log on/off: Toggle raw block output to console")
     print("- show self_awareness: View consolidated identity, goals, and blockers")
-    print("- show user_awareness: View user directive and interaction context")
+    print("- show user_awareness: View user awareness")
+    print("- show user_directive: View user directive")
     print("- show peer_awareness: View awareness of active peers")
     print("- show schema: View database schema")
     print("- pip_install <package>: Install a Python package in the main environment")
@@ -195,9 +196,9 @@ def run_main_loop(agent, input_queue):
             elif user_input.lower() == 'log off':
                 agent.print_raw = False
                 print(f"{chr(10)}Raw log output disabled. Only console responses will be shown.")
-            elif user_input.lower() == 'show awareness':
+            elif user_input.lower() == 'show user_awareness':
                 if hasattr(agent, 'state') and agent.state:
-                    _paged_output(f"--- AWARENESS ---\n{agent.state.awareness_text}\n--- END ---")
+                    _paged_output(f"--- AWARENESS ---\n{agent.state._user_awareness}\n--- END ---")
                 else:
                     print(f"{chr(10)}No awareness data available yet.")
             elif user_input.lower() == 'show ultimate_task':

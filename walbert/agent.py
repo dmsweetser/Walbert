@@ -258,7 +258,7 @@ class WalbertAgent:
     def _execute_pending_blocks(self, provided_blocks):
         """Execute all pending blocks (SQL, Python, etc.) in order."""
         import re
-        executable_types = {"sql_execute", "python_execute", "bash_execute", "self_awareness", "user_awareness", "immediate_task", "ultimate_task", "impediment"}
+        executable_types = {"sql_execute", "python_execute", "bash_execute", "self_awareness", "user_awareness", "immediate_task", "ultimate_task", "impediment", "user_directive"}
         peer_pattern = re.compile(r'^peer_(\d+\.\d+\.\d+\.\d+)_')
 
         with self._lock:
@@ -282,6 +282,9 @@ class WalbertAgent:
             elif btype == "user_awareness":
                 self.state._user_awareness = block["content"]
                 self.state._save_user_awareness()
+            elif btype == "user_directive":
+                self.state._user_directive = block["content"]
+                self.state._save_user_directive()
             elif btype == "immediate_task":
                 self.state._immediate_task = block["content"]
                 self.state._save_immediate_task()

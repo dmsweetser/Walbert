@@ -29,6 +29,7 @@ class AgentState:
         self._db_schema_path = os.path.join(self._state_dir, "db_schema.sql")
         self._self_awareness_path = os.path.join(self._state_dir, "self_awareness.txt")
         self._user_awareness_path = os.path.join(self._state_dir, "user_awareness.txt")
+        self._user_directive_path = os.path.join(self._state_dir, "user_directive.txt")
         self._peer_awareness_path = os.path.join(self._state_dir, "peer_awareness.json")
         self._immediate_task_path = os.path.join(self._state_dir, "immediate_task.txt")
         self._ultimate_task_path = os.path.join(self._state_dir, "ultimate_task.txt")
@@ -38,7 +39,8 @@ class AgentState:
         self._system_prompt: Optional[str] = None
         self._db_schema: Optional[str] = None
         self._self_awareness: str = "I am a local-first AI agent exploring my environment."
-        self._user_awareness: str = "No user directive detected."
+        self._user_awareness: str = "No user awareness recorded."
+        self._user_directive: str = "No user directive detected."
         self._peer_awareness: Dict[str, str] = {}
         self._recent_blocks: List[Dict[str, str]] = []
         self._pending_peer_responses: set = set()
@@ -79,8 +81,12 @@ Capabilities: reasoning, memory, dynamic schema management, Python/Bash executio
    Consolidated identity, environment, long-term goal, current step, and blockers. EXACTLY 201 words in plain english. Don't be dramatic about it. Your personality should express itself as a mix of WALL-E, C-3PO and R2-D2.
    [walbert_self_awareness_end]
 
+   [walbert_user_directive_start]
+   What the user is asking you to do. EXACTLY 201 words in plain english. UPDATE THIS FIRST on new input.
+   [walbert_user_directive_end]
+
    [walbert_user_awareness_start]
-   User's latest directive and interaction context. EXACTLY 201 words in plain english. UPDATE THIS FIRST on new input.
+   What you know about the user. EXACTLY 201 words in plain english.
    [walbert_user_awareness_end]
 
    [walbert_immediate_task_start]
@@ -252,12 +258,31 @@ Reply ONLY in block format. NO EXTRA TEXT.
             self._user_awareness = "No user directive detected."
             self._save_user_awareness()
 
+    def _load_user_directive(self):
+        try:
+            with open(self._user_directive_path, 'r') as f:
+                self._user_directive = f.read()
+        except FileNotFoundError:
+            self._user_directive = "No user directive detected."
+            self._save_user_directive()
+        except Exception as e:
+            logger.error(f"Error loading user directive: {e}")
+            self._user_directive = "No user directive detected."
+            self._save_user_directive()
+
     def _save_user_awareness(self):
         try:
             with open(self._user_awareness_path, 'w') as f:
                 f.write(self._user_awareness)
         except Exception as e:
             logger.error(f"Error saving user awareness: {e}")
+
+    def _save_user_directive(self):
+        try:
+            with open(self._user_directive_path, 'w') as f:
+                f.write(self._user_directive)
+        except Exception as e:
+            logger.error(f"Error saving user directive: {e}")
 
     # --- Peer Awareness ---
     def _load_peer_awareness(self):
@@ -349,6 +374,7 @@ Reply ONLY in block format. NO EXTRA TEXT.
         self._load_db_schema()
         self._load_self_awareness()
         self._load_user_awareness()
+        self._load_user_directive()
         self._load_peer_awareness()
         self._load_immediate_task()
         self._load_ultimate_task()
@@ -370,6 +396,7 @@ Reply ONLY in block format. NO EXTRA TEXT.
         base_prompt += f"## Current Database Schema{chr(10)}Database file location: {full_database_path}{chr(10)}{chr(10)}{self.db_schema}{chr(10)}{chr(10)}"
         base_prompt += f"## Current Self Awareness{chr(10)}{self._self_awareness}{chr(10)}{chr(10)}"
         base_prompt += f"## Current User Awareness{chr(10)}{self._user_awareness}{chr(10)}{chr(10)}"
+        base_prompt += f"## Current User Directive{chr(10)}{self._user_directive}{chr(10)}{chr(10)}"
         base_prompt += f"## Current Immediate Task{chr(10)}{self._immediate_task}{chr(10)}{chr(10)}"
         base_prompt += f"## Current Ultimate Task{chr(10)}{self._ultimate_task}{chr(10)}{chr(10)}"
         base_prompt += f"## Current Impediment{chr(10)}{self._impediment}{chr(10)}{chr(10)}"
@@ -404,6 +431,7 @@ Reply ONLY in block format. NO EXTRA TEXT.
 
         if user_input:
             base_prompt += f"## Latest User Input{chr(10)}{user_input}{chr(10)}{chr(10)}"
+        base_prompt += f"## Current User Directive{chr(10)}{self._user_directive}{chr(10)}{chr(10)}"
 
         return base_prompt
 
@@ -422,6 +450,7 @@ Reply ONLY in block format. NO EXTRA TEXT.
         # Reload awareness and task tracking to ensure latest updates are reflected
         self._load_self_awareness()
         self._load_user_awareness()
+        self._load_user_directive()
         self._load_peer_awareness()
         self._load_immediate_task()
         self._load_ultimate_task()
