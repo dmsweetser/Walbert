@@ -279,6 +279,9 @@ def main():
 
     print_welcome_message(agent)
 
+    if agent.config.audio_enabled and hasattr(agent, 'audio_thread') and agent.audio_thread:
+        agent.audio_thread.handle_console_response("Welcome to Walbert! The local-first AI agent.")
+
     run_main_loop(agent, input_queue)
 
 
