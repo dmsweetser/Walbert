@@ -142,6 +142,7 @@ cat > instance/config.json << EOF
             "min_p": $MIN_P
         }
     },
+    "llama_binary_path": "instance/llama.cpp/bin/llama-completion",
     "mmproj_path": "$MMPROJ_PATH",
     "piper_model": "null",
     "audio_enabled": false,
