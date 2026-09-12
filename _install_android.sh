@@ -128,16 +128,6 @@ else
     MIN_P=0.05
 fi
 
-# Download Piper TTS model
-PIPER_MODEL="instance/models/en_GB-northern_english_male-medium.onnx"
-if [ ! -f "$PIPER_MODEL" ]; then
-    echo "Downloading Piper TTS model..."
-    wget -O "$PIPER_MODEL" \
-      "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/GB/northern_english/male/medium/en_GB-northern_english_male-medium.onnx"
-else
-    echo "$PIPER_MODEL already exists, skipping download."
-fi
-
 # Write config.json
 cat > instance/config.json << EOF
 {
@@ -153,7 +143,7 @@ cat > instance/config.json << EOF
         }
     },
     "mmproj_path": "$MMPROJ_PATH",
-    "piper_model": "$PIPER_MODEL",
+    "piper_model": "null",
     "audio_enabled": false,
     "stt_enabled": false,
     "tts_enabled": false,
