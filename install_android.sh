@@ -16,7 +16,7 @@ source venv/bin/activate
 
 pip install --upgrade pip setuptools wheel
 
-pip install -r walbert_requirements_android.txt
+pip install -r requirements_android.txt
 
 # Model selection
 echo "Select a model:"
