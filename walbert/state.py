@@ -461,8 +461,7 @@ Reply ONLY in block format. NO EXTRA TEXT.
         """Fetch basic details about the current machine."""
         details = []
 
-        # Debug: Check if platform is the module
-        print(f"platform type: {type(platform)}")  # Should be <class 'module'>
+        
 
         # OS and version
         os_name = platform.system()

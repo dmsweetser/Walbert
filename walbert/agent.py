@@ -401,23 +401,16 @@ class WalbertAgent:
                     continue
 
                 if self.waiting_for_user:
-                    try:
-                        msg_type, msg = input_queue.get(timeout=self.config.user_input_timeout)
-                        self.waiting_for_user = False
-                        if msg_type == "exit":
-                            self.end_conversation()
-                            return
-                        if msg_type == "user_input":
-                            last_user_input = msg
-                            self.state.append_block("user_input", msg)
-                            self._generate_response_block(msg, interrupt_event)
-                            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
-                            continue
-                    except queue.Empty:
-                        self.logger.info("User input timeout. Resuming autonomous operation.")
-                        self.state.append_block("system_note", "User failed to respond within timeout. Continuing autonomous operation.")
-                        self.waiting_for_user = False
-                        continue
+                    msg_type, msg = input_queue.get()
+                    self.waiting_for_user = False
+                    if msg_type == "exit":
+                        self.end_conversation()
+                        return
+                    if msg_type == "user_input":
+                        last_user_input = msg
+                        self.state.append_block("user_input", msg)
+                        self._generate_response_block(msg, interrupt_event)
+                        print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
                 else:
                     # Autonomous mode
                     # Check for incoming peer messages
