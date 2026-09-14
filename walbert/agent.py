@@ -380,7 +380,9 @@ class WalbertAgent:
             try:
                 # Non-blocking check for user input
                 try:
-                    msg_type, msg = input_queue.get_nowait()
+                    items = input_queue.get_nowait()
+                    msg_type = items[0]
+                    msg = items[1] if len(items) > 1 else None
                 except queue.Empty:
                     msg_type = None
                     msg = None
