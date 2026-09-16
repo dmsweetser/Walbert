@@ -61,7 +61,7 @@ if [ "$model_choice" == "2" ]; then
     MIN_P=0.0
 elif [ "$model_choice" == "3" ]; then
     MODEL_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q2_K.gguf"
-    MMPROJ_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q2_K-mmproj-BF16.gguf"
+    MMPROJ_PATH=""
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
         wget --content-disposition \
@@ -69,14 +69,6 @@ elif [ "$model_choice" == "3" ]; then
           -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
-    fi
-    if [ ! -f "$MMPROJ_PATH" ]; then
-        echo "Downloading $MMPROJ_PATH..."
-        wget --content-disposition \
-          "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-BF16-mmproj.gguf?download=true" \
-          -O "$MMPROJ_PATH"
-    else
-        echo "$MMPROJ_PATH already exists, skipping download."
     fi
     CONTEXT_SIZE=32768
     OUTPUT_TOKENS=16384
@@ -90,7 +82,7 @@ elif [ "$model_choice" == "4" ]; then
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
         wget --content-disposition \
-          "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q2_K.gguf?download=true" \
+          "https://huggingface.co/unsloth/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q2_K_L.gguf?download=true" \
           -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
@@ -103,7 +95,7 @@ elif [ "$model_choice" == "4" ]; then
     MIN_P=0.00
 else
     MODEL_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-Q2_K.gguf"
-    MMPROJ_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf"
+    MMPROJ_PATH=""instance/models/Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf""
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
         wget --content-disposition \
