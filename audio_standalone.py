@@ -77,8 +77,7 @@ class StandaloneAudio:
         self.engine.setProperty('voice', 'english-us')
 
         # Initialize VOSK for STT
-        # script_dir = os.path.dirname(os.path.abspath(__file__))
-        model_path = os.path.abspath("./vosk/model-small-en-us-0.15/")
+        model_path = os.path.abspath("./vosk/vosk-model-small-en-us-0.15/")
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"VOSK model not found at {model_path}. Download failed.")
 
