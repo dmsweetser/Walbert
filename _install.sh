@@ -10,14 +10,7 @@ sudo apt install -y build-essential libssl-dev zlib1g-dev \
                  libffi-dev liblzma-dev libudev-dev
 sudo apt install -y python3-dev
 
-# You might need the items below for audio
 
-# sudo apt install -y portaudio19-dev
-# sudo apt install -y libbluetooth-dev
-# sudo apt install pulseaudio
-# sudo apt install ffmpeg
-# sudo apt install -y pipewire-audio-client-libraries libspa-0.2-bluetooth
-# systemctl --user restart pipewire pipewire-pulse || true
 
 # Create directories
 mkdir -p instance
@@ -254,15 +247,7 @@ cat > instance/config.json << EOF
     "peer_communication_enabled": false,
     "python_execution_enabled": false,
     "bash_execution_enabled": false,
-    "audio_enabled": $bt_enabled,
-    "stt_enabled": $bt_enabled,
-    "tts_enabled": $bt_enabled,
-    "bluetooth_device": "$BT_DEVICE",
-    "bluetooth_sink": "$BT_SINK",
-    "bluetooth_source": "$BT_SOURCE",
-    "stt_timeout": 30,
-    "user_input_timeout": 60,
-    "tts_voice": "default",
+    
     "database_path": "instance/walbert.db"
 }
 EOF

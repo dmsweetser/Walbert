@@ -16,11 +16,6 @@ from walbert.config import Config
 from walbert.model_config import ModelConfig
 
 
-def dummy_on_press(key):
-    """Dummy key press handler for when audio is disabled or no display is available."""
-    pass
-
-
 def load_config() -> Config:
     """Load system configuration"""
     try:
@@ -51,11 +46,7 @@ def load_config() -> Config:
                 audio_enabled=bool(config_data.get('audio_enabled', False)),
                 stt_enabled=bool(config_data.get('stt_enabled', False)),
                 tts_enabled=bool(config_data.get('tts_enabled', False)),
-                bluetooth_device=config_data.get('bluetooth_device', None),
-                stt_timeout=int(config_data.get('stt_timeout', 30)),
-                user_input_timeout=int(config_data.get('user_input_timeout', 60)),
-                tts_voice=config_data.get('tts_voice', "default")
-            )
+                )
     except FileNotFoundError:
         logger.error("instance/config.json not found")
         sys.exit(1)
@@ -125,7 +116,7 @@ def print_welcome_message(agent):
     print("- pip_install <package>: Install a Python package in the main environment")
     print("- help: Show these options again")
     print("- Any other input will be treated as a request to Walbert")
-    print(f"{chr(10)}Status: Python={'ON' if agent.config.python_execution_enabled else 'OFF'}, Bash={'ON' if agent.config.bash_execution_enabled else 'OFF'}, Peer={'ON' if agent.config.peer_communication_enabled else 'OFF'}, Audio_On={'ON' if agent.config.audio_enabled == True else 'OFF'}, Waiting_For_User={'YES' if agent.waiting_for_user else 'NO'}")
+    print(f"{chr(10)}Status: Python={'ON' if agent.config.python_execution_enabled else 'OFF'}, Bash={'ON' if agent.config.bash_execution_enabled else 'OFF'}, Peer={'ON' if agent.config.peer_communication_enabled else 'OFF'}, Waiting_For_User={'YES' if agent.waiting_for_user else 'NO'}")
     print("")
 
 
@@ -186,10 +177,6 @@ def run_main_loop(agent, input_queue):
                 agent.enable_peer_communication()
             elif user_input.lower() == 'peer off':
                 agent.disable_peer_communication()
-            elif user_input.lower() in ['audio on']:
-                agent.enable_audio()
-            elif user_input.lower() in ['audio off']:
-                agent.disable_audio()
             elif user_input.lower() == 'log on':
                 agent.print_raw = True
                 print(f"{chr(10)}Raw log output enabled. All block executions will be printed.")
@@ -278,9 +265,6 @@ def main():
     agent_thread.start()
 
     print_welcome_message(agent)
-
-    if agent.config.audio_enabled and hasattr(agent, 'audio_thread') and agent.audio_thread:
-        agent.audio_thread.handle_console_response("Welcome to Walbert! The local-first AI agent.")
 
     run_main_loop(agent, input_queue)
 

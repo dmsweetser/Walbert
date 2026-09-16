@@ -28,12 +28,4 @@ class Config:
     peer_communication_enabled: bool = False
     python_execution_enabled: bool = False
     bash_execution_enabled: bool = False
-    audio_enabled: bool = False
-    stt_enabled: bool = False
-    tts_enabled: bool = False
-    bluetooth_device: Optional[str] = None
-    stt_timeout: int = 30
-    user_input_timeout: int = 60
-    tts_voice: str = "default"
     database_path: str = "instance/walbert.db"
-    piper_model: str = "instance/models/en_GB-northern_english_male-medium.onnx"

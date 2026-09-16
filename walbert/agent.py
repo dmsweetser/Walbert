@@ -22,7 +22,7 @@ from walbert.state import AgentState
 from walbert.parser import BlockParser
 from walbert.executor import BlockExecutor
 from walbert.comms import NetworkManager
-from walbert.audio_thread import AudioIOThread
+
 
 # Initialize logging
 os.makedirs('instance', exist_ok=True)
@@ -105,7 +105,6 @@ class WalbertAgent:
         self.waiting_for_user = False
         self.input_queue = input_queue
         self.comms = NetworkManager(config) if config.peer_communication_enabled else None
-        self.audio_thread = None
         self._pending_peer_ip = None
         self._pending_peer_responses = set()
         self._comms_started = False
@@ -115,9 +114,6 @@ class WalbertAgent:
 
         self.logger = logging.getLogger('walbert.agent')
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
-
-        if self.config.audio_enabled:
-            self.enable_audio()
 
     def _init_components(self):
         """Initialize components that depend on DB connection."""
@@ -507,20 +503,6 @@ Error: {str(e)}
         self._audio_started = True
         self.logger.info("Audio I/O thread enabled")
         print(f"{chr(10)}Audio I/O thread enabled")
-
-    def disable_audio(self):
-        self.config.audio_enabled = False
-        self.config.stt_enabled = False
-        self.config.tts_enabled = False
-        if not self._audio_started:
-            return
-        if self.audio_thread and self.audio_thread.is_alive():
-            self.audio_thread.stop()
-            self.audio_thread.join(timeout=2)
-            self.audio_thread = None
-        self._audio_started = False
-        self.logger.info("Audio I/O thread disabled")
-        print(f"{chr(10)}Audio I/O thread disabled")
 
     def _log_block_received(self, block_type: str, content: str):
         """Log a received block to instance/block_logs/received/"""

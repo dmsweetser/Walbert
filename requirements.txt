@@ -2,7 +2,6 @@ python-dotenv
 requests
 numpy
 readchar
-pyaudio
-faster-whisper
-piper-tts
+speechrecognition
+pyttsx3
 psutil

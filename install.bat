@@ -86,26 +86,7 @@ if not exist "%MMPROJ_PATH%" (
     powershell -Command "Invoke-WebRequest -Uri 'https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true' -OutFile '%MMPROJ_PATH%'"
 )
 
-:: Download Piper TTS model
-set PIPER_MODEL=instance\models\en_GB-northern_english_male-medium.onnx
-if not exist "%PIPER_MODEL%" (
-    echo Downloading Piper TTS model...
-    powershell -Command "Invoke-WebRequest -Uri 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/GB/northern_english/male/medium/en_GB-northern_english-male-medium.onnx' -OutFile '%PIPER_MODEL%'"
-)
 
-echo Configure Bluetooth Audio Device:
-set /p bt_choice="Enable Bluetooth audio routing? (y/n) [n]: "
-if "%bt_choice%"=="y" (
-    set bt_enabled=true
-    set BT_DEVICE="null"
-    set BT_SINK="null"
-    set BT_SOURCE="null"
-) else (
-    set bt_enabled=false
-    set BT_DEVICE="null"
-    set BT_SINK="null"
-    set BT_SOURCE="null"
-)
 
 :: Write config.json
 (
@@ -137,15 +118,7 @@ echo     "be_presbyterian": true,
 echo     "peer_communication_enabled": false,
 echo     "python_execution_enabled": false,
 echo     "bash_execution_enabled": false,
-echo     "audio_enabled": %bt_enabled%,
-echo     "stt_enabled": %bt_enabled%,
-echo     "tts_enabled": %bt_enabled%,
-echo     "bluetooth_device": "%BT_DEVICE%",
-echo     "bluetooth_sink": "%BT_SINK%",
-echo     "bluetooth_source": "%BT_SOURCE%",
-echo     "stt_timeout": 30,
-echo     "user_input_timeout": 60,
-echo     "tts_voice": "default",
+
 echo     "database_path": "instance/walbert.db"
 echo }
 ) > instance\config.json
