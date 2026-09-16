@@ -10,14 +10,7 @@ Walbert Standalone Audio Module (Offline, Faster-Whisper + Silero VAD Edition)
 - Bluetooth: Supports default input/output via Bluetooth
 - Audio Feedback: Single beep on start, double-beep on successful input capture
 
-This script:
-- Installs required system and Python dependencies
-- Opens a microphone stream
-- Uses VAD to segment speech
-- Uses faster-whisper to transcribe segments
-- Detects the wake word "walbert" or Bluetooth play/pause button press
-- After wake word/button press, treats next utterance as a command
-- Prints all recognized text to console
+This script is fully self-contained and will attempt to install all dependencies.
 """
 
 import sys
@@ -41,46 +34,117 @@ ENABLE_BLUETOOTH_CONTROL = True  # Enable Bluetooth play/pause button as wake tr
 # Dependency Installation
 # ============================================================
 
+def run_command(command, error_message):
+    """Run a shell command and handle errors gracefully."""
+    try:
+        subprocess.check_call(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    except subprocess.CalledProcessError:
+        print(f"[WARNING] {error_message}", file=sys.stderr)
+        return False
+    except Exception as e:
+        print(f"[ERROR] Unexpected error: {e}", file=sys.stderr)
+        return False
+
+
 def install_system_dependencies():
     """Install system-level dependencies for audio processing."""
     if platform.system() == "Linux":
         print("[INFO] Installing system dependencies for Linux...", file=sys.stderr)
-        subprocess.check_call(["sudo", "apt-get", "update"])
-        subprocess.check_call(
-            ["sudo", "apt-get", "install", "-y", "espeak", "ffmpeg", "portaudio19-dev", "pulseaudio", "pulseaudio-module-bluetooth", "bluez", "bluez-tools"]
+        
+        # Update package lists
+        run_command(
+            ["sudo", "apt-get", "update"],
+            "Failed to update package lists. Some system dependencies may not be installed."
         )
+        
+        # Install required packages
+        system_packages = [
+            "espeak",
+            "ffmpeg", 
+            "portaudio19-dev",
+            "pulseaudio",
+            "pulseaudio-module-bluetooth",
+            "bluez",
+            "bluez-tools",
+            "python3-dbus",
+            "python3-gi"
+        ]
+        
+        for package in system_packages:
+            run_command(
+                ["sudo", "apt-get", "install", "-y", package],
+                f"Failed to install {package}. You may need to install it manually."
+            )
+    
     elif platform.system() == "Darwin":  # macOS
         print("[INFO] Installing system dependencies for macOS...", file=sys.stderr)
-        subprocess.check_call(["brew", "install", "espeak", "ffmpeg", "portaudio", "blueutil"])
+        
+        # Check if Homebrew is installed
+        if not run_command(["brew", "--version"], "Homebrew not found. Please install Homebrew first."):
+            print("[ERROR] Homebrew is required for macOS. Install it from https://brew.sh", file=sys.stderr)
+            return
+        
+        # Install required packages
+        system_packages = ["espeak", "ffmpeg", "portaudio", "blueutil"]
+        
+        for package in system_packages:
+            run_command(
+                ["brew", "install", package],
+                f"Failed to install {package}. You may need to install it manually."
+            )
+    
     else:
         print(
-            "[ERROR] System dependency installation not supported for this OS. Please install manually.",
+            "[ERROR] System dependency installation not supported for this OS. "
+            "Please install the following manually: espeak, ffmpeg, portaudio, and Bluetooth tools.",
             file=sys.stderr,
         )
-        sys.exit(1)
 
 
-def install_package(package):
+def install_python_package(package):
     """Install a Python package if it's not already installed."""
     try:
         __import__(package)
+        print(f"[INFO] {package} is already installed.", file=sys.stderr)
     except ImportError:
         print(f"[INFO] Installing {package}...", file=sys.stderr)
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+        try:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", package, "--quiet"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        except subprocess.CalledProcessError:
+            print(f"[ERROR] Failed to install {package}. You may need to install it manually.", file=sys.stderr)
 
 
 def check_prerequisites():
     """Check and install all prerequisites."""
+    print("[INFO] Checking and installing prerequisites...", file=sys.stderr)
+    
+    # Install system dependencies
     install_system_dependencies()
-    install_package("systemtools")
-    install_package("wheel")
-    install_package("faster_whisper")
-    install_package("torch")
-    install_package("webrtcvad-wheels")
-    install_package("pyttsx3")
-    install_package("pyaudio")
-    install_package("pydub")
-    install_package("dbus-python")  # For Bluetooth control on Linux
+    
+    # Install Python packages
+    python_packages = [
+        "systemtools",
+        "wheel",
+        "faster-whisper",
+        "torch",
+        "webrtcvad-wheels",
+        "pyttsx3",
+        "pyaudio",
+        "pydub",
+    ]
+    
+    for package in python_packages:
+        install_python_package(package)
+    
+    # Install platform-specific Python packages
+    if platform.system() == "Linux":
+        install_python_package("pydbus")
+        install_python_package("PyGObject")
 
 
 # Check prerequisites before proceeding
@@ -99,8 +163,12 @@ from pydub.generators import Sine
 
 # Platform-specific imports for Bluetooth
 if platform.system() == "Linux":
-    import dbus
-    from dbus.mainloop.glib import DBusGMainLoop
+    try:
+        from pydbus import SessionBus
+        from gi.repository import GLib
+    except ImportError:
+        print("[WARNING] pydbus or PyGObject not available. Bluetooth play/pause detection disabled.", file=sys.stderr)
+        ENABLE_BLUETOOTH_CONTROL = False
 elif platform.system() == "Darwin":
     import subprocess
 
@@ -183,17 +251,33 @@ class BluetoothMonitor:
             print("[WARNING] Bluetooth play/pause monitoring not supported on this OS.", file=sys.stderr)
     
     def _start_linux_monitor(self):
-        """Monitor Bluetooth play/pause button presses on Linux using DBus."""
-        try:
-            DBusGMainLoop(set_as_default=True)
-            bus = dbus.SystemBus()
+        """Monitor Bluetooth play/pause button presses on Linux using pydbus."""
+        if not ENABLE_BLUETOOTH_CONTROL:
+            return
             
-            # Listen for signals from the Bluetooth service
-            bus.add_signal_receiver(
-                self._handle_dbus_signal,
-                signal_name="PropertiesChanged",
-                dbus_interface="org.freedesktop.DBus.Properties",
+        try:
+            def on_properties_changed(interface, changed, invalidated):
+                # Check for play/pause button press in the changed properties
+                if interface == "org.bluez.MediaPlayer1":
+                    if "PlaybackStatus" in changed:
+                        status = changed["PlaybackStatus"]
+                        if status == "paused":
+                            self.play_pause_pressed = True
+                            time.sleep(0.5)  # Debounce
+                            self.play_pause_pressed = False
+
+            bus = SessionBus()
+            bus.subscribe(
+                sender="org.bluez",
+                signal="PropertiesChanged",
+                object="/org/bluez/hci0",  # Adjust based on your Bluetooth device
+                callback=on_properties_changed,
             )
+
+            # Start a GLib main loop in a separate thread
+            loop = GLib.MainLoop()
+            loop_thread = threading.Thread(target=loop.run, daemon=True)
+            loop_thread.start()
             
             print("[INFO] Monitoring Bluetooth play/pause button (Linux).", file=sys.stderr)
         except Exception as e:
@@ -204,7 +288,7 @@ class BluetoothMonitor:
         def poll_bluetooth():
             while self._running:
                 try:
-                    # Use blueutil to check for play/pause button presses
+                    # Use blueutil to check for connected devices
                     result = subprocess.run(
                         ["blueutil", "--is-connected"],
                         capture_output=True,
@@ -221,14 +305,6 @@ class BluetoothMonitor:
         
         threading.Thread(target=poll_bluetooth, daemon=True).start()
         print("[INFO] Monitoring Bluetooth play/pause button (macOS).", file=sys.stderr)
-    
-    def _handle_dbus_signal(self, *args, **kwargs):
-        """Handle DBus signals for Bluetooth events."""
-        # Placeholder for actual DBus signal handling
-        # Replace with logic to detect play/pause button presses
-        self.play_pause_pressed = True
-        time.sleep(0.5)  # Debounce
-        self.play_pause_pressed = False
     
     def is_play_pause_pressed(self):
         """Check if the play/pause button was pressed."""

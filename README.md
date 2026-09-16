@@ -8,7 +8,6 @@ Walbert is a local-first AI agent designed to run entirely on your machine. It s
 - **Autonomous Operation**: Can operate without user input
 - **Peer Communication**: Communicate with other Walbert agents on the network
 - **Code Execution**: Execute Python and Bash code safely
-- **Audio Support**: Voice input/output with Bluetooth audio support
 - **Database Integration**: Full SQLite database access
 - **Modular Architecture**: Easily extensible design
 
@@ -52,7 +51,6 @@ main.py
 │   ├── walbert/models/manager.py
 │   ├── walbert/database/manager.py
 │   ├── walbert/comms.py
-│   └── walbert/audio_thread.py
 └── instance/
     ├── config.json
     └── conversations/

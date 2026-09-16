@@ -162,7 +162,6 @@ cat > instance/config.json << EOF
     },
     "llama_binary_path": "instance/llama.cpp/bin/llama-completion",
     "mmproj_path": "$MMPROJ_PATH",
-    "piper_model": "$PIPER_MODEL",
     "log_level": "DEBUG",
     "server_port": 8080,
     "server_health_check_timeout": 2,

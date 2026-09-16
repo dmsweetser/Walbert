@@ -42,10 +42,7 @@ def load_config() -> Config:
                 be_presbyterian=bool(config_data.get('be_presbyterian', True)),
                 peer_communication_enabled=bool(config_data.get('peer_communication_enabled', False)),
                 python_execution_enabled=bool(config_data.get('python_execution_enabled', False)),
-                bash_execution_enabled=bool(config_data.get('bash_execution_enabled', False)),
-                audio_enabled=bool(config_data.get('audio_enabled', False)),
-                stt_enabled=bool(config_data.get('stt_enabled', False)),
-                tts_enabled=bool(config_data.get('tts_enabled', False)),
+                bash_execution_enabled=bool(config_data.get('bash_execution_enabled', False))
                 )
     except FileNotFoundError:
         logger.error("instance/config.json not found")
@@ -105,7 +102,6 @@ def print_welcome_message(agent):
     print("- exit/quit: Exit the program")
     print("- python on/off: Toggle Python execution")
     print("- bash on/off: Toggle Bash execution")
-    print("- audio on/off: Toggle STT/TTS")
     print("- peer on/off: Toggle peer communication")
     print("- log on/off: Toggle raw block output to console")
     print("- show self_awareness: View consolidated identity, goals, and blockers")

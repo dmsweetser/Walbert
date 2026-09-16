@@ -136,10 +136,6 @@ cat > instance/config.json << EOF
     },
     "llama_binary_path": "instance/llama.cpp/bin/llama-completion",
     "mmproj_path": "$MMPROJ_PATH",
-    "piper_model": "null",
-    "audio_enabled": false,
-    "stt_enabled": false,
-    "tts_enabled": false,
     "bluetooth_device": "null",
     "bluetooth_sink": "null",
     "bluetooth_source": "null",
@@ -150,9 +146,7 @@ cat > instance/config.json << EOF
     "peer_communication_enabled": false,
     "python_execution_enabled": false,
     "bash_execution_enabled": false,
-    "stt_timeout": 30,
     "user_input_timeout": 60,
-    "tts_voice": "default",
     "database_path": "instance/walbert.db"
 }
 EOF

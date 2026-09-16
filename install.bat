@@ -104,7 +104,6 @@ echo         }
 echo     },
 echo     "llama_binary_path": "instance/llama.cpp/bin/llama-completion",
 echo     "mmproj_path": "%MMPROJ_PATH%",
-echo     "piper_model": "%PIPER_MODEL%",
 echo     "log_level": "DEBUG",
 echo     "server_port": 8080,
 echo     "server_health_check_timeout": 2,

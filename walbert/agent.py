@@ -63,13 +63,8 @@ def load_config() -> Config:
                 peer_communication_enabled=bool(config_data.get('peer_communication_enabled', False)),
                 python_execution_enabled=bool(config_data.get('python_execution_enabled', False)),
                 bash_execution_enabled=bool(config_data.get('bash_execution_enabled', False)),
-                audio_enabled=bool(config_data.get('audio_enabled', False)),
-                stt_enabled=bool(config_data.get('stt_enabled', False)),
-                tts_enabled=bool(config_data.get('tts_enabled', False)),
                 bluetooth_device=config_data.get('bluetooth_device', None),
-                stt_timeout=int(config_data.get('stt_timeout', 30)),
-                user_input_timeout=int(config_data.get('user_input_timeout', 60)),
-                tts_voice=config_data.get('tts_voice', "default")
+                user_input_timeout=int(config_data.get('user_input_timeout', 60))
             )
     except FileNotFoundError:
         logger.error("instance/config.json not found")
@@ -108,7 +103,6 @@ class WalbertAgent:
         self._pending_peer_ip = None
         self._pending_peer_responses = set()
         self._comms_started = False
-        self._audio_started = False
 
         os.makedirs(self.config.conversation_log_dir, exist_ok=True)
 
@@ -358,9 +352,7 @@ class WalbertAgent:
             if block_type in ("awareness", "context_blocks"):
                 formatted_text = f"{chr(10)}".join(f"**** {line}" for line in text.split(f"{chr(10)}"))
                 print(formatted_text, end='', flush=True)
-            else:
-                if hasattr(self, 'audio_thread') and self.audio_thread:
-                    self.audio_thread.handle_console_response(text)            
+            else:         
                 print(text, end='', flush=True)
 
     def run_autonomous(self, input_queue, interrupt_event=None, test_mode=False):
@@ -463,8 +455,6 @@ Error: {str(e)}
 
     def shutdown(self):
         """Shutdown agent cleanly."""
-        if self.audio_thread and self.audio_thread.is_alive():
-            self.audio_thread.stop()
         self.end_conversation()
 
     def enable_peer_communication(self):
@@ -488,21 +478,6 @@ Error: {str(e)}
         self._comms_started = False
         self.logger.info(f"{chr(10)}Peer communication disabled")
         print(f"{chr(10)}Peer communication disabled")
-
-    def enable_audio(self):
-        self.config.audio_enabled = True
-        self.config.stt_enabled = True
-        self.config.tts_enabled = True
-        if self._audio_started:
-            return
-        if not self.input_queue:
-            import queue
-            self.input_queue = queue.Queue()
-        self.audio_thread = AudioIOThread(self.input_queue, self.config)
-        self.audio_thread.start()
-        self._audio_started = True
-        self.logger.info("Audio I/O thread enabled")
-        print(f"{chr(10)}Audio I/O thread enabled")
 
     def _log_block_received(self, block_type: str, content: str):
         """Log a received block to instance/block_logs/received/"""
