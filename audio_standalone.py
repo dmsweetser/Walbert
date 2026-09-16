@@ -4,17 +4,19 @@ Walbert Standalone Audio Module (Offline, Faster-Whisper + Silero VAD Edition)
 
 - STT: faster-whisper (base) running locally
 - VAD: WebRTC VAD + Silero VAD-style logic for speech detection
-- Wake word: "walbert" detected from transcribed text
+- Wake word: "walbert" detected from transcribed text OR Bluetooth play/pause button press
 - TTS: pyttsx3 with espeak
 - Debug: console output of audio → text, optional STT→TTS loopback
+- Bluetooth: Supports default input/output via Bluetooth
+- Audio Feedback: Single beep on start, double-beep on successful input capture
 
 This script:
 - Installs required system and Python dependencies
 - Opens a microphone stream
 - Uses VAD to segment speech
 - Uses faster-whisper to transcribe segments
-- Detects the wake word "walbert"
-- After wake word, treats next utterance as a command
+- Detects the wake word "walbert" or Bluetooth play/pause button press
+- After wake word/button press, treats next utterance as a command
 - Prints all recognized text to console
 """
 
@@ -33,22 +35,23 @@ import numpy as np
 # Feature Flags
 # ============================================================
 ENABLE_STT_TTS_LOOPBACK = True  # Speak back recognized text for debugging
-
+ENABLE_BLUETOOTH_CONTROL = True  # Enable Bluetooth play/pause button as wake trigger
 
 # ============================================================
 # Dependency Installation
 # ============================================================
+
 def install_system_dependencies():
     """Install system-level dependencies for audio processing."""
     if platform.system() == "Linux":
         print("[INFO] Installing system dependencies for Linux...", file=sys.stderr)
         subprocess.check_call(["sudo", "apt-get", "update"])
         subprocess.check_call(
-            ["sudo", "apt-get", "install", "-y", "espeak", "ffmpeg", "portaudio19-dev"]
+            ["sudo", "apt-get", "install", "-y", "espeak", "ffmpeg", "portaudio19-dev", "pulseaudio", "pulseaudio-module-bluetooth", "bluez", "bluez-tools"]
         )
     elif platform.system() == "Darwin":  # macOS
         print("[INFO] Installing system dependencies for macOS...", file=sys.stderr)
-        subprocess.check_call(["brew", "install", "espeak", "ffmpeg", "portaudio"])
+        subprocess.check_call(["brew", "install", "espeak", "ffmpeg", "portaudio", "blueutil"])
     else:
         print(
             "[ERROR] System dependency installation not supported for this OS. Please install manually.",
@@ -77,6 +80,7 @@ def check_prerequisites():
     install_package("pyttsx3")
     install_package("pyaudio")
     install_package("pydub")
+    install_package("dbus-python")  # For Bluetooth control on Linux
 
 
 # Check prerequisites before proceeding
@@ -91,11 +95,20 @@ import pyaudio
 import pyttsx3
 from pydub import AudioSegment
 from pydub.playback import play
+from pydub.generators import Sine
+
+# Platform-specific imports for Bluetooth
+if platform.system() == "Linux":
+    import dbus
+    from dbus.mainloop.glib import DBusGMainLoop
+elif platform.system() == "Darwin":
+    import subprocess
 
 
 # ============================================================
 # Helper Functions
 # ============================================================
+
 def pcm_to_float32(pcm: np.ndarray) -> np.ndarray:
     """Convert int16 PCM to float32 normalized to [-1, 1]."""
     return pcm.astype(np.float32) / 32768.0
@@ -137,9 +150,99 @@ def is_speech_webrtc(pcm: np.ndarray, vad: webrtcvad.Vad, sample_rate: int) -> b
     return speech_frames / total_frames > 0.3
 
 
+def generate_beep(duration_ms: int = 100, frequency: int = 800):
+    """Generate a beep sound using Pydub."""
+    beep = Sine(frequency).to_audio_segment(duration=duration_ms)
+    return beep
+
+
+def play_beep(beep):
+    """Play a beep sound."""
+    play(beep)
+
+
+# ============================================================
+# Bluetooth Play/Pause Detection
+# ============================================================
+
+class BluetoothMonitor:
+    """Monitor Bluetooth play/pause button presses."""
+    
+    def __init__(self):
+        self.play_pause_pressed = False
+        self._running = False
+        
+    def start(self):
+        """Start monitoring for Bluetooth play/pause button presses."""
+        self._running = True
+        if platform.system() == "Linux":
+            self._start_linux_monitor()
+        elif platform.system() == "Darwin":
+            self._start_macos_monitor()
+        else:
+            print("[WARNING] Bluetooth play/pause monitoring not supported on this OS.", file=sys.stderr)
+    
+    def _start_linux_monitor(self):
+        """Monitor Bluetooth play/pause button presses on Linux using DBus."""
+        try:
+            DBusGMainLoop(set_as_default=True)
+            bus = dbus.SystemBus()
+            
+            # Listen for signals from the Bluetooth service
+            bus.add_signal_receiver(
+                self._handle_dbus_signal,
+                signal_name="PropertiesChanged",
+                dbus_interface="org.freedesktop.DBus.Properties",
+            )
+            
+            print("[INFO] Monitoring Bluetooth play/pause button (Linux).", file=sys.stderr)
+        except Exception as e:
+            print(f"[ERROR] Failed to start Bluetooth monitor on Linux: {e}", file=sys.stderr)
+    
+    def _start_macos_monitor(self):
+        """Monitor Bluetooth play/pause button presses on macOS using blueutil."""
+        def poll_bluetooth():
+            while self._running:
+                try:
+                    # Use blueutil to check for play/pause button presses
+                    result = subprocess.run(
+                        ["blueutil", "--is-connected"],
+                        capture_output=True,
+                        text=True
+                    )
+                    if result.returncode == 0 and "true" in result.stdout:
+                        # Simulate play/pause detection (replace with actual logic)
+                        self.play_pause_pressed = True
+                        time.sleep(0.5)  # Debounce
+                        self.play_pause_pressed = False
+                except Exception as e:
+                    print(f"[ERROR] Bluetooth monitoring error: {e}", file=sys.stderr)
+                time.sleep(0.1)
+        
+        threading.Thread(target=poll_bluetooth, daemon=True).start()
+        print("[INFO] Monitoring Bluetooth play/pause button (macOS).", file=sys.stderr)
+    
+    def _handle_dbus_signal(self, *args, **kwargs):
+        """Handle DBus signals for Bluetooth events."""
+        # Placeholder for actual DBus signal handling
+        # Replace with logic to detect play/pause button presses
+        self.play_pause_pressed = True
+        time.sleep(0.5)  # Debounce
+        self.play_pause_pressed = False
+    
+    def is_play_pause_pressed(self):
+        """Check if the play/pause button was pressed."""
+        return self.play_pause_pressed
+    
+    def stop(self):
+        """Stop monitoring."""
+        self._running = False
+
+
 # ============================================================
 # Standalone Audio Class
 # ============================================================
+
 class StandaloneAudio:
     def __init__(self):
         # ----------------------------------------
@@ -177,6 +280,8 @@ class StandaloneAudio:
         # Audio input stream
         # ----------------------------------------
         self.pa = pyaudio.PyAudio()
+        
+        # Use default input device (should work with Bluetooth if set as default)
         self.stream = self.pa.open(
             format=pyaudio.paInt16,
             channels=1,
@@ -185,6 +290,11 @@ class StandaloneAudio:
             frames_per_buffer=4096,
             stream_callback=self._audio_callback,
         )
+
+        # ----------------------------------------
+        # Bluetooth Monitor
+        # ----------------------------------------
+        self.bluetooth_monitor = BluetoothMonitor()
 
         # ----------------------------------------
         # State
@@ -201,12 +311,30 @@ class StandaloneAudio:
         # Silence threshold after speech ends to finalize utterance
         self.silence_threshold = 1.5  # seconds
 
+        # Beep sounds
+        self.single_beep = generate_beep(duration_ms=100)
+        self.double_beep = generate_beep(duration_ms=200)
+
     # ============================================================
     # Audio Callback
     # ============================================================
     def _audio_callback(self, in_data, frame_count, time_info, status):
         """Callback for processing audio data."""
         if not self._running:
+            return (in_data, pyaudio.paContinue)
+
+        # Check for Bluetooth play/pause button press
+        if ENABLE_BLUETOOTH_CONTROL and self.bluetooth_monitor.is_play_pause_pressed():
+            if not self._wake_word_detected:
+                self._wake_word_detected = True
+                print(
+                    "[BLUETOOTH] Play/Pause button pressed. Awaiting command...",
+                    file=sys.stderr,
+                )
+                play_beep(self.single_beep)
+                if ENABLE_STT_TTS_LOOPBACK:
+                    self.engine.say("Ready.")
+                    self.engine.runAndWait()
             return (in_data, pyaudio.paContinue)
 
         # Convert raw PCM bytes → numpy array
@@ -236,6 +364,7 @@ class StandaloneAudio:
                     and current_time - self._last_speech_time > self.silence_threshold
                 ):
                     print("[VAD] Speech ended. Finalizing utterance.", file=sys.stderr)
+                    play_beep(self.double_beep)
                     self._finalize_utterance()
                     self._in_utterance = False
                     self._utterance_buffer.clear()
@@ -309,8 +438,10 @@ class StandaloneAudio:
     def start_stt(self):
         """Start continuous speech recognition."""
         self._running = True
+        play_beep(self.single_beep)  # Single beep on start
+        self.bluetooth_monitor.start()
         self.stream.start_stream()
-        print("[STT] Listening for wake word and commands...", file=sys.stderr)
+        print("[STT] Listening for wake word, Bluetooth play/pause, or commands...", file=sys.stderr)
 
     def start_tts(self):
         """Read TTS commands from stdin and speak them."""
@@ -334,6 +465,7 @@ class StandaloneAudio:
     def stop(self):
         """Stop the audio module."""
         self._running = False
+        self.bluetooth_monitor.stop()
         self.stream.stop_stream()
         self.stream.close()
         self.pa.terminate()

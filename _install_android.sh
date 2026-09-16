@@ -60,12 +60,12 @@ if [ "$model_choice" == "2" ]; then
     TOP_K=20
     MIN_P=0.0
 elif [ "$model_choice" == "3" ]; then
-    MODEL_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q2_K_M.gguf"
-    MMPROJ_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q2_K_M-mmproj-BF16.gguf"
+    MODEL_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q2_K.gguf"
+    MMPROJ_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q2_K-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
         wget --content-disposition \
-          "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q2_K_M.gguf?download=true" \
+          "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q2_K.gguf?download=true" \
           -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
@@ -85,12 +85,12 @@ elif [ "$model_choice" == "3" ]; then
     TOP_K=40
     MIN_P=0.00
 elif [ "$model_choice" == "4" ]; then
-    MODEL_PATH="instance/models/Ministral-3-3B-Instruct-2512-Q2_K_M.gguf"
+    MODEL_PATH="instance/models/Ministral-3-3B-Instruct-2512-Q2_K.gguf"
     MMPROJ_PATH=""
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
         wget --content-disposition \
-          "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q2_K_M.gguf?download=true" \
+          "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q2_K.gguf?download=true" \
           -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
@@ -102,12 +102,12 @@ elif [ "$model_choice" == "4" ]; then
     TOP_K=40
     MIN_P=0.00
 else
-    MODEL_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-Q2_K_M.gguf"
+    MODEL_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-Q2_K.gguf"
     MMPROJ_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf"
     if [ ! -f "$MODEL_PATH" ]; then
         echo "Downloading $MODEL_PATH..."
         wget --content-disposition \
-          "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q2_K_M.gguf?download=true" \
+          "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q2_K.gguf?download=true" \
           -O "$MODEL_PATH"
     else
         echo "$MODEL_PATH already exists, skipping download."
