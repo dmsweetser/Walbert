@@ -34,7 +34,7 @@ def install_package(package):
         print(f"[INFO] Installing {package}...", file=sys.stderr)
         subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
-def download_vosk_model(model_path="../instance/models"):
+def download_vosk_model(model_path="vosk"):
     """Download the VOSK model if it doesn't exist."""
     if not os.path.exists(model_path):
         print(f"[INFO] Downloading VOSK model to {model_path}...", file=sys.stderr)
@@ -77,7 +77,8 @@ class StandaloneAudio:
         self.engine.setProperty('voice', 'english-us')
 
         # Initialize VOSK for STT
-        model_path = "model"
+        # script_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.abspath("./vosk/model-small-en-us-0.15/")
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"VOSK model not found at {model_path}. Download failed.")
 
