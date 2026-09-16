@@ -18,7 +18,7 @@ import numpy as np
 # ============================================================
 # Feature Flags
 # ============================================================
-ENABLE_STT_TTS_LOOPBACK = False   # Speak back recognized text for debugging
+ENABLE_STT_TTS_LOOPBACK = True   # Speak back recognized text for debugging
 
 
 # ============================================================
@@ -116,7 +116,7 @@ class StandaloneAudio:
         self._silence_start = None
         self._command_buffer_pcm = []
 
-        self.wake_word = "walbert"
+        self.wake_word = "hey"
         self.silence_threshold = 2.5  # seconds
 
     # ============================================================
