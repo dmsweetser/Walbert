@@ -1,5 +1,4 @@
 #!/bin/bash
-# Walbert Installation Script (PipeWire + Bluetooth + Whisper + Piper TTS aware)
 
 set -e
 
@@ -144,76 +143,6 @@ else
     TOP_P=0.9
     TOP_K=40
     MIN_P=0.05
-fi
-
-# Download Piper TTS model
-PIPER_MODEL="instance/models/en_GB-northern_english_male-medium.onnx"
-if [ ! -f "$PIPER_MODEL" ]; then
-    echo "Downloading Piper TTS model..."
-    wget -O "$PIPER_MODEL" \
-      "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/GB/northern_english/male/medium/en_GB-northern_english-male-medium.onnx"
-else
-    echo "$PIPER_MODEL already exists, skipping download."
-fi
-
-echo "Configure Bluetooth Audio Device:"
-read -p "Enable Bluetooth audio routing? (y/n) [n]: " bt_choice
-bt_enabled=${bt_choice:-n}
-BT_DEVICE="null"
-BT_SINK="null"
-BT_SOURCE="null"
-
-if [[ "$bt_enabled" == "y" ]]; then
-    if command -v bluetoothctl &> /dev/null; then
-        echo "Scanning for Bluetooth audio devices (10 seconds)..."
-        bluetoothctl --timeout 10 scan on
-
-        echo "Discovered devices:"
-        RAW_DEVICES=$(bluetoothctl devices)
-
-        # Parse into arrays
-        mapfile -t DEV_LINES < <(echo "$RAW_DEVICES" | grep "^Device ")
-
-        if [ ${#DEV_LINES[@]} -eq 0 ]; then
-            echo "No Bluetooth devices found."
-            BT_DEVICE="null"
-        else
-            echo "Available devices:"
-            i=1
-            for line in "${DEV_LINES[@]}"; do
-                MAC=$(echo "$line" | awk '{print $2}')
-                NAME=$(echo "$line" | cut -d' ' -f3-)
-                echo "  $i) $NAME ($MAC)"
-                i=$((i+1))
-            done
-
-            read -p "Select a device by number (1-${#DEV_LINES[@]}): " device_num
-
-            if [[ "$device_num" =~ ^[0-9]+$ ]] && [ "$device_num" -ge 1 ] && [ "$device_num" -le ${#DEV_LINES[@]} ]; then
-                SELECTED="${DEV_LINES[$((device_num-1))]}"
-                BT_MAC=$(echo "$SELECTED" | awk '{print $2}')
-                BT_DEVICE="$BT_MAC"
-
-                echo "Pairing and connecting to $BT_MAC..."
-                echo -e "pair $BT_MAC\ntrust $BT_MAC" | bluetoothctl
-                echo -e "connect $BT_MAC" | bluetoothctl
-                sleep 1
-                echo -e "connect $BT_MAC" | bluetoothctl
-
-                echo "Bluetooth device info:"
-                echo -e "info $BT_MAC" | bluetoothctl
-
-                BT_SINK="null"
-                BT_SOURCE="null"
-            else
-                echo "Invalid selection."
-                BT_DEVICE="null"
-            fi
-        fi
-        
-    else
-        echo "bluetoothctl not found. Please configure manually in config.json."
-    fi
 fi
 
 if [[ "$bt_enabled" == "y" ]]; then bt_enabled=true; else bt_enabled=false; fi
