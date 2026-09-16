@@ -2,6 +2,4 @@ python-dotenv
 requests
 numpy
 readchar
-speechrecognition
-pyttsx3
 psutil
