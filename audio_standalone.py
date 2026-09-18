@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
-Walbert Standalone Audio Module (Offline, Faster-Whisper + Silero VAD Edition)
+Walbert Standalone Audio Module (Offline, Faster-Whisper + WebRTC VAD Edition)
 
 - STT: faster-whisper (base) running locally
-- VAD: WebRTC VAD + Silero VAD-style logic for speech detection
-- Wake word: "walbert" detected from transcribed text OR Bluetooth play/pause button press
+- VAD: WebRTC VAD for speech detection
+- Wake word: "computer" detected from transcribed text
 - TTS: pyttsx3 with espeak
 - Debug: console output of audio → text, optional STT→TTS loopback
-- Bluetooth: Supports default input/output via Bluetooth
 - Audio Feedback: Single beep on start, double-beep on successful input capture
 
 This script is fully self-contained and will attempt to install all dependencies.
@@ -27,86 +26,86 @@ import numpy as np
 # ============================================================
 # Feature Flags
 # ============================================================
-ENABLE_STT_TTS_LOOPBACK = True  # Speak back recognized text for debugging
-ENABLE_BLUETOOTH_CONTROL = True  # Enable Bluetooth play/pause button as wake trigger
+ENABLE_STT_TTS_LOOPBACK = False  # Speak back recognized text for debugging
 
 # ============================================================
 # Dependency Installation
 # ============================================================
 
-def run_command(command, error_message):
+def run_command(command, error_message, suppress_output=False):
     """Run a shell command and handle errors gracefully."""
     try:
-        subprocess.check_call(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        stdout = subprocess.DEVNULL if suppress_output else None
+        stderr = subprocess.DEVNULL if suppress_output else None
+        subprocess.check_call(command, stdout=stdout, stderr=stderr)
         return True
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
         print(f"[WARNING] {error_message}", file=sys.stderr)
+        print(f"[DEBUG] Command failed: {' '.join(command)}", file=sys.stderr)
         return False
     except Exception as e:
         print(f"[ERROR] Unexpected error: {e}", file=sys.stderr)
         return False
 
-
 def install_system_dependencies():
     """Install system-level dependencies for audio processing."""
     if platform.system() == "Linux":
         print("[INFO] Installing system dependencies for Linux...", file=sys.stderr)
-        
+
         # Update package lists
         run_command(
             ["sudo", "apt-get", "update"],
-            "Failed to update package lists. Some system dependencies may not be installed."
+            "Failed to update package lists. Some system dependencies may not be installed.",
+            suppress_output=True
         )
-        
+
         # Install required packages
         system_packages = [
             "espeak",
-            "ffmpeg", 
+            "ffmpeg",
             "portaudio19-dev",
             "pulseaudio",
-            "pulseaudio-module-bluetooth",
-            "bluez",
-            "bluez-tools",
-            "python3-dbus",
-            "python3-gi"
         ]
-        
+
         for package in system_packages:
             run_command(
                 ["sudo", "apt-get", "install", "-y", package],
-                f"Failed to install {package}. You may need to install it manually."
+                f"Failed to install {package}. You may need to install it manually.",
+                suppress_output=True
             )
-    
+
     elif platform.system() == "Darwin":  # macOS
         print("[INFO] Installing system dependencies for macOS...", file=sys.stderr)
-        
+
         # Check if Homebrew is installed
         if not run_command(["brew", "--version"], "Homebrew not found. Please install Homebrew first."):
             print("[ERROR] Homebrew is required for macOS. Install it from https://brew.sh", file=sys.stderr)
-            return
-        
+            return False
+
         # Install required packages
-        system_packages = ["espeak", "ffmpeg", "portaudio", "blueutil"]
-        
+        system_packages = ["espeak", "ffmpeg", "portaudio"]
+
         for package in system_packages:
             run_command(
                 ["brew", "install", package],
-                f"Failed to install {package}. You may need to install it manually."
+                f"Failed to install {package}. You may need to install it manually.",
+                suppress_output=True
             )
-    
     else:
         print(
             "[ERROR] System dependency installation not supported for this OS. "
-            "Please install the following manually: espeak, ffmpeg, portaudio, and Bluetooth tools.",
+            "Please install the following manually: espeak, ffmpeg, portaudio.",
             file=sys.stderr,
         )
-
+        return False
+    return True
 
 def install_python_package(package):
     """Install a Python package if it's not already installed."""
     try:
         __import__(package)
         print(f"[INFO] {package} is already installed.", file=sys.stderr)
+        return True
     except ImportError:
         print(f"[INFO] Installing {package}...", file=sys.stderr)
         try:
@@ -115,17 +114,18 @@ def install_python_package(package):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
+            return True
         except subprocess.CalledProcessError:
             print(f"[ERROR] Failed to install {package}. You may need to install it manually.", file=sys.stderr)
-
+            return False
 
 def check_prerequisites():
     """Check and install all prerequisites."""
     print("[INFO] Checking and installing prerequisites...", file=sys.stderr)
-    
+
     # Install system dependencies
     install_system_dependencies()
-    
+
     # Install Python packages
     python_packages = [
         "systemtools",
@@ -137,15 +137,9 @@ def check_prerequisites():
         "pyaudio",
         "pydub",
     ]
-    
+
     for package in python_packages:
         install_python_package(package)
-    
-    # Install platform-specific Python packages
-    if platform.system() == "Linux":
-        install_python_package("pydbus")
-        install_python_package("PyGObject")
-
 
 # Check prerequisites before proceeding
 check_prerequisites()
@@ -161,18 +155,6 @@ from pydub import AudioSegment
 from pydub.playback import play
 from pydub.generators import Sine
 
-# Platform-specific imports for Bluetooth
-if platform.system() == "Linux":
-    try:
-        from pydbus import SessionBus
-        from gi.repository import GLib
-    except ImportError:
-        print("[WARNING] pydbus or PyGObject not available. Bluetooth play/pause detection disabled.", file=sys.stderr)
-        ENABLE_BLUETOOTH_CONTROL = False
-elif platform.system() == "Darwin":
-    import subprocess
-
-
 # ============================================================
 # Helper Functions
 # ============================================================
@@ -180,7 +162,6 @@ elif platform.system() == "Darwin":
 def pcm_to_float32(pcm: np.ndarray) -> np.ndarray:
     """Convert int16 PCM to float32 normalized to [-1, 1]."""
     return pcm.astype(np.float32) / 32768.0
-
 
 def frame_generator(pcm: np.ndarray, sample_rate: int, frame_duration_ms: int = 30):
     """
@@ -194,7 +175,6 @@ def frame_generator(pcm: np.ndarray, sample_rate: int, frame_duration_ms: int = 
         frame = pcm[offset : offset + n_samples_per_frame]
         yield frame.tobytes()
         offset += n_samples_per_frame
-
 
 def is_speech_webrtc(pcm: np.ndarray, vad: webrtcvad.Vad, sample_rate: int) -> bool:
     """
@@ -217,103 +197,14 @@ def is_speech_webrtc(pcm: np.ndarray, vad: webrtcvad.Vad, sample_rate: int) -> b
     # Consider it speech if a reasonable fraction of frames are speech
     return speech_frames / total_frames > 0.3
 
-
 def generate_beep(duration_ms: int = 100, frequency: int = 800):
     """Generate a beep sound using Pydub."""
     beep = Sine(frequency).to_audio_segment(duration=duration_ms)
     return beep
 
-
 def play_beep(beep):
     """Play a beep sound."""
     play(beep)
-
-
-# ============================================================
-# Bluetooth Play/Pause Detection
-# ============================================================
-
-class BluetoothMonitor:
-    """Monitor Bluetooth play/pause button presses."""
-    
-    def __init__(self):
-        self.play_pause_pressed = False
-        self._running = False
-        
-    def start(self):
-        """Start monitoring for Bluetooth play/pause button presses."""
-        self._running = True
-        if platform.system() == "Linux":
-            self._start_linux_monitor()
-        elif platform.system() == "Darwin":
-            self._start_macos_monitor()
-        else:
-            print("[WARNING] Bluetooth play/pause monitoring not supported on this OS.", file=sys.stderr)
-    
-    def _start_linux_monitor(self):
-        """Monitor Bluetooth play/pause button presses on Linux using pydbus."""
-        if not ENABLE_BLUETOOTH_CONTROL:
-            return
-            
-        try:
-            def on_properties_changed(interface, changed, invalidated):
-                # Check for play/pause button press in the changed properties
-                if interface == "org.bluez.MediaPlayer1":
-                    if "PlaybackStatus" in changed:
-                        status = changed["PlaybackStatus"]
-                        if status == "paused":
-                            self.play_pause_pressed = True
-                            time.sleep(0.5)  # Debounce
-                            self.play_pause_pressed = False
-
-            bus = SessionBus()
-            bus.subscribe(
-                sender="org.bluez",
-                signal="PropertiesChanged",
-                object="/org/bluez/hci0",  # Adjust based on your Bluetooth device
-                callback=on_properties_changed,
-            )
-
-            # Start a GLib main loop in a separate thread
-            loop = GLib.MainLoop()
-            loop_thread = threading.Thread(target=loop.run, daemon=True)
-            loop_thread.start()
-            
-            print("[INFO] Monitoring Bluetooth play/pause button (Linux).", file=sys.stderr)
-        except Exception as e:
-            print(f"[ERROR] Failed to start Bluetooth monitor on Linux: {e}", file=sys.stderr)
-    
-    def _start_macos_monitor(self):
-        """Monitor Bluetooth play/pause button presses on macOS using blueutil."""
-        def poll_bluetooth():
-            while self._running:
-                try:
-                    # Use blueutil to check for connected devices
-                    result = subprocess.run(
-                        ["blueutil", "--is-connected"],
-                        capture_output=True,
-                        text=True
-                    )
-                    if result.returncode == 0 and "true" in result.stdout:
-                        # Simulate play/pause detection (replace with actual logic)
-                        self.play_pause_pressed = True
-                        time.sleep(0.5)  # Debounce
-                        self.play_pause_pressed = False
-                except Exception as e:
-                    print(f"[ERROR] Bluetooth monitoring error: {e}", file=sys.stderr)
-                time.sleep(0.1)
-        
-        threading.Thread(target=poll_bluetooth, daemon=True).start()
-        print("[INFO] Monitoring Bluetooth play/pause button (macOS).", file=sys.stderr)
-    
-    def is_play_pause_pressed(self):
-        """Check if the play/pause button was pressed."""
-        return self.play_pause_pressed
-    
-    def stop(self):
-        """Stop monitoring."""
-        self._running = False
-
 
 # ============================================================
 # Standalone Audio Class
@@ -341,7 +232,6 @@ class StandaloneAudio:
         # Initialize faster-whisper STT
         # ----------------------------------------
         print("[INFO] Loading faster-whisper model (base)...", file=sys.stderr)
-        # Use CPU; you can change device="cuda" if you have GPU
         self.model = WhisperModel("base", device="cpu", compute_type="int8")
 
         # ----------------------------------------
@@ -349,15 +239,12 @@ class StandaloneAudio:
         # ----------------------------------------
         self.sample_rate = 16000
         self.vad = webrtcvad.Vad()
-        # Aggressiveness: 0–3 (3 is most aggressive)
-        self.vad.set_mode(2)
+        self.vad.set_mode(2)  # Aggressiveness: 0–3 (3 is most aggressive)
 
         # ----------------------------------------
         # Audio input stream
         # ----------------------------------------
         self.pa = pyaudio.PyAudio()
-        
-        # Use default input device (should work with Bluetooth if set as default)
         self.stream = self.pa.open(
             format=pyaudio.paInt16,
             channels=1,
@@ -368,20 +255,14 @@ class StandaloneAudio:
         )
 
         # ----------------------------------------
-        # Bluetooth Monitor
-        # ----------------------------------------
-        self.bluetooth_monitor = BluetoothMonitor()
-
-        # ----------------------------------------
         # State
         # ----------------------------------------
         self._running = False
-
         self._in_utterance = False
         self._utterance_buffer = deque()
         self._last_speech_time = None
 
-        self.wake_word = "walbert"
+        self.wake_word = "computer"
         self._wake_word_detected = False
 
         # Silence threshold after speech ends to finalize utterance
@@ -397,20 +278,6 @@ class StandaloneAudio:
     def _audio_callback(self, in_data, frame_count, time_info, status):
         """Callback for processing audio data."""
         if not self._running:
-            return (in_data, pyaudio.paContinue)
-
-        # Check for Bluetooth play/pause button press
-        if ENABLE_BLUETOOTH_CONTROL and self.bluetooth_monitor.is_play_pause_pressed():
-            if not self._wake_word_detected:
-                self._wake_word_detected = True
-                print(
-                    "[BLUETOOTH] Play/Pause button pressed. Awaiting command...",
-                    file=sys.stderr,
-                )
-                play_beep(self.single_beep)
-                if ENABLE_STT_TTS_LOOPBACK:
-                    self.engine.say("Ready.")
-                    self.engine.runAndWait()
             return (in_data, pyaudio.paContinue)
 
         # Convert raw PCM bytes → numpy array
@@ -490,8 +357,9 @@ class StandaloneAudio:
                     f"[STT] Wake word '{self.wake_word}' detected. Awaiting command...",
                     file=sys.stderr,
                 )
+                play_beep(self.single_beep)
                 if ENABLE_STT_TTS_LOOPBACK:
-                    self.engine.say("Ready.")
+                    self.engine.say("... Ready.")
                     self.engine.runAndWait()
             return
 
@@ -502,7 +370,7 @@ class StandaloneAudio:
             print(command_text, flush=True)
 
             if ENABLE_STT_TTS_LOOPBACK:
-                self.engine.say("..." + command_text)
+                self.engine.say(command_text)
                 self.engine.runAndWait()
 
             # Reset wake word state after command
@@ -515,9 +383,8 @@ class StandaloneAudio:
         """Start continuous speech recognition."""
         self._running = True
         play_beep(self.single_beep)  # Single beep on start
-        self.bluetooth_monitor.start()
         self.stream.start_stream()
-        print("[STT] Listening for wake word, Bluetooth play/pause, or commands...", file=sys.stderr)
+        print("[STT] Listening for wake word and commands...", file=sys.stderr)
 
     def start_tts(self):
         """Read TTS commands from stdin and speak them."""
@@ -541,12 +408,10 @@ class StandaloneAudio:
     def stop(self):
         """Stop the audio module."""
         self._running = False
-        self.bluetooth_monitor.stop()
         self.stream.stop_stream()
         self.stream.close()
         self.pa.terminate()
         print("[STT/TTS] Stopped.", file=sys.stderr)
-
 
 # ============================================================
 # Main
