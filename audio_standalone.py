@@ -263,7 +263,6 @@ class StandaloneAudio:
         self._last_speech_time = None
 
         self.wake_word = "computer"
-        self._wake_word_detected = False
 
         # Silence threshold after speech ends to finalize utterance
         self.silence_threshold = 1.5  # seconds
@@ -341,40 +340,27 @@ class StandaloneAudio:
         for segment in segments:
             full_text += segment.text
 
-        full_text = full_text.strip()
-        lower_text = full_text.lower()
+        full_text = full_text.strip().lower()
+        print(f"[STT] Text: {full_text}", file=sys.stderr)
+        print(full_text, flush=True)
 
-        # Console output of audio → text
-        if full_text:
-            print(f"[STT] Text: {full_text}", file=sys.stderr)
-            print(full_text, flush=True)
-
-        # Wake word handling
-        if not self._wake_word_detected:
-            if self.wake_word in lower_text:
-                self._wake_word_detected = True
-                print(
-                    f"[STT] Wake word '{self.wake_word}' detected. Awaiting command...",
-                    file=sys.stderr,
-                )
-                play_beep(self.single_beep)
+        # Check for wake word and process command immediately
+        if self.wake_word in full_text:
+            play_beep(self.single_beep)
+            # Extract command text after the wake word
+            command_text = full_text.split(self.wake_word, 1)[1].strip()
+            if command_text:
+                print(f"[COMMAND] {command_text}", file=sys.stderr)
+                print(command_text, flush=True)
                 if ENABLE_STT_TTS_LOOPBACK:
-                    self.engine.say("... Ready.")
+                    self.engine.say(command_text)
                     self.engine.runAndWait()
-            return
-
-        # If wake word already detected, treat this utterance as a command
-        if self._wake_word_detected and full_text:
-            command_text = full_text
-            print(f"[COMMAND] {command_text}", file=sys.stderr)
-            print(command_text, flush=True)
-
-            if ENABLE_STT_TTS_LOOPBACK:
-                self.engine.say(command_text)
-                self.engine.runAndWait()
-
-            # Reset wake word state after command
-            self._wake_word_detected = False
+            else:
+                # Wake word detected but no command provided
+                print("[STT] Wake word detected. Awaiting command...", file=sys.stderr)
+                if ENABLE_STT_TTS_LOOPBACK:
+                    self.engine.say("Ready.")
+                    self.engine.runAndWait()
 
     # ============================================================
     # Public API
