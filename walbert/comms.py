@@ -129,6 +129,11 @@ class NetworkManager:
             if ip == self.local_ip:
                 continue  # Skip self
 
+            # Skip already known peers to prevent handshake loops
+            with self._lock:
+                if ip in self.known_peers:
+                    continue
+
             semaphore.acquire()
             threading.Thread(target=scan_ip, args=(ip,), daemon=True).start()
 
@@ -196,11 +201,11 @@ class NetworkManager:
             if raw_message == self.handshake_message:
                 client.sendall(self.handshake_response.encode() + b"\n")
                 logger.info(f"Responded to handshake from {addr}")
-                # Add to peers if not already present
                 with self._lock:
-                    if addr[0] not in self.known_peers:
-                        self.known_peers[addr[0]] = self.port
-                        self.peer_last_seen[addr[0]] = time.time()
+                    was_new = addr[0] not in self.known_peers
+                    self.known_peers[addr[0]] = self.port
+                    self.peer_last_seen[addr[0]] = time.time()
+                    if was_new:
                         logger.info(f"Added peer from handshake: {addr[0]}:{self.port}")
                 return
 
