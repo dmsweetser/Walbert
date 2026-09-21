@@ -318,7 +318,7 @@ class StandaloneAudio:
     # Utterance Finalization and STT
     # ============================================================
     def _finalize_utterance(self):
-        """Combine buffered PCM, run STT, handle wake word and commands."""
+        """Combine buffered PCM, run STT, and write to input.txt for Walbert."""
         if not self._utterance_buffer:
             return
 
@@ -342,21 +342,21 @@ class StandaloneAudio:
 
         full_text = full_text.strip().lower()
         print(f"[STT] Text: {full_text}", file=sys.stderr)
-        print(full_text, flush=True)
-
-        # Check for wake word and process command immediately
+        
         if self.wake_word in full_text:
             play_beep(self.single_beep)
-            # Extract command text after the wake word
             command_text = full_text.split(self.wake_word, 1)[1].strip()
             if command_text:
+                try:
+                    with open('input.txt', 'w', encoding='utf-8') as f:
+                        f.write(command_text)
+                except Exception as e:
+                    print(f"[STT] Error writing to input.txt: {e}", file=sys.stderr)
                 print(f"[COMMAND] {command_text}", file=sys.stderr)
-                print(command_text, flush=True)
                 if ENABLE_STT_TTS_LOOPBACK:
                     self.engine.say(command_text)
                     self.engine.runAndWait()
             else:
-                # Wake word detected but no command provided
                 print("[STT] Wake word detected. Awaiting command...", file=sys.stderr)
                 if ENABLE_STT_TTS_LOOPBACK:
                     self.engine.say("Ready.")
@@ -373,20 +373,24 @@ class StandaloneAudio:
         print("[STT] Listening for wake word and commands...", file=sys.stderr)
 
     def start_tts(self):
-        """Read TTS commands from stdin and speak them."""
+        """Read TTS commands from output.txt and speak them."""
         def speak_loop():
-            print("[TTS] Ready for text input via stdin...", file=sys.stderr)
+            print("[TTS] Ready for text input via output.txt...", file=sys.stderr)
+            last_output = ""
             while self._running:
                 try:
-                    line = sys.stdin.readline()
-                    if not line:
-                        break
-                    text = line.strip()
-                    if text:
-                        self.engine.say(text)
-                        self.engine.runAndWait()
+                    if os.path.exists('output.txt'):
+                        with open('output.txt', 'r', encoding='utf-8') as f:
+                            text = f.read().strip()
+                        if text and text != last_output:
+                            self.engine.say(text)
+                            self.engine.runAndWait()
+                            last_output = text
+                        os.remove('output.txt')
+                    time.sleep(0.5)
                 except Exception as e:
                     print(f"[TTS] Error: {e}", file=sys.stderr)
+                    time.sleep(1)
 
         thread = threading.Thread(target=speak_loop, daemon=True)
         thread.start()

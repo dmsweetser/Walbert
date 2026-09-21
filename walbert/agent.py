@@ -347,7 +347,14 @@ class WalbertAgent:
             self.logger.error(f"Error logging prompt/response: {e}")
 
     def write_output(self, text: str, block_type: str = None) -> None:
-        """Write output to console."""
+        """Write output to console and output.txt for TTS."""
+        if block_type == "console_response_blocking" or block_type == "console_response_nonblocking":
+            # Write to output file for TTS consumption
+            try:
+                with open('output.txt', 'w', encoding='utf-8') as f:
+                    f.write(text)
+            except Exception:
+                pass
         if block_type == "console_response_blocking" or block_type == "console_response_nonblocking" or self.print_raw:
             if block_type in ("awareness", "context_blocks"):
                 formatted_text = f"{chr(10)}".join(f"**** {line}" for line in text.split(f"{chr(10)}"))
