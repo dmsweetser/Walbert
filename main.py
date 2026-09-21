@@ -4,6 +4,7 @@ Walbert - Local AI Agent
 Main entry point for the Walbert AI agent system (headless-aware)
 """
 
+import select
 import sys
 import os
 import logging
@@ -151,18 +152,20 @@ def run_main_loop(agent, input_queue):
     try:
         while True:
             user_input = None
-            # Check for file-based input first
-            if os.path.exists('input.txt'):
-                try:
-                    with open('input.txt', 'r', encoding='utf-8') as f:
-                        user_input = f.read().strip()
-                    os.remove('input.txt')
-                except Exception:
-                    pass
-            
-            # Fallback to console input if no file input was processed
-            if user_input is None:
-                user_input = get_nonblocking_input()
+            while user_input is None:
+                # Re-check file in case audio module wrote to it
+                if os.path.exists('input.txt'):
+                    try:
+                        with open('input.txt', 'r', encoding='utf-8') as f:
+                            user_input = f.read().strip()
+                        os.remove('input.txt')
+                        break
+                    except Exception:
+                        pass
+                # Wait for stdin with a short timeout to avoid blocking
+                if select.select([sys.stdin], [], [], 0.1)[0]:
+                    user_input = get_nonblocking_input()
+                    break
 
             if user_input.lower() in ['exit', 'quit']:
                 input_queue.put(("exit",))
