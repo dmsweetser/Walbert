@@ -9,6 +9,7 @@ source venv/bin/activate || { echo "[ERROR] Failed to activate virtual environme
 cleanup() {
     pkill -f "python3 audio_standalone.py" 2>/dev/null
     pkill -f "python3 main.py" 2>/dev/null
+    # Explicitly clear IPC files on exit
     rm -f input.txt output.txt
 }
 trap cleanup EXIT
@@ -21,6 +22,19 @@ if ! kill -0 $AUDIO_PID 2>/dev/null; then
     echo "[ERROR] audio_standalone.py failed to start."
     exit 1
 fi
+
+# Explicitly handle output.txt for TTS only (prevents accidental STT feedback)
+(
+    while true; do
+        if [ -f "output.txt" ]; then
+            # Only pass to TTS, never to STT
+            cat output.txt > /dev/null
+            rm -f output.txt
+        fi
+        sleep 0.5
+    done
+) &
+TTS_LOOP_PID=$!
 
 # Start main.py
 if [ "$1" = "test" ]; then

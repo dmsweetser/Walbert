@@ -306,7 +306,6 @@ class StandaloneAudio:
                     and current_time - self._last_speech_time > self.silence_threshold
                 ):
                     print("[VAD] Speech ended. Finalizing utterance.", file=sys.stderr)
-                    play_beep(self.double_beep)
                     self._finalize_utterance()
                     self._in_utterance = False
                     self._utterance_buffer.clear()
@@ -348,6 +347,7 @@ class StandaloneAudio:
             command_text = full_text.split(self.wake_word, 1)[1].strip()
             if command_text:
                 try:
+                    # STRICT: STT ONLY writes to input.txt
                     with open('input.txt', 'w', encoding='utf-8') as f:
                         f.write(command_text)
                 except Exception as e:
@@ -359,7 +359,7 @@ class StandaloneAudio:
             else:
                 print("[STT] Wake word detected. Awaiting command...", file=sys.stderr)
                 if ENABLE_STT_TTS_LOOPBACK:
-                    self.engine.say("Ready.")
+                    self.engine.say("... Ready.")
                     self.engine.runAndWait()
 
     # ============================================================
@@ -379,6 +379,7 @@ class StandaloneAudio:
             last_output = ""
             while self._running:
                 try:
+                    # STRICT: TTS ONLY reads output.txt
                     if os.path.exists('output.txt'):
                         with open('output.txt', 'r', encoding='utf-8') as f:
                             text = f.read().strip()
