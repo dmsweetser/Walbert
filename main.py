@@ -56,9 +56,21 @@ def get_nonblocking_input(prompt: str = ">>>>> ") -> str:
     """
     Read input from stdin in a non-blocking way, echoing characters as they are typed.
     Supports backspace. Returns the input string when Enter is pressed.
+    Falls back to line-based read when no TTY is available (headless/SSH mode).
     """
-    import readchar
     print(prompt, end='', flush=True)
+    # Check if we have a TTY; if not, use simple line read
+    if not sys.stdin.isatty():
+        try:
+            line = sys.stdin.readline()
+            if not line:
+                return ''
+            return line.rstrip('\n\r')
+        except KeyboardInterrupt:
+            print(f"{chr(10)}Interrupting...")
+            raise
+    # TTY mode: interactive character-by-character read
+    import readchar
     user_input = []
     while True:
         try:
@@ -118,7 +130,6 @@ def print_welcome_message(agent):
 
 
 def _paged_output(text):
-    import readchar
     lines = text.split('\n')
     idx = 0
     print(f"{chr(10)}--- PAGED OUTPUT (n=next, p=prev, q=exit) ---")
@@ -131,7 +142,11 @@ def _paged_output(text):
             print("--- END OF OUTPUT ---")
             break
         print(f"{chr(10)}[Press n for next, p for prev, q to exit] ", end='', flush=True)
+        # Skip interactive paging in headless mode; just continue
+        if not sys.stdin.isatty():
+            continue
         try:
+            import readchar
             cmd = readchar.readchar()
             if cmd == 'n':
                 continue
