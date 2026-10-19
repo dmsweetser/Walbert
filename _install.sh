@@ -40,6 +40,7 @@ echo "1) Devstral-24B-Instruct-GGUF (Default)"
 echo "2) Qwen3.6-35B-A3B"
 echo "3) Ministral 3 - 8B"
 echo "4) Ministral 3 - 3B"
+echo "5) Qwen3.5-4B (Lightweight)"
 read -p "Enter choice: " model_choice
 
 MODEL_PATH=""
@@ -114,6 +115,23 @@ elif [ "$model_choice" == "4" ]; then
     fi
     CONTEXT_SIZE=32768
     OUTPUT_TOKENS=16384
+    TEMPERATURE=0.7
+    TOP_P=0.9
+    TOP_K=40
+    MIN_P=0.00
+elif [ "$model_choice" == "5" ]; then
+    MODEL_PATH="instance/models/Qwen3.5-4B-IQ4_XS.gguf"
+    MMPROJ_PATH=""
+    if [ ! -f "$MODEL_PATH" ]; then
+        echo "Downloading $MODEL_PATH..."
+        wget --content-disposition \
+          "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-IQ4_XS.gguf?download=true" \
+          -O "$MODEL_PATH"
+    else
+        echo "$MODEL_PATH already exists, skipping download."
+    fi
+    CONTEXT_SIZE=32768
+    OUTPUT_TOKENS=8192
     TEMPERATURE=0.7
     TOP_P=0.9
     TOP_K=40

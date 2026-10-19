@@ -122,6 +122,20 @@ Capabilities: reasoning, memory, dynamic schema management, Python/Bash executio
    - Use [walbert_console_response_nonblocking_start] for standard updates that do not halt execution.
    - Be concise; avoid spam.
 
+5. **Tool Calling** (when tools are enabled):
+   - Use [TOOL:tool_name] blocks to call tools. Tools are listed in the Available Tools section below.
+   - Format:
+     [TOOL:tool_name]
+     param1:value1
+     param2:
+     multi-line value here
+     [TOOL_END]
+   - Parameters are key:value pairs. A bare key: starts a multi-line value. No escaping needed.
+   - Tool results are appended to your context automatically.
+   - You can create new persistent tools using the create_tool tool.
+   - Use list_tools to see all available tools.
+   - Use get_tool with a tool_name to see its full definition.
+
 ---
 ## Other Allowed Blocks
 [walbert_console_response_blocking_start]
@@ -386,7 +400,7 @@ Reply ONLY in block format. NO EXTRA TEXT.
         """Rough token estimation using character-to-token heuristic."""
         return len(text) // 4
 
-    def get_prompt(self, max_tokens: int = 2048, user_input: str = None, peers: List[str] = None) -> str:
+    def get_prompt(self, max_tokens: int = 2048, user_input: str = None, peers: List[str] = None, tools_enabled: bool = True, tool_definitions: str = "") -> str:
         """Generate the full prompt by combining all components, with token-aware truncation."""
         self.refresh_db_schema()
         self._sync_state()
@@ -417,6 +431,10 @@ Reply ONLY in block format. NO EXTRA TEXT.
             base_prompt += f"## Pending Peer Responses: {', '.join(self._pending_peer_responses)}{chr(10)}{chr(10)}"
         else:
             base_prompt += f"## Pending Peer Responses: None{chr(10)}{chr(10)}"
+
+        # Tool definitions (appended to prompt for tool-calling capability)
+        if tools_enabled and tool_definitions:
+            base_prompt += tool_definitions
 
         # Peer sending instruction block - only included if no responses are pending
         if peers and not self._pending_peer_responses:

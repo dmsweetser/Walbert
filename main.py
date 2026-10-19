@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Walbert - Local AI Agent
 Main entry point for the Walbert AI agent system (headless-aware)
@@ -85,17 +84,17 @@ def print_welcome_message(agent):
     # Print welcome message and ASCII art
     print("""          
  ___            ___      
-/   \\          /   \\    
-\\_   \\        /  __/    
- _\\   \\      /  /__     
- \\___  \\____/   __/     
-     \\_       _/        
-       | @ @  \\_        
+\   \          /   \    
+\__   \        /  __/    
+ _\   \      /  __/     
+ \___\______/   __/     
+     \_       _/        
+       | @ @  \_        
        |                
-     _/     /\\          
-    /o)  (o/\\ \\_        
-    \\_____/ /           
-      \\____/                      
+     _/     /\         
+    /o)  (o/\ \_        
+    \_____/ /           
+      \____/                      
               """)
 
     print("Welcome to Walbert! The local-first AI agent.")
@@ -110,10 +109,11 @@ def print_welcome_message(agent):
     print("- show user_directive: View user directive")
     print("- show peer_awareness: View awareness of active peers")
     print("- show schema: View database schema")
+    print("- list tools: List all available tools")
     print("- pip_install <package>: Install a Python package in the main environment")
     print("- help: Show these options again")
     print("- Any other input will be treated as a request to Walbert")
-    print(f"{chr(10)}Status: Python={'ON' if agent.config.python_execution_enabled else 'OFF'}, Bash={'ON' if agent.config.bash_execution_enabled else 'OFF'}, Peer={'ON' if agent.config.peer_communication_enabled else 'OFF'}, Waiting_For_User={'YES' if agent.waiting_for_user else 'NO'}")
+    print(f"{chr(10)}Status: Python={'ON' if agent.config.python_execution_enabled else 'OFF'}, Bash={'ON' if agent.config.bash_execution_enabled else 'OFF'}, Peer={'ON' if agent.config.peer_communication_enabled else 'OFF'}, Tools={'ON' if agent.tools_enabled else 'OFF'}, Waiting_For_User={'YES' if agent.waiting_for_user else 'NO'}")
     print("")
 
 
@@ -194,6 +194,12 @@ def run_main_loop(agent, input_queue):
             elif user_input.lower() == 'log off':
                 agent.print_raw = False
                 print(f"{chr(10)}Raw log output disabled. Only console responses will be shown.")
+            elif user_input.lower() == 'tools on':
+                agent.tools_enabled = True
+                print(f"{chr(10)}Tool calling enabled.")
+            elif user_input.lower() == 'tools off':
+                agent.tools_enabled = False
+                print(f"{chr(10)}Tool calling disabled.")
             elif user_input.lower() == 'show user_awareness':
                 if hasattr(agent, 'state') and agent.state:
                     _paged_output(f"--- AWARENESS ---\n{agent.state._user_awareness}\n--- END ---")
@@ -224,6 +230,12 @@ def run_main_loop(agent, input_queue):
                     _paged_output(f"--- DB SCHEMA ---\n{agent.state.db_schema}\n--- END ---")
                 else:
                     print(f"{chr(10)}No schema data available yet.")
+            elif user_input.lower() == 'list tools':
+                if hasattr(agent, 'tools') and agent.tools:
+                    tools_text = agent.tools.registry.to_prompt_format()
+                    _paged_output(tools_text)
+                else:
+                    print(f"{chr(10)}Tools not initialized.")
             elif user_input.lower().startswith('pip_install '):
                 package = user_input[12:].strip()
                 if package:

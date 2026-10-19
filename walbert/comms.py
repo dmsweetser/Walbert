@@ -1,7 +1,6 @@
 """
 Network communication module for Walbert-to-Walbert interaction.
 Uses TCP-based IP scanning and handshake negotiation for peer discovery.
-Fixed to avoid blocking the main thread on startup.
 """
 import socket
 import threading
@@ -30,6 +29,8 @@ class NetworkManager:
         self.handshake_message = "WALBERT_HANDSHAKE"
         self.handshake_response = "WALBERT_CONFIRM"
         self.scan_interval = 60  # seconds
+        self._discovery_lock = threading.Lock()  # Separate lock for discovery ops
+        self._last_scan_time = 0
 
     def _get_local_ip(self) -> Optional[str]:
         """Get the first non-loopback IPv4 address of the machine."""
@@ -85,23 +86,50 @@ class NetworkManager:
         logger.info("NetworkManager stopped")
 
     def _periodic_scan(self):
-        """Run network scan periodically."""
+        """Run network scan periodically.
+        
+        Strategy: scan only a subset of IPs per pass (round-robin) to avoid
+        blocking the main loop. Each IP gets scanned at least once per cycle.
+        """
+        scan_count = 0
         while self._running:
-            self._scan_network()
+            # Scan a batch of IPs each cycle (max 30 per scan to avoid blocking)
+            batch_size = min(30, 254)
+            self._scan_network(batch_size, timeout=0.3)
+            
+            scan_count += 1
             # Sleep for scan_interval, but check _running every second
             for _ in range(self.scan_interval):
                 if not self._running:
                     return
                 time.sleep(1)
 
-    def _scan_network(self, timeout: float = 0.5, max_threads: int = 20):
-        """Scan the local network for Walbert peers using TCP handshake."""
+    def _scan_network(self, max_ips: int = 30, timeout: float = 0.3):
+        """Scan a batch of IPs in the local network for Walbert peers.
+        
+        Uses a round-robin approach to spread scans across the subnet.
+        """
         if not self.network_prefix:
             logger.warning("Cannot scan network: no valid local IP")
             return
 
-        discovered_peers = {}
-        semaphore = threading.Semaphore(max_threads)
+        with self._discovery_lock:
+            # Get IPs not yet known
+            unknown_ips = []
+            for i in range(1, 255):
+                ip = f"{self.network_prefix}.{i}"
+                if ip == self.local_ip:
+                    continue
+                if ip not in self.known_peers:
+                    unknown_ips.append(ip)
+            
+            # Take a batch
+            batch = unknown_ips[:max_ips]
+        
+        if not batch:
+            return  # All peers discovered
+
+        semaphore = threading.Semaphore(min(max_ips, 10))
 
         def scan_ip(ip: str):
             try:
@@ -115,40 +143,25 @@ class NetworkManager:
 
                 if response == self.handshake_response:
                     with self._lock:
-                        discovered_peers[ip] = self.port
-                    logger.info(f"Discovered Walbert peer at {ip}:{self.port}")
+                        if ip not in self.known_peers:
+                            self.known_peers[ip] = self.port
+                            self.peer_last_seen[ip] = time.time()
+                            logger.info(f"Discovered Walbert peer at {ip}:{self.port}")
                 sock.close()
             except Exception:
                 pass
             finally:
                 semaphore.release()
 
-        # Scan all IPs in the subnet (skip network and broadcast addresses)
-        for i in range(1, 255):
-            ip = f"{self.network_prefix}.{i}"
-            if ip == self.local_ip:
-                continue  # Skip self
-
-            # Skip already known peers to prevent handshake loops
-            with self._lock:
-                if ip in self.known_peers:
-                    continue
-
+        # Launch scan threads
+        for ip in batch:
             semaphore.acquire()
             threading.Thread(target=scan_ip, args=(ip,), daemon=True).start()
 
-        # Wait for all threads to complete
-        for _ in range(254):
-            try:
-                semaphore.acquire(timeout=1)
-            except:
-                break
-
-        # Update known peers
-        with self._lock:
-            for ip, port in discovered_peers.items():
-                self.known_peers[ip] = port
-                self.peer_last_seen[ip] = time.time()
+        # Wait for batch to complete (with timeout)
+        deadline = time.time() + (len(batch) * timeout + 2)
+        while semaphore._value < min(max_ips, 10) and time.time() < deadline:
+            time.sleep(0.1)
 
     def _listen_tcp(self):
         """Listen for TCP request/response messages."""
@@ -179,7 +192,10 @@ class NetworkManager:
         server.close()
 
     def _handle_client(self, client: socket.socket, addr: tuple):
-        """Handle incoming TCP request/response."""
+        """Handle incoming TCP request/response.
+        
+        Uses a line-based protocol: messages are terminated by newline.
+        """
         try:
             client.settimeout(10.0)
             data = b""
@@ -195,17 +211,15 @@ class NetworkManager:
                 return
 
             raw_message = data.decode().strip()
-            logger.info(f"Received from {addr}: {raw_message}")
+            logger.debug(f"Received from {addr}: {raw_message[:100]}")
 
             # Handle handshake
             if raw_message == self.handshake_message:
                 client.sendall(self.handshake_response.encode() + b"\n")
-                logger.info(f"Responded to handshake from {addr}")
                 with self._lock:
-                    was_new = addr[0] not in self.known_peers
-                    self.known_peers[addr[0]] = self.port
-                    self.peer_last_seen[addr[0]] = time.time()
-                    if was_new:
+                    if addr[0] not in self.known_peers:
+                        self.known_peers[addr[0]] = self.port
+                        self.peer_last_seen[addr[0]] = time.time()
                         logger.info(f"Added peer from handshake: {addr[0]}:{self.port}")
                 return
 
@@ -217,7 +231,7 @@ class NetworkManager:
                     "timestamp": time.time()
                 })
 
-            # Process request and send response
+            # Send acknowledgment
             response = {
                 "status": "ok",
                 "message": "Request received and processed by Walbert",
@@ -225,9 +239,12 @@ class NetworkManager:
             }
             client.sendall(json.dumps(response).encode() + b"\n")
         except Exception as e:
-            logger.error(f"Client handling error: {e}")
+            logger.debug(f"Client handling error from {addr}: {e}")
         finally:
-            client.close()
+            try:
+                client.close()
+            except Exception:
+                pass
 
     def send_to_peer(self, peer_ip: str, message: str, port: Optional[int] = None, retries: int = 3) -> Optional[str]:
         """Send a raw message string to a specific peer and wait for response."""
@@ -238,7 +255,7 @@ class NetworkManager:
 
         for attempt in range(retries):
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(15.0)
+            sock.settimeout(10.0)
             try:
                 sock.connect((peer_ip, target_port))
                 sock.sendall(message.encode() + b"\n")

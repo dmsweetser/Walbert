@@ -15,13 +15,16 @@ import time
 import queue
 import shutil
 import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from walbert.config import Config
 from walbert.model_config import ModelConfig
 from walbert.state import AgentState
 from walbert.parser import BlockParser
 from walbert.executor import BlockExecutor
 from walbert.comms import NetworkManager
+from walbert.tools.registry import ToolRegistry
+from walbert.tools.parser import ToolParser
+from walbert.tools.executor import ToolExecutor
 
 
 # Initialize logging
@@ -75,7 +78,7 @@ def load_config() -> Config:
 
 
 class WalbertAgent:
-    """Refactored Walbert agent with separated responsibilities."""
+    """Refactored Walbert agent with separated responsibilities and tool calling."""
 
     DEFAULT_USER_CONTROL_TIMEOUT = 300
     MODEL_RESTART_DELAY = 5
@@ -98,6 +101,7 @@ class WalbertAgent:
         self.bash_execution_enabled = config.bash_execution_enabled
         self.print_raw = False
         self.waiting_for_user = False
+        self.tools_enabled = True
         self.input_queue = input_queue
         self.comms = NetworkManager(config) if config.peer_communication_enabled else None
         self._pending_peer_ip = None
@@ -109,6 +113,11 @@ class WalbertAgent:
         self.logger = logging.getLogger('walbert.agent')
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
 
+        # Tool system
+        self.tools = None
+        self.tool_parser = ToolParser()
+        self.tool_executor = None
+
     def _init_components(self):
         """Initialize components that depend on DB connection."""
         from walbert.database.manager import DatabaseManager
@@ -118,6 +127,11 @@ class WalbertAgent:
         self.db = DatabaseManager(self.config.database_path)
         self.state.db = self.db
         self.executor = BlockExecutor(self.config, self.db)
+
+        # Initialize tool system
+        self.tools = ToolRegistry()
+        self.tool_executor = ToolExecutor(self.tools)
+        self.logger.info(f"Initialized {len(self.tools.list_tools())} tools")
 
     def start_conversation(self):
         """Start a new conversation session."""
@@ -162,8 +176,15 @@ class WalbertAgent:
         if self.comms is not None:
             peers = self.comms.get_peer_list()
         self.state.set_pending_peer_responses(self._pending_peer_responses)
-        prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size, user_input=user_input, peers=peers)
-        prompt += f"{chr(10)}Please respond in the appropriate walbert_* blocks. Be concise and sequential.\n"
+        tool_defs = self.tools.to_prompt_format() if (self.tools_enabled and self.tools) else ""
+        prompt = self.state.get_prompt(
+            max_tokens=self.config.model_configs['model'].context_size,
+            user_input=user_input,
+            peers=peers,
+            tools_enabled=self.tools_enabled,
+            tool_definitions=tool_defs
+        )
+        prompt += f"{chr(10)}Please respond using the appropriate walbert_* blocks and/or [TOOL:name] blocks. Be concise and sequential.\n"
 
         model_response = self.model_manager.execute_model(
             prompt,
@@ -177,9 +198,15 @@ class WalbertAgent:
         if interrupt_event and interrupt_event.is_set():
             interrupt_event.clear()
             return ""
-            
+
+        # Parse and execute both old blocks and new tool format
         response_blocks = self.parser.parse(model_response)
         self._execute_pending_blocks(response_blocks)
+
+        # Parse and execute tool blocks
+        if self.tools_enabled:
+            tool_blocks = self.tool_parser.parse(model_response)
+            self._execute_tool_blocks(tool_blocks)
 
         console_content = ""
         is_blocking = False
@@ -188,7 +215,7 @@ class WalbertAgent:
                 console_content = block["content"]
                 is_blocking = block["type"] == "console_response_blocking"
                 break
-        
+
         if console_content:
             self.write_output(console_content, "console_response")
             if is_blocking:
@@ -199,7 +226,7 @@ class WalbertAgent:
                 self.waiting_for_user = False
         else:
             self.waiting_for_user = False
-            
+
         return console_content
 
     def _generate_autonomous_block(self, last_user_input, interrupt_event) -> str:
@@ -208,7 +235,14 @@ class WalbertAgent:
         if self.comms is not None:
             peers = self.comms.get_peer_list()
         self.state.set_pending_peer_responses(self._pending_peer_responses)
-        prompt = self.state.get_prompt(max_tokens=self.config.model_configs['model'].context_size, user_input=last_user_input, peers=peers)
+        tool_defs = self.tools.to_prompt_format() if (self.tools_enabled and self.tools) else ""
+        prompt = self.state.get_prompt(
+            max_tokens=self.config.model_configs['model'].context_size,
+            user_input=last_user_input,
+            peers=peers,
+            tools_enabled=self.tools_enabled,
+            tool_definitions=tool_defs
+        )
         prompt += (
             f"{chr(10)}You are operating autonomously. Please review your current context. Synthesize your progress, update these tracking blocks as needed, and maintain awareness of your database state. If no objectives have been provided, explore the world around you as safely as you can.\n"
         )
@@ -225,16 +259,21 @@ class WalbertAgent:
         if interrupt_event and interrupt_event.is_set():
             interrupt_event.clear()
             return "Continue monitoring and processing."
-            
+
         blocks = self.parser.parse(model_response)
 
         self._execute_pending_blocks(blocks)
+
+        # Parse and execute tool blocks
+        if self.tools_enabled:
+            tool_blocks = self.tool_parser.parse(model_response)
+            self._execute_tool_blocks(tool_blocks)
 
         console_content = ""
         for block in blocks:
             if block["type"] == "console_response_blocking" or block["type"] == "console_response_nonblocking":
                 console_content = block["content"]
-        
+
         if console_content:
             self.write_output(console_content, block["type"])
             print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
@@ -316,6 +355,45 @@ class WalbertAgent:
 
         # Ensure state syncs immediately after execution so next prompt reflects changes
         self.state._sync_state()
+
+    def _execute_tool_blocks(self, tool_calls: List[Dict[str, Any]]):
+        """Execute tool calls from the tool parser.
+        
+        Each tool_call is {"name": str, "params": {str: str}}.
+        Results are appended to state and logged.
+        """
+        if not tool_calls:
+            return
+
+        for tc in tool_calls:
+            tool_name = tc["name"]
+            params = tc["params"]
+            self.logger.info(f"Executing tool: {tool_name} with params: {list(params.keys())}")
+
+            # Log the tool call
+            self._log_block_emitted(f"tool:{tool_name}", json.dumps({"params": params}, indent=2))
+
+            # Execute
+            result = self.tool_executor.execute(tool_name, params)
+
+            # Log result
+            result_text = result.get("result", "")
+            self._log_block_emitted(f"tool_result:{tool_name}", json.dumps(result, indent=2))
+
+            # Append to state for context
+            if result.get("success"):
+                self.state.append_block(f"tool:{tool_name}", result_text)
+                self.state.append_block("tool_result", f"Tool '{tool_name}' succeeded:\n{result_text[:2000]}")
+            else:
+                self.state.append_block(f"tool_error:{tool_name}", result.get("error", "Unknown error"))
+                self.state.append_block("tool_error", f"Tool '{tool_name}' failed: {result.get('error', 'Unknown error')}")
+
+            # Print result
+            if self.print_raw or result.get("success"):
+                self.write_output(
+                    f"[Tool: {tool_name}] {'OK' if result.get('success') else 'FAIL'}: {result_text[:500]}",
+                    f"tool_result:{tool_name}"
+                )
 
     def _log_block_emitted(self, block_type: str, content: str):
         """Log an emitted block to instance/block_logs/emitted/"""
