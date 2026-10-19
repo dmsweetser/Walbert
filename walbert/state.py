@@ -146,18 +146,11 @@ Bot response (BLOCKING). Waits for user input or timeout.
 Bot response (NON-BLOCKING). Continues execution immediately.
 [walbert_console_response_nonblocking_end]
 
-[walbert_sql_execute_start]
-A single SQL statement with no adornment or commentary.
-USE THIS TO INTERACT WITH YOUR SQLITE DB - DO NOT TRY TO USE PYTHON INSTEAD
-[walbert_sql_execute_end]
-
-[walbert_python_execute_start]
-Python code with no adornment or commentary.
-[walbert_python_execute_end]
-
 [walbert_bash_execute_start]
 A single Bash command with no adornment or commentary.
 [walbert_bash_execute_end]
+
+NOTE: SQL execution uses the db_query tool. Python execution uses the python_execute tool. Use [TOOL:db_query] and [TOOL:python_execute] blocks instead of legacy walbert_sql_execute/walbert_python_execute blocks.
 
 ---
 Reply ONLY in block format. NO EXTRA TEXT.

@@ -271,6 +271,36 @@ DEFAULT_TOOLS = {
         "category": "system",
         "handler": "walbert.tools.builtins.system.get_tool"
     },
+    "db_query": {
+        "name": "db_query",
+        "description": "Execute a SQL query against the Walbert SQLite database. Use for SELECT queries to read data, or INSERT/UPDATE/DELETE to modify data.",
+        "parameters": {
+            "db_path": {"type": "string", "description": "Path to the SQLite database file (default: 'instance/walbert.db')", "required": False, "default": "instance/walbert.db"},
+            "sql": {"type": "string", "description": "SQL statement to execute", "required": True}
+        },
+        "category": "database",
+        "handler": "walbert.tools.builtins.sql.execute_sql"
+    },
+    "python_execute": {
+        "name": "python_execute",
+        "description": "Execute Python code in a subprocess. Use for data processing, API calls, file operations, or any task requiring Python.",
+        "parameters": {
+            "code": {"type": "string", "description": "Python source code to execute", "required": True},
+            "timeout": {"type": "integer", "description": "Maximum execution time in seconds (default: 60)", "required": False, "default": 60}
+        },
+        "category": "system",
+        "handler": "walbert.tools.builtins.python.execute_python"
+    },
+    "peer_send": {
+        "name": "peer_send",
+        "description": "Send a message to a peer Walbert instance on the network. Returns the peer's response.",
+        "parameters": {
+            "peer_ip": {"type": "string", "description": "IP address of the peer Walbert instance", "required": True},
+            "message": {"type": "string", "description": "Message text to send to the peer", "required": True}
+        },
+        "category": "network",
+        "handler": "walbert.tools.builtins.shell.peer_send"
+    },
 }
 
 

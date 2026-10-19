@@ -131,6 +131,12 @@ class WalbertAgent:
         # Initialize tool system
         self.tools = ToolRegistry()
         self.tool_executor = ToolExecutor(self.tools)
+        
+        # Wire up the comms manager for peer_send tool
+        if self.comms is not None:
+            from walbert.tools.builtins.shell import set_comms
+            set_comms(self.comms)
+        
         self.logger.info(f"Initialized {len(self.tools.list_tools())} tools")
 
     def start_conversation(self):
@@ -285,9 +291,16 @@ class WalbertAgent:
         return "Continue monitoring and processing."
 
     def _execute_pending_blocks(self, provided_blocks):
-        """Execute all pending blocks (SQL, Python, etc.) in order."""
+        """Execute all pending blocks (SQL, Python, etc.) in order.
+        
+        Routes legacy block types through the tool system for consistency.
+        """
         import re
-        executable_types = {"sql_execute", "python_execute", "bash_execute", "self_awareness", "user_awareness", "immediate_task", "ultimate_task", "impediment", "user_directive"}
+        executable_types = {
+            "sql_execute", "python_execute", "bash_execute",
+            "self_awareness", "user_awareness", "immediate_task",
+            "ultimate_task", "impediment", "user_directive"
+        }
         peer_pattern = re.compile(r'^peer_(\d+\.\d+\.\d+\.\d+)_')
 
         with self._lock:
@@ -323,6 +336,41 @@ class WalbertAgent:
             elif btype == "impediment":
                 self.state._impediment = block["content"]
                 self.state._save_impediment()
+            elif btype in ("sql_execute", "python_execute", "bash_execute"):
+                # Route legacy execution blocks through the tool system
+                if self.tool_executor is not None:
+                    if btype == "sql_execute":
+                        tool_name = "db_query"
+                        tool_params = {"sql": block["content"]}
+                    elif btype == "python_execute":
+                        tool_name = "python_execute"
+                        tool_params = {"code": block["content"]}
+                    else:  # bash_execute
+                        tool_name = "shell_run"
+                        tool_params = {"command": block["content"]}
+
+                    result = self.tool_executor.execute(tool_name, tool_params)
+                    result_text = result.get("result", "")
+
+                    self._log_block_emitted(f"tool:{tool_name}", json.dumps({"params": tool_params}, indent=2))
+                    self._log_block_emitted(f"tool_result:{tool_name}", json.dumps(result, indent=2))
+
+                    self.state.append_block(btype, block["content"])
+                    if result.get("success"):
+                        self.state.append_block("execution_result", result_text)
+                        self.write_output(json.dumps(result, indent=2), btype)
+                    else:
+                        self.state.append_block("execution_error", result.get("error", "Unknown error"))
+                        self.write_output(f"Execution error ({tool_name}): {result.get('error', 'Unknown error')}", btype)
+                else:
+                    # Fallback to legacy executor if tool system not initialized
+                    result_block = self.executor.execute(block)
+                    if result_block:
+                        self._log_block_emitted(result_block["type"], result_block["content"])
+                        self.state.append_block(block["type"], block["content"])
+                        self.state.append_block("execution_result", result_block["content"])
+                        self.write_output(json.dumps(result_block, indent=2), result_block["type"])
+
             elif peer_pattern.match(btype):
                 ip_match = peer_pattern.match(btype)
                 peer_ip = ip_match.group(1) if ip_match else None
@@ -331,25 +379,33 @@ class WalbertAgent:
                         self.state._peer_awareness[peer_ip] = block["content"]
                         self.state._save_peer_awareness()
                     elif btype == f"peer_{peer_ip}_message_send":
+                        # Route peer message sending through the tool system
                         if self.config.peer_communication_enabled and self.comms is not None:
                             if peer_ip in self._pending_peer_responses:
                                 self.logger.warning(f"Already waiting for response from {peer_ip}, skipping message")
                                 continue
                             self._pending_peer_responses.add(peer_ip)
-                            self.comms.send_to_peer(peer_ip, block["content"])
-                            self.logger.info(f"Sent peer message to {peer_ip}, waiting for response")
+                            if self.tool_executor is not None:
+                                result = self.tool_executor.execute("peer_send", {
+                                    "peer_ip": peer_ip,
+                                    "message": block["content"]
+                                })
+                                result_text = result.get("result", "")
+                                self._log_block_emitted(f"tool:peer_send", json.dumps({"peer_ip": peer_ip, "message": "..." }, indent=2))
+                                self._log_block_emitted(f"tool_result:peer_send", json.dumps(result, indent=2))
+                                if result.get("success"):
+                                    self.state.append_block(f"peer_{peer_ip}_message_sent", result_text)
+                                else:
+                                    self.state.append_block(f"peer_{peer_ip}_message_error", result.get("error", "Unknown error"))
+                            else:
+                                # Fallback: direct comms call
+                                self.comms.send_to_peer(peer_ip, block["content"])
+                                self.logger.info(f"Sent peer message to {peer_ip}, waiting for response")
                         else:
                             self.logger.warning("Peer communication disabled or NetworkManager not initialized.")
                     elif btype == f"peer_{peer_ip}_message_received":
                         self.state._peer_awareness[peer_ip] = block["content"]
                         self.state._save_peer_awareness()
-            elif btype in ("sql_execute", "python_execute", "bash_execute"):
-                result_block = self.executor.execute(block)
-                if result_block:
-                    self._log_block_emitted(result_block["type"], result_block["content"])
-                    self.state.append_block(block["type"], block["content"])
-                    self.state.append_block("execution_result", result_block["content"])
-                    self.write_output(json.dumps(result_block, indent=2), result_block["type"])
 
             block["executed"] = True
 

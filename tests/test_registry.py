@@ -153,6 +153,7 @@ class TestToolRegistry:
             "google_calendar_list", "google_calendar_create",
             "google_drive_list", "google_drive_upload",
             "create_tool", "list_tools", "get_tool",
+            "db_query", "python_execute", "peer_send",
         ]
         for tool_name in expected_tools:
             assert tool_name in tools, f"Missing expected tool: {tool_name}"

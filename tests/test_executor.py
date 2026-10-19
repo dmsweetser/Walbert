@@ -154,3 +154,65 @@ class TestToolExecutor:
         })
         assert result["success"] is True
         # Should show results or "No files matching"
+
+    def test_execute_db_query(self, executor, tmp_path):
+        """Test db_query tool."""
+        import sqlite3
+        # Create a test database
+        db_path = str(tmp_path / "test.db")
+        conn = sqlite3.connect(db_path)
+        conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
+        conn.execute("INSERT INTO test (name) VALUES ('walbert')")
+        conn.commit()
+        conn.close()
+        
+        result = executor.execute("db_query", {
+            "db_path": db_path,
+            "sql": "SELECT * FROM test"
+        })
+        assert result["success"] is True
+        assert "walbert" in result["result"]
+        assert "id" in result["result"]
+
+    def test_execute_db_query_insert(self, executor, tmp_path):
+        """Test db_query with INSERT."""
+        import sqlite3
+        db_path = str(tmp_path / "test2.db")
+        conn = sqlite3.connect(db_path)
+        conn.execute("CREATE TABLE items (id INTEGER PRIMARY KEY, value TEXT)")
+        conn.commit()
+        conn.close()
+        
+        result = executor.execute("db_query", {
+            "db_path": db_path,
+            "sql": "INSERT INTO items (value) VALUES ('test')"
+        })
+        assert result["success"] is True
+        assert "1 row" in result["result"]
+
+    def test_execute_python_execute(self, executor):
+        """Test python_execute tool."""
+        result = executor.execute("python_execute", {
+            "code": "print('hello from python tool')",
+            "timeout": "10"
+        })
+        assert result["success"] is True
+        assert "hello from python tool" in result["result"]
+
+    def test_execute_python_execute_empty(self, executor):
+        """Test python_execute with empty code."""
+        result = executor.execute("python_execute", {
+            "code": "",
+            "timeout": "10"
+        })
+        assert result["success"] is True
+        assert "No Python code provided" in result["result"]
+
+    def test_execute_peer_send_no_comms(self, executor):
+        """Test peer_send when comms is not configured."""
+        result = executor.execute("peer_send", {
+            "peer_ip": "192.168.1.1",
+            "message": "hello"
+        })
+        assert result["success"] is True
+        assert "not enabled" in result["result"]

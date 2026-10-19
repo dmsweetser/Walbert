@@ -8,9 +8,42 @@ import logging
 import subprocess
 import tempfile
 import sys
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger("walbert.tools.builtins.shell")
+
+# Module-level reference to the NetworkManager instance.
+# Set by the agent during initialization so peer_send can use it.
+_comms = None
+
+
+def set_comms(comms_manager):
+    """Set the NetworkManager instance for peer communication tools."""
+    global _comms
+    _comms = comms_manager
+
+
+def get_comms():
+    """Get the current NetworkManager instance."""
+    return _comms
+
+
+def peer_send(peer_ip: str, message: str, **kwargs) -> str:
+    """Send a message to a peer Walbert instance.
+    
+    Args:
+        peer_ip: IP address of the peer Walbert instance.
+        message: Message text to send.
+    """
+    comms = get_comms()
+    if comms is None:
+        return "Error: Peer communication is not enabled. Enable it via config or the enable_peer_communication tool."
+    
+    result = comms.send_to_peer(peer_ip, message)
+    if result is None:
+        return f"Error: Failed to send message to {peer_ip} (connection refused or timed out)"
+    
+    return f"Message sent to {peer_ip}.\nResponse: {result}"
 
 
 def run_command(command: str, timeout: int = 60, **kwargs) -> str:
