@@ -54,10 +54,12 @@ class ModelManager:
         ]
 
         logger.info(f"Running llama-completion: {' '.join(cmd)}")
+        # llama-completion writes model output to stderr, info to stderr too
+        # Merge stderr into stdout so we can read everything from one pipe
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
             bufsize=1
         )
