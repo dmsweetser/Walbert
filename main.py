@@ -167,20 +167,33 @@ def run_main_loop(agent, input_queue):
     try:
         while True:
             user_input = None
-            while user_input is None:
-                # Re-check file in case audio module wrote to it
-                if os.path.exists('input.txt'):
-                    try:
-                        with open('input.txt', 'r', encoding='utf-8') as f:
-                            user_input = f.read().strip()
-                        os.remove('input.txt')
-                        break
-                    except Exception:
-                        pass
-                # Wait for stdin with a short timeout to avoid blocking
+            # First, check for file-based input (headless/audio mode)
+            if os.path.exists('input.txt'):
+                try:
+                    with open('input.txt', 'r', encoding='utf-8') as f:
+                        user_input = f.read().strip()
+                    os.remove('input.txt')
+                except Exception:
+                    pass
+            # Only check stdin if we don't have file input yet
+            if user_input is None and not sys.stdin.isatty():
+                # Non-TTY: use blocking readline (handles EOF cleanly)
+                try:
+                    line = sys.stdin.readline()
+                    if line:
+                        user_input = line.rstrip('\n\r')
+                except KeyboardInterrupt:
+                    print(f"{chr(10)}Interrupting...")
+                    raise
+            elif user_input is None:
+                # TTY mode: use select + readchar
                 if select.select([sys.stdin], [], [], 0.1)[0]:
                     user_input = get_nonblocking_input()
                     break
+
+            if user_input is None:
+                # No input from any source, continue waiting
+                continue
 
             if user_input.lower() in ['exit', 'quit']:
                 input_queue.put(("exit",))
