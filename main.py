@@ -192,7 +192,6 @@ def run_main_loop(agent, input_queue):
                 # TTY mode: use select + readchar
                 if select.select([sys.stdin], [], [], 0.1)[0]:
                     user_input = get_nonblocking_input()
-                    break
 
             if user_input is None:
                 # No input from any source, continue waiting

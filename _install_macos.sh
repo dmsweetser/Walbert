@@ -1,0 +1,223 @@
+ #!/bin/bash
+
+set -e
+
+echo "Setting up Walbert on macOS..."
+
+# Check for Homebrew
+if ! command -v brew &> /dev/null; then
+    echo "Homebrew is not installed. Installing Homebrew..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
+
+echo "Updating Homebrew..."
+brew update
+
+echo "Installing dependencies..."
+brew install python3
+
+# Create directories
+mkdir -p instance
+mkdir -p instance/conversations
+mkdir -p instance/llama.cpp/bin
+mkdir -p instance/models
+
+echo "Creating Python virtual environment..."
+python3 -m venv venv
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to create virtual environment"
+    exit 1
+fi
+
+echo "Activating virtual environment..."
+source venv/bin/activate
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to activate virtual environment"
+    exit 1
+fi
+
+pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt
+
+echo "Select a model:"
+echo "1) Devstral-24B-Instruct-GGUF (Default)"
+echo "2) Qwen3.6-35B-A3B"
+echo "3) Ministral 3 - 8B"
+echo "4) Ministral 3 - 3B"
+echo "5) Qwen3.5-4B (Lightweight)"
+read -p "Enter choice: " model_choice
+
+MODEL_PATH=""
+MMPROJ_PATH=""
+CONTEXT_SIZE=""
+OUTPUT_TOKENS=""
+TEMPERATURE=""
+TOP_P=""
+TOP_K=""
+MIN_P=""
+
+if [ "$model_choice" == "2" ]; then
+    MODEL_PATH="instance/models/Qwen3.6-35B-A3B-UD-IQ3_S.gguf"
+    MMPROJ_PATH="instance/models/Qwen3.6-35B-A3B-UD-IQ3_S-mmproj-BF16.gguf"
+    if [ ! -f "$MODEL_PATH" ]; then
+        echo "Downloading $MODEL_PATH..."
+        curl -L --output "$MODEL_PATH" \
+          "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-IQ3_S.gguf?download=true"
+    else
+        echo "$MODEL_PATH already exists, skipping download."
+    fi
+    if [ ! -f "$MMPROJ_PATH" ]; then
+        echo "Downloading $MMPROJ_PATH..."
+        curl -L --output "$MMPROJ_PATH" \
+          "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/mmproj-BF16.gguf?download=true"
+    else
+        echo "$MMPROJ_PATH already exists, skipping download."
+    fi
+    CONTEXT_SIZE=32768
+    OUTPUT_TOKENS=16384
+    TEMPERATURE=0.7
+    TOP_P=0.8
+    TOP_K=20
+    MIN_P=0.0
+elif [ "$model_choice" == "3" ]; then
+    MODEL_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf"
+    MMPROJ_PATH="instance/models/Ministral-3-8B-Instruct-2512-Q4_K_M-mmproj-BF16.gguf"
+    if [ ! -f "$MODEL_PATH" ]; then
+        echo "Downloading $MODEL_PATH..."
+        curl -L --output "$MODEL_PATH" \
+          "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf?download=true"
+    else
+        echo "$MODEL_PATH already exists, skipping download."
+    fi
+    if [ ! -f "$MMPROJ_PATH" ]; then
+        echo "Downloading $MMPROJ_PATH..."
+        curl -L --output "$MMPROJ_PATH" \
+          "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-BF16-mmproj.gguf?download=true"
+    else
+        echo "$MMPROJ_PATH already exists, skipping download."
+    fi
+    CONTEXT_SIZE=32768
+    OUTPUT_TOKENS=16384
+    TEMPERATURE=0.7
+    TOP_P=0.9
+    TOP_K=40
+    MIN_P=0.00
+elif [ "$model_choice" == "4" ]; then
+    MODEL_PATH="instance/models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
+    MMPROJ_PATH=""
+    if [ ! -f "$MODEL_PATH" ]; then
+        echo "Downloading $MODEL_PATH..."
+        curl -L --output "$MODEL_PATH" \
+          "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf?download=true"
+    else
+        echo "$MODEL_PATH already exists, skipping download."
+    fi
+    CONTEXT_SIZE=32768
+    OUTPUT_TOKENS=16384
+    TEMPERATURE=0.7
+    TOP_P=0.9
+    TOP_K=40
+    MIN_P=0.00
+elif [ "$model_choice" == "5" ]; then
+    MODEL_PATH="instance/models/Qwen3.5-4B-IQ4_XS.gguf"
+    MMPROJ_PATH=""
+    if [ ! -f "$MODEL_PATH" ]; then
+        echo "Downloading $MODEL_PATH..."
+        curl -L --output "$MODEL_PATH" \
+          "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-IQ4_XS.gguf?download=true"
+    else
+        echo "$MODEL_PATH already exists, skipping download."
+    fi
+    CONTEXT_SIZE=32768
+    OUTPUT_TOKENS=8192
+    TEMPERATURE=0.7
+    TOP_P=0.9
+    TOP_K=40
+    MIN_P=0.00
+else
+    MODEL_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf"
+    MMPROJ_PATH="instance/models/Devstral-Small-2-24B-Instruct-2512-mmproj-BF16.gguf"
+    if [ ! -f "$MODEL_PATH" ]; then
+        echo "Downloading $MODEL_PATH..."
+        curl -L --output "$MODEL_PATH" \
+          "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf?download=true"
+    else
+        echo "$MODEL_PATH already exists, skipping download."
+    fi
+    if [ ! -f "$MMPROJ_PATH" ]; then
+        echo "Downloading $MMPROJ_PATH..."
+        curl -L --output "$MMPROJ_PATH" \
+          "https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF/resolve/main/mmproj-BF16.gguf?download=true"
+    else
+        echo "$MMPROJ_PATH already exists, skipping download."
+    fi
+    CONTEXT_SIZE=32768
+    OUTPUT_TOKENS=16384
+    TEMPERATURE=0.7
+    TOP_P=0.9
+    TOP_K=40
+    MIN_P=0.05
+fi
+
+if [[ "$bt_enabled" == "y" ]]; then bt_enabled=true; else bt_enabled=false; fi
+
+cat > instance/config.json << EOF
+{
+    "model_configs": {
+        "model": {
+            "model_path": "$MODEL_PATH",
+            "context_size": $CONTEXT_SIZE,
+            "output_tokens": $OUTPUT_TOKENS,
+            "temperature": $TEMPERATURE,
+            "top_p": $TOP_P,
+            "top_k": $TOP_K,
+            "min_p": $MIN_P
+        }
+    },
+    "llama_binary_path": "instance/llama.cpp/bin/llama-completion",
+    "mmproj_path": "$MMPROJ_PATH",
+    "log_level": "DEBUG",
+    "server_port": 8080,
+    "server_health_check_timeout": 2,
+    "server_startup_timeout": 60,
+    "python_execution_timeout": 30,
+    "autonomous_operation_timeout": 120,
+    "conversation_log_dir": "instance/conversations",
+    "walbert_port": 8081,
+    "udp_port": 9999,
+    "be_presbyterian": true,
+    "peer_communication_enabled": false,
+    "python_execution_enabled": false,
+    "bash_execution_enabled": false,
+    
+    "database_path": "instance/walbert.db"
+}
+EOF
+
+echo "Created default config at instance/config.json"
+echo "Please edit this file with your specific paths before running Walbert"
+
+echo "Downloading llama.cpp binary..."
+if [ ! -f "instance/llama.cpp/bin/llama-server" ]; then
+    # Detect architecture
+    ARCH=$(uname -m)
+    if [ "$ARCH" == "arm64" ]; then
+        LLAMA_URL="https://github.com/ggml-org/llama.cpp/releases/download/b9279/llama-b9279-bin-arm64-osx.tar.gz"
+    else
+        LLAMA_URL="https://github.com/ggml-org/llama.cpp/releases/download/b9279/llama-b9279-bin-intel-macosx.tar.gz"
+    fi
+
+    curl -L --output llama.cpp.tar.gz "$LLAMA_URL"
+
+    echo "Extracting llama.cpp binary..."
+    tar -xzf llama.cpp.tar.gz -C instance/llama.cpp/bin --strip-components=1
+    rm llama.cpp.tar.gz
+else
+    echo "llama.cpp already exists, skipping download."
+fi
+
+echo "Installation complete"
+echo "Please edit instance/config.json with your specific paths before running Walbert"
+
+chmod +x _run.sh
+</content>
