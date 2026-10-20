@@ -42,7 +42,7 @@ class TestWalbertAgent:
         assert agent.config == mock_config
         assert agent.state is not None
         assert agent.parser is not None
-        assert agent.tools is None  # Not initialized until start_conversation
+        assert agent.tools is not None  # Initialized in __init__ for main-loop commands
         assert agent.tools_enabled is True
 
     def test_start_conversation(self, agent, mock_config):

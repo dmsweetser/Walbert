@@ -435,15 +435,27 @@ Reply ONLY in block format. NO EXTRA TEXT.
         elif peers and self._pending_peer_responses:
             base_prompt += f"[walbert_peer_communication_instructions_start]{chr(10)}Available Peers: {', '.join(peers)}. WARNING: You are currently waiting for responses from the following peers: {', '.join(self._pending_peer_responses)}. Do not send new messages.{chr(10)}[walbert_peer_communication_instructions_end]{chr(10)}{chr(10)}"
 
-        if self._recent_blocks:
-            base_prompt += f"## Recent Activity{chr(10)}"
-            base_prompt += f"{chr(10)}".join(
-                f"[walbert_{b['type']}_start]{chr(10)}{b['content']}{chr(10)}[walbert_{b['type']}_end]{chr(10)}{chr(10)}" for b in self._recent_blocks
-            )
-
         if user_input:
             base_prompt += f"## Latest User Input{chr(10)}{user_input}{chr(10)}{chr(10)}"
         base_prompt += f"## Current User Directive{chr(10)}{self._user_directive}{chr(10)}{chr(10)}"
+
+        # Add recent blocks with token-aware truncation
+        if self._recent_blocks:
+            # Build blocks and check token budget
+            blocks_text = ""
+            kept = 0
+            for b in self._recent_blocks:
+                block_str = f"[walbert_{b['type']}_start]{chr(10)}{b['content']}{chr(10)}[walbert_{b['type']}_end]{chr(10)}{chr(10)}"
+                if self._estimate_tokens(base_prompt + blocks_text + block_str) <= max_tokens:
+                    blocks_text += block_str
+                    kept += 1
+                else:
+                    break
+
+            if blocks_text:
+                base_prompt += f"## Recent Activity{chr(10)}{blocks_text}"
+            elif kept == 0:
+                base_prompt += f"## Recent Activity (truncated — context full){chr(10)}"
 
         return base_prompt
 

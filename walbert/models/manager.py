@@ -3,6 +3,7 @@ Model manager implementation using direct llama-completion binary execution
 """
 
 import os
+import re
 import select
 import subprocess
 import logging
@@ -65,8 +66,11 @@ class ModelManager:
         )
 
         response_content = ""
+        raw_lines = []
         current_iteration = 0
         first_token = True
+        # Pattern for llama-completion debug lines: "0.00.414.177 I ..."
+        _debug_re = re.compile(r'^\d+\.\d+\.\d+\.\d+\s+[IEW]\s+')
 
         try:
             while True:
@@ -79,27 +83,28 @@ class ModelManager:
                 ready, _, _ = select.select([process.stdout], [], [], 0.1)
                 if ready:
                     try:
-                        token = process.stdout.read(1)
+                        line = process.stdout.readline()
                     except Exception:
-                        token = None
-                    
-                    if not token:
-                        with open(response_file, 'w', encoding='utf-8') as f:
-                            f.write(response_content)
-                        break
-                        
-                    response_content += token
-                    current_iteration += 1
-                    
-                    if current_iteration % 100 == 0:
-                        with open(response_file, 'w', encoding='utf-8') as f:
-                            f.write(response_content)
-                    
-                    if callback:
-                        if first_token:
-                            callback(f"{chr(10)}{chr(10)}[Walbert Output]{chr(10)}")
-                            first_token = False
-                        callback(token)
+                        line = ""
+
+                    if not line:
+                        # Check for EOF
+                        if process.poll() is not None:
+                            break
+                        continue
+
+                    raw_lines.append(line)
+
+                    # Filter out debug lines
+                    if not _debug_re.match(line):
+                        response_content += line
+                        current_iteration += 1
+
+                        if callback and line.strip():
+                            if first_token:
+                                callback(f"{chr(10)}{chr(10)}[Walbert Output]{chr(10)}")
+                                first_token = False
+                            callback(line)
         except Exception as e:
             logger.error(f"Error during model execution: {e}")
         finally:
@@ -109,7 +114,7 @@ class ModelManager:
                 os.remove(prompt_file)
             if os.path.exists(response_file):
                 os.remove(response_file)
-            
+
             if callback:
                 callback(f"\n\n>>>>> ")
 

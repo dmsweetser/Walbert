@@ -15,6 +15,9 @@ from walbert.agent import WalbertAgent
 from walbert.config import Config
 from walbert.model_config import ModelConfig
 
+# Module-level logger so load_config() can use it before main() runs
+logger = logging.getLogger('walbert')
+
 
 def load_config() -> Config:
     """Load system configuration"""
@@ -298,8 +301,6 @@ def main():
             logging.FileHandler('instance/walbert.log')
         ]
     )
-    global logger
-    logger = logging.getLogger('walbert')
 
     config = load_config()
     log_level = getattr(logging, config.log_level.upper(), logging.INFO)

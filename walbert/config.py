@@ -28,4 +28,6 @@ class Config:
     peer_communication_enabled: bool = False
     python_execution_enabled: bool = False
     bash_execution_enabled: bool = False
+    bluetooth_device: Optional[str] = None
+    user_input_timeout: int = 60
     database_path: str = "instance/walbert.db"
