@@ -114,9 +114,11 @@ class WalbertAgent:
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
 
         # Tool system
-        self.tools = None
         self.tool_parser = ToolParser()
         self.tool_executor = None
+        # Initialize tools registry early (not deferred to _init_components)
+        # so main loop commands like 'list tools' work immediately
+        self.tools = ToolRegistry()
 
     def _init_components(self):
         """Initialize components that depend on DB connection."""
@@ -128,8 +130,7 @@ class WalbertAgent:
         self.state.db = self.db
         self.executor = BlockExecutor(self.config, self.db)
 
-        # Initialize tool system
-        self.tools = ToolRegistry()
+        # Initialize tool executor (tools registry already created in __init__)
         self.tool_executor = ToolExecutor(self.tools)
         
         # Wire up the comms manager for peer_send tool

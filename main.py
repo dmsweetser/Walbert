@@ -94,19 +94,19 @@ def get_nonblocking_input(prompt: str = ">>>>> ") -> str:
 
 def print_welcome_message(agent):
     # Print welcome message and ASCII art
-    print("""          
- ___            ___      
-\   \          /   \    
-\__   \        /  __/    
- _\   \      /  __/     
- \___\______/   __/     
-     \_       _/        
-       | @ @  \_        
-       |                
-     _/     /\         
-    /o)  (o/\ \_        
-    \_____/ /           
-      \____/                      
+    print(r"""
+ ___            ___
+\   \          /   \
+\__   \        /  __/
+_\   \      /  __/
+ \___\______/   __/
+     \_       _/
+       | @ @  \_
+       |
+     _/     /\
+    /o)  (o/\ \_
+    \_____/ /
+      \____/
               """)
 
     print("Welcome to Walbert! The local-first AI agent.")
@@ -260,7 +260,7 @@ def run_main_loop(agent, input_queue):
                     print(f"{chr(10)}No schema data available yet.")
             elif user_input.lower() == 'list tools':
                 if hasattr(agent, 'tools') and agent.tools:
-                    tools_text = agent.tools.registry.to_prompt_format()
+                    tools_text = agent.tools.to_prompt_format()
                     _paged_output(tools_text)
                 else:
                     print(f"{chr(10)}Tools not initialized.")
