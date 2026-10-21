@@ -74,6 +74,7 @@ def run_command(command: str, timeout: int = 60, **kwargs) -> str:
 
 def run_script(script: str, language: str = "bash", timeout: int = 120, **kwargs) -> str:
     """Write a script to a temp file and execute it."""
+    script_path = None
     try:
         timeout = int(timeout) if isinstance(timeout, str) else timeout
         with tempfile.NamedTemporaryFile(
@@ -83,31 +84,36 @@ def run_script(script: str, language: str = "bash", timeout: int = 120, **kwargs
         ) as f:
             f.write(script)
             script_path = f.name
-        
+
         if language == "python":
             cmd = [sys.executable, script_path]
         else:
             cmd = ["bash", script_path]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=timeout
         )
-        
-        os.unlink(script_path)
-        
+
         output_parts = []
         if result.stdout:
             output_parts.append(f"STDOUT:\n{result.stdout}")
         if result.stderr:
             output_parts.append(f"STDERR:\n{result.stderr}")
         output_parts.append(f"Exit code: {result.returncode}")
-        
+
         return "\n".join(output_parts)
     except Exception as e:
         return f"Error running script: {e}"
+    finally:
+        # Clean up temp file to avoid disk leak
+        if script_path and os.path.exists(script_path):
+            try:
+                os.unlink(script_path)
+            except OSError:
+                pass
 
 
 def create_tool(tool_name: str, description: str, parameters_json: str, handler_code: str, **kwargs) -> str:

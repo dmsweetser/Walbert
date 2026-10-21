@@ -277,14 +277,16 @@ class WalbertAgent:
             self._execute_tool_blocks(tool_blocks)
 
         console_content = ""
+        console_type = None
         for block in blocks:
             if block["type"] == "console_response_blocking" or block["type"] == "console_response_nonblocking":
                 console_content = block["content"]
+                console_type = block["type"]
 
         if console_content:
-            self.write_output(console_content, block["type"])
+            self.write_output(console_content, console_type or "console_response_nonblocking")
             print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
-            if block["type"] == "console_response_blocking":
+            if console_type == "console_response_blocking":
                 self.waiting_for_user = True
         else:
             self.waiting_for_user = False
@@ -539,6 +541,10 @@ class WalbertAgent:
                         self.end_conversation()
                         return
                     if msg_type == "user_input":
+                        if msg == last_user_input:
+                            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                            self.waiting_for_user = False
+                            continue
                         last_user_input = msg
                         self.state.append_block("user_input", msg)
                         self._generate_response_block(msg, interrupt_event)

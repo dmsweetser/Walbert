@@ -44,12 +44,18 @@ def http_post(url: str, body: str = "", headers: str = "", **kwargs) -> str:
                 hdrs = json.loads(headers)
             except json.JSONDecodeError:
                 return f"Error: Invalid JSON headers: {headers}"
-        
-        data = json.loads(body) if body and body.strip() else None
-        
-        resp = requests.post(url, json=data, headers=hdrs, timeout=30)
+
+        data = None
+        if body and body.strip():
+            try:
+                data = json.loads(body)
+            except json.JSONDecodeError:
+                # Send as raw body if not valid JSON
+                pass
+
+        resp = requests.post(url, json=data, headers=hdrs if data else {}, timeout=30, data=body if not data else None)
         resp.raise_for_status()
-        
+
         try:
             result = resp.json()
             return f"# {url}\n# Status: {resp.status_code}\n{json.dumps(result, indent=2)}"
@@ -129,9 +135,15 @@ def _curl_get(url: str, timeout: int) -> str:
             capture_output=True, text=True, timeout=timeout + 5
         )
         content = result.stdout
-        if len(content) > 50000:
-            content = content[:50000] + "\n...(truncated)"
-        return f"# {url}\n\n{content}"
+        # Strip HTML tags to get readable text
+        import re
+        text = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL)
+        text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)
+        text = re.sub(r'<[^>]+>', ' ', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        if len(text) > 50000:
+            text = text[:50000] + "\n...(truncated)"
+        return f"# {url}\n\n{text}"
     except Exception as e:
         return f"Error fetching {url} (curl fallback): {e}"
 

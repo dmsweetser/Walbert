@@ -259,11 +259,11 @@ Reply ONLY in block format. NO EXTRA TEXT.
             with open(self._user_awareness_path, 'r') as f:
                 self._user_awareness = f.read()
         except FileNotFoundError:
-            self._user_awareness = "No user directive detected."
+            self._user_awareness = "No user awareness recorded."
             self._save_user_awareness()
         except Exception as e:
             logger.error(f"Error loading user awareness: {e}")
-            self._user_awareness = "No user directive detected."
+            self._user_awareness = "No user awareness recorded."
             self._save_user_awareness()
 
     def _load_user_directive(self):

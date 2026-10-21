@@ -31,6 +31,7 @@ class NetworkManager:
         self.scan_interval = 60  # seconds
         self._discovery_lock = threading.Lock()  # Separate lock for discovery ops
         self._last_scan_time = 0
+        self._scan_threads: list = []
 
     def _get_local_ip(self) -> Optional[str]:
         """Get the first non-loopback IPv4 address of the machine."""
@@ -129,7 +130,7 @@ class NetworkManager:
         if not batch:
             return  # All peers discovered
 
-        semaphore = threading.Semaphore(min(max_ips, 10))
+        scan_threads = []
 
         def scan_ip(ip: str):
             try:
@@ -150,18 +151,26 @@ class NetworkManager:
                 sock.close()
             except Exception:
                 pass
-            finally:
-                semaphore.release()
 
         # Launch scan threads
         for ip in batch:
-            semaphore.acquire()
-            threading.Thread(target=scan_ip, args=(ip,), daemon=True).start()
+            t = threading.Thread(target=scan_ip, args=(ip,), daemon=True)
+            t.start()
+            scan_threads.append(t)
 
         # Wait for batch to complete (with timeout)
         deadline = time.time() + (len(batch) * timeout + 2)
-        while semaphore._value < min(max_ips, 10) and time.time() < deadline:
+        while time.time() < deadline:
+            with self._discovery_lock:
+                self._scan_threads = [t for t in self._scan_threads if t.is_alive()]
+                self._scan_threads.extend(scan_threads)
+            alive = [t for t in scan_threads if t.is_alive()]
+            if not alive:
+                break
             time.sleep(0.1)
+        # Clean up any remaining threads
+        for t in scan_threads:
+            t.join(timeout=1)
 
     def _listen_tcp(self):
         """Listen for TCP request/response messages."""

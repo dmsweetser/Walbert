@@ -45,6 +45,7 @@ class BlockExecutor:
         if not self.config.python_execution_enabled:
             return {"type": "python_result", "content": "Python execution is disabled."}
 
+        script_path = None
         try:
             # Write code exactly as provided
             with tempfile.NamedTemporaryFile(delete=False, suffix=".py") as tmp:
@@ -73,6 +74,14 @@ class BlockExecutor:
 
         except Exception as e:
             return {"type": "python_result", "content": f"Python execution error: {str(e)}"}
+
+        finally:
+            # Clean up temp file to avoid disk leak
+            if script_path and os.path.exists(script_path):
+                try:
+                    os.unlink(script_path)
+                except OSError:
+                    pass
 
     # ---------------- BASH ----------------
 
