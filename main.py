@@ -274,9 +274,8 @@ def run_main_loop(agent, input_queue):
                     agent._install_python_package(package)
                     print(f"{chr(10)}Package installation command executed.")
             elif user_input == "":
-                # EOF on stdin (pipe closed) — exit cleanly
-                print(f"{chr(10)}Goodbye!")
-                break
+                # Empty line from user, ignore it
+                continue
             else:
                 # Put user input into queue for agent
                 print(f"{chr(10)}Walbert has received your request.")
