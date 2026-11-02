@@ -485,16 +485,16 @@ class WalbertAgent:
 
     def write_output(self, text: str, block_type: str = None) -> None:
         """Write output to console and output.txt for TTS."""
-        if block_type == "console_response_blocking" or block_type == "console_response_nonblocking":
+        if block_type in ("console_response_blocking", "console_response_nonblocking", "console_response"):
             # Write to output file for TTS consumption
             try:
                 with open('output.txt', 'w', encoding='utf-8') as f:
                     f.write(text)
             except Exception:
                 pass
-        if block_type == "console_response_blocking" or block_type == "console_response_nonblocking" or self.print_raw:
+        if block_type in ("console_response_blocking", "console_response_nonblocking", "console_response") or self.print_raw:
             if block_type in ("awareness", "context_blocks"):
-                formatted_text = f"{chr(10)}".join(f"**** {line}" for line in text.split(f"{chr(10)}"))
+                formatted_text = "\n".join(f"**** {line}" for line in text.split("\n"))
                 print(formatted_text, end='', flush=True)
             else:         
                 print(text, end='', flush=True)
