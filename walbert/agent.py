@@ -1,31 +1,29 @@
 #!/usr/bin/env python3
 """
-Walbert - Local AI Agent
-Main entry point for the Walbert AI agent system
+Walbert - Local AI Agent (TOOLS ONLY version)
+
+Uses llama-server as a persistent background process for fast KV-cache reuse.
+All operations go through the tool system — no legacy block formats.
+Peer communication, SQL, Python, Bash — everything is a tool call.
 """
 
-import select
-import subprocess
-import sys
 import os
-import logging
+import sys
 import json
 import threading
 import time
 import queue
-import shutil
-import datetime
+import logging
 from typing import Dict, Any, Optional, List
+
 from walbert.config import Config
 from walbert.model_config import ModelConfig
 from walbert.state import AgentState
-from walbert.parser import BlockParser
-from walbert.executor import BlockExecutor
 from walbert.comms import NetworkManager
 from walbert.tools.registry import ToolRegistry
 from walbert.tools.parser import ToolParser
 from walbert.tools.executor import ToolExecutor
-
+from walbert.models.manager import ModelManager
 
 # Initialize logging
 os.makedirs('instance', exist_ok=True)
@@ -57,9 +55,15 @@ def load_config() -> Config:
             }
             return Config(
                 model_configs=model_configs,
-                llama_binary_path=config_data['llama_binary_path'],
+                llama_binary_path=config_data.get('llama_binary_path', 'llama-server'),
                 mmproj_path=config_data.get('mmproj_path', ""),
                 log_level=config_data.get('log_level', "INFO"),
+                server_port=config_data.get('server_port', 8080),
+                server_startup_timeout=config_data.get('server_startup_timeout', 60),
+                python_execution_timeout=config_data.get('python_execution_timeout', 60),
+                bash_execution_timeout=config_data.get('bash_execution_timeout', 60),
+                autonomous_operation_timeout=config_data.get('autonomous_operation_timeout', 120),
+                conversation_log_dir=config_data.get('conversation_log_dir', 'instance/conversations'),
                 walbert_port=config_data.get('walbert_port', 8081),
                 udp_port=config_data.get('udp_port', 9999),
                 be_presbyterian=bool(config_data.get('be_presbyterian', True)),
@@ -67,7 +71,8 @@ def load_config() -> Config:
                 python_execution_enabled=bool(config_data.get('python_execution_enabled', False)),
                 bash_execution_enabled=bool(config_data.get('bash_execution_enabled', False)),
                 bluetooth_device=config_data.get('bluetooth_device', None),
-                user_input_timeout=int(config_data.get('user_input_timeout', 60))
+                user_input_timeout=int(config_data.get('user_input_timeout', 60)),
+                database_path=config_data.get('database_path', 'instance/walbert.db')
             )
     except FileNotFoundError:
         logger.error("instance/config.json not found")
@@ -78,7 +83,7 @@ def load_config() -> Config:
 
 
 class WalbertAgent:
-    """Refactored Walbert agent with separated responsibilities and tool calling."""
+    """Walbert agent using llama-server + TOOLS ONLY approach."""
 
     DEFAULT_USER_CONTROL_TIMEOUT = 300
     MODEL_RESTART_DELAY = 5
@@ -88,17 +93,11 @@ class WalbertAgent:
         self.config = config
         self.model_manager = model_manager
         self.state = AgentState(config)
-        self.executor = None
-        self.parser = BlockParser()
         self._lock = threading.Lock()
         self.input_timeout = self.config.autonomous_operation_timeout
-        self.last_input_time = 0
         self.model_ready = False
         self.processing_cycle = 0
-        self.current_conversation_file = None
         self.db = None
-        self.python_execution_enabled = config.python_execution_enabled
-        self.bash_execution_enabled = config.bash_execution_enabled
         self.print_raw = False
         self.waiting_for_user = False
         self.tools_enabled = True
@@ -115,29 +114,25 @@ class WalbertAgent:
 
         # Tool system
         self.tool_parser = ToolParser()
-        self.tool_executor = None
-        # Initialize tools registry early (not deferred to _init_components)
-        # so main loop commands like 'list tools' work immediately
         self.tools = ToolRegistry()
+        self.tool_executor = None
 
     def _init_components(self):
         """Initialize components that depend on DB connection."""
         from walbert.database.manager import DatabaseManager
-        from walbert.models.manager import ModelManager
         if self.model_manager is None:
             self.model_manager = ModelManager(self.config)
         self.db = DatabaseManager(self.config.database_path)
         self.state.db = self.db
-        self.executor = BlockExecutor(self.config, self.db)
 
-        # Initialize tool executor (tools registry already created in __init__)
+        # Initialize tool executor
         self.tool_executor = ToolExecutor(self.tools)
-        
+
         # Wire up the comms manager for peer_send tool
         if self.comms is not None:
             from walbert.tools.builtins.shell import set_comms
             set_comms(self.comms)
-        
+
         self.logger.info(f"Initialized {len(self.tools.list_tools())} tools")
 
     def start_conversation(self):
@@ -173,17 +168,19 @@ class WalbertAgent:
             self.session_dir = None
             if self.db and hasattr(self.db, 'close'):
                 self.db.close()
+            if self.model_manager:
+                self.model_manager.shutdown()
             if self._comms_started and self.comms:
                 self.comms.stop()
                 self._comms_started = False
 
-    def _generate_response_block(self, user_input, interrupt_event) -> str:
-        """Generate a response block using the model."""
+    def _generate_response(self, user_input, interrupt_event) -> str:
+        """Generate a response using the model, parse and execute tool calls."""
         peers = None
         if self.comms is not None:
             peers = self.comms.get_peer_list()
         self.state.set_pending_peer_responses(self._pending_peer_responses)
-        tool_defs = self.tools.to_prompt_format() if (self.tools_enabled and self.tools) else ""
+        tool_defs = self.tools.to_prompt_format() if self.tools_enabled else ""
         prompt = self.state.get_prompt(
             max_tokens=self.config.model_configs['model'].context_size,
             user_input=user_input,
@@ -191,7 +188,6 @@ class WalbertAgent:
             tools_enabled=self.tools_enabled,
             tool_definitions=tool_defs
         )
-        prompt += f"{chr(10)}Please respond using the appropriate walbert_* blocks and/or [TOOL:name] blocks. Be concise and sequential.\n"
 
         model_response = self.model_manager.execute_model(
             prompt,
@@ -201,48 +197,25 @@ class WalbertAgent:
 
         self._log_full_prompt_and_response(prompt, model_response)
 
-        # Abort if interrupted before processing blocks
         if interrupt_event and interrupt_event.is_set():
             interrupt_event.clear()
             return ""
 
-        # Parse and execute both old blocks and new tool format
-        response_blocks = self.parser.parse(model_response)
-        self._execute_pending_blocks(response_blocks)
-
-        # Parse and execute tool blocks
+        # Parse and execute tool calls (TOOLS ONLY)
         if self.tools_enabled:
             tool_blocks = self.tool_parser.parse(model_response)
             self._execute_tool_blocks(tool_blocks)
 
-        console_content = ""
-        is_blocking = False
-        for block in response_blocks:
-            if block["type"] in ("console_response_blocking", "console_response_nonblocking"):
-                console_content = block["content"]
-                is_blocking = block["type"] == "console_response_blocking"
-                break
+        self.waiting_for_user = True
+        return model_response
 
-        if console_content:
-            self.write_output(console_content, "console_response")
-            if is_blocking:
-                print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
-                self.waiting_for_user = True
-            else:
-                print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
-                self.waiting_for_user = False
-        else:
-            self.waiting_for_user = False
-
-        return console_content
-
-    def _generate_autonomous_block(self, last_user_input, interrupt_event) -> str:
-        """Generate an autonomous instruction block."""
+    def _generate_autonomous(self, last_user_input, interrupt_event) -> str:
+        """Generate an autonomous instruction."""
         peers = None
         if self.comms is not None:
             peers = self.comms.get_peer_list()
         self.state.set_pending_peer_responses(self._pending_peer_responses)
-        tool_defs = self.tools.to_prompt_format() if (self.tools_enabled and self.tools) else ""
+        tool_defs = self.tools.to_prompt_format() if self.tools_enabled else ""
         prompt = self.state.get_prompt(
             max_tokens=self.config.model_configs['model'].context_size,
             user_input=last_user_input,
@@ -250,9 +223,7 @@ class WalbertAgent:
             tools_enabled=self.tools_enabled,
             tool_definitions=tool_defs
         )
-        prompt += (
-            f"{chr(10)}You are operating autonomously. Please review your current context. Synthesize your progress, update these tracking blocks as needed, and maintain awareness of your database state. If no objectives have been provided, explore the world around you as safely as you can.\n"
-        )
+        prompt += "\nYou are operating autonomously. Review your current context and take action.\n"
 
         model_response = self.model_manager.execute_model(
             prompt,
@@ -262,165 +233,20 @@ class WalbertAgent:
 
         self._log_full_prompt_and_response(prompt, model_response)
 
-        # Abort if interrupted before processing blocks
         if interrupt_event and interrupt_event.is_set():
             interrupt_event.clear()
             return "Continue monitoring and processing."
 
-        blocks = self.parser.parse(model_response)
-
-        self._execute_pending_blocks(blocks)
-
-        # Parse and execute tool blocks
+        # Parse and execute tool calls (TOOLS ONLY)
         if self.tools_enabled:
             tool_blocks = self.tool_parser.parse(model_response)
             self._execute_tool_blocks(tool_blocks)
 
-        console_content = ""
-        console_type = None
-        for block in blocks:
-            if block["type"] == "console_response_blocking" or block["type"] == "console_response_nonblocking":
-                console_content = block["content"]
-                console_type = block["type"]
-
-        if console_content:
-            self.write_output(console_content, console_type or "console_response_nonblocking")
-            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
-            if console_type == "console_response_blocking":
-                self.waiting_for_user = True
-        else:
-            self.waiting_for_user = False
-
+        self.waiting_for_user = False
         return "Continue monitoring and processing."
 
-    def _execute_pending_blocks(self, provided_blocks):
-        """Execute all pending blocks (SQL, Python, etc.) in order.
-        
-        Routes legacy block types through the tool system for consistency.
-        """
-        import re
-        executable_types = {
-            "sql_execute", "python_execute", "bash_execute",
-            "self_awareness", "user_awareness", "immediate_task",
-            "ultimate_task", "impediment", "user_directive"
-        }
-        peer_pattern = re.compile(r'^peer_(\d+\.\d+\.\d+\.\d+)_')
-
-        with self._lock:
-            pending_blocks = []
-            for b in provided_blocks:
-                btype = b["type"]
-                # Log emitted block
-                self._log_block_emitted(btype, b.get("content", ""))
-                if btype in executable_types:
-                    pending_blocks.append(b)
-                elif peer_pattern.match(btype):
-                    pending_blocks.append(b)
-
-        for block in pending_blocks:
-            self.logger.debug(f"Executing block: {block}")
-            btype = block["type"]
-
-            if btype == "self_awareness":
-                self.state._self_awareness = block["content"]
-                self.state._save_self_awareness()
-            elif btype == "user_awareness":
-                self.state._user_awareness = block["content"]
-                self.state._save_user_awareness()
-            elif btype == "user_directive":
-                self.state._user_directive = block["content"]
-                self.state._save_user_directive()
-            elif btype == "immediate_task":
-                self.state._immediate_task = block["content"]
-                self.state._save_immediate_task()
-            elif btype == "ultimate_task":
-                self.state._ultimate_task = block["content"]
-                self.state._save_ultimate_task()
-            elif btype == "impediment":
-                self.state._impediment = block["content"]
-                self.state._save_impediment()
-            elif btype in ("sql_execute", "python_execute", "bash_execute"):
-                # Route legacy execution blocks through the tool system
-                if self.tool_executor is not None:
-                    if btype == "sql_execute":
-                        tool_name = "db_query"
-                        tool_params = {"sql": block["content"]}
-                    elif btype == "python_execute":
-                        tool_name = "python_execute"
-                        tool_params = {"code": block["content"]}
-                    else:  # bash_execute
-                        tool_name = "shell_run"
-                        tool_params = {"command": block["content"]}
-
-                    result = self.tool_executor.execute(tool_name, tool_params)
-                    result_text = result.get("result", "")
-
-                    self._log_block_emitted(f"tool:{tool_name}", json.dumps({"params": tool_params}, indent=2))
-                    self._log_block_emitted(f"tool_result:{tool_name}", json.dumps(result, indent=2))
-
-                    self.state.append_block(btype, block["content"])
-                    if result.get("success"):
-                        self.state.append_block("execution_result", result_text)
-                        self.write_output(json.dumps(result, indent=2), btype)
-                    else:
-                        self.state.append_block("execution_error", result.get("error", "Unknown error"))
-                        self.write_output(f"Execution error ({tool_name}): {result.get('error', 'Unknown error')}", btype)
-                else:
-                    # Fallback to legacy executor if tool system not initialized
-                    result_block = self.executor.execute(block)
-                    if result_block:
-                        self._log_block_emitted(result_block["type"], result_block["content"])
-                        self.state.append_block(block["type"], block["content"])
-                        self.state.append_block("execution_result", result_block["content"])
-                        self.write_output(json.dumps(result_block, indent=2), result_block["type"])
-
-            elif peer_pattern.match(btype):
-                ip_match = peer_pattern.match(btype)
-                peer_ip = ip_match.group(1) if ip_match else None
-                if peer_ip:
-                    if btype == f"peer_{peer_ip}_awareness":
-                        self.state._peer_awareness[peer_ip] = block["content"]
-                        self.state._save_peer_awareness()
-                    elif btype == f"peer_{peer_ip}_message_send":
-                        # Route peer message sending through the tool system
-                        if self.config.peer_communication_enabled and self.comms is not None:
-                            if peer_ip in self._pending_peer_responses:
-                                self.logger.warning(f"Already waiting for response from {peer_ip}, skipping message")
-                                continue
-                            self._pending_peer_responses.add(peer_ip)
-                            if self.tool_executor is not None:
-                                result = self.tool_executor.execute("peer_send", {
-                                    "peer_ip": peer_ip,
-                                    "message": block["content"]
-                                })
-                                result_text = result.get("result", "")
-                                self._log_block_emitted(f"tool:peer_send", json.dumps({"peer_ip": peer_ip, "message": "..." }, indent=2))
-                                self._log_block_emitted(f"tool_result:peer_send", json.dumps(result, indent=2))
-                                if result.get("success"):
-                                    self.state.append_block(f"peer_{peer_ip}_message_sent", result_text)
-                                else:
-                                    self.state.append_block(f"peer_{peer_ip}_message_error", result.get("error", "Unknown error"))
-                            else:
-                                # Fallback: direct comms call
-                                self.comms.send_to_peer(peer_ip, block["content"])
-                                self.logger.info(f"Sent peer message to {peer_ip}, waiting for response")
-                        else:
-                            self.logger.warning("Peer communication disabled or NetworkManager not initialized.")
-                    elif btype == f"peer_{peer_ip}_message_received":
-                        self.state._peer_awareness[peer_ip] = block["content"]
-                        self.state._save_peer_awareness()
-
-            block["executed"] = True
-
-        # Ensure state syncs immediately after execution so next prompt reflects changes
-        self.state._sync_state()
-
     def _execute_tool_blocks(self, tool_calls: List[Dict[str, Any]]):
-        """Execute tool calls from the tool parser.
-        
-        Each tool_call is {"name": str, "params": {str: str}}.
-        Results are appended to state and logged.
-        """
+        """Execute tool calls from the tool parser."""
         if not tool_calls:
             return
 
@@ -449,8 +275,9 @@ class WalbertAgent:
 
             # Print result
             if self.print_raw or result.get("success"):
+                status = "OK" if result.get("success") else "FAIL"
                 self.write_output(
-                    f"[Tool: {tool_name}] {'OK' if result.get('success') else 'FAIL'}: {result_text[:500]}",
+                    f"[Tool: {tool_name}] {status}: {result_text[:500]}",
                     f"tool_result:{tool_name}"
                 )
 
@@ -468,14 +295,13 @@ class WalbertAgent:
             self.logger.error(f"Failed to log emitted block: {e}")
 
     def _log_full_prompt_and_response(self, prompt: str, response: str):
-        """Log full prompt and response to separate timestamped files in the session directory."""
+        """Log full prompt and response."""
         if not hasattr(self, 'session_dir') or not self.session_dir:
             return
         try:
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
             prompt_path = os.path.join(self.session_dir, f"{timestamp}_prompt.txt")
             response_path = os.path.join(self.session_dir, f"{timestamp}_response.txt")
-
             with open(prompt_path, 'w') as f:
                 f.write(prompt)
             with open(response_path, 'w') as f:
@@ -486,7 +312,6 @@ class WalbertAgent:
     def write_output(self, text: str, block_type: str = None) -> None:
         """Write output to console and output.txt for TTS."""
         if block_type in ("console_response_blocking", "console_response_nonblocking", "console_response"):
-            # Write to output file for TTS consumption
             try:
                 with open('output.txt', 'w', encoding='utf-8') as f:
                     f.write(text)
@@ -496,11 +321,11 @@ class WalbertAgent:
             if block_type in ("awareness", "context_blocks"):
                 formatted_text = "\n".join(f"**** {line}" for line in text.split("\n"))
                 print(formatted_text, end='', flush=True)
-            else:         
+            else:
                 print(text, end='', flush=True)
 
-    def run_autonomous(self, input_queue, interrupt_event=None, test_mode=False):
-        """Main agent execution loop with block-based context."""
+    def run(self, input_queue, interrupt_event=None, test_mode=False):
+        """Main agent execution loop."""
         self.start_conversation()
 
         while not self.model_ready:
@@ -525,13 +350,13 @@ class WalbertAgent:
 
                 if msg_type == "user_input":
                     if msg == last_user_input:
-                        print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                        print(f"\n\n\n>>>>> ", end='', flush=True)
                         continue
                     last_user_input = msg
                     self._log_block_received("user_input", msg)
                     self.state.append_block("user_input", msg)
-                    self._generate_response_block(msg, interrupt_event)
-                    print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                    self._generate_response(msg, interrupt_event)
+                    print(f"\n\n\n>>>>> ", end='', flush=True)
                     continue
 
                 if self.waiting_for_user:
@@ -542,33 +367,31 @@ class WalbertAgent:
                         return
                     if msg_type == "user_input":
                         if msg == last_user_input:
-                            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                            print(f"\n\n\n>>>>> ", end='', flush=True)
                             self.waiting_for_user = False
                             continue
                         last_user_input = msg
                         self.state.append_block("user_input", msg)
-                        self._generate_response_block(msg, interrupt_event)
-                        print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
+                        self._generate_response(msg, interrupt_event)
+                        print(f"\n\n\n>>>>> ", end='', flush=True)
                 else:
                     # Autonomous mode
-                    # Check for incoming peer messages
                     if self.comms is not None:
                         pending_msgs = self.comms.get_pending_messages()
                         for msg in pending_msgs:
                             self.state.append_block("peer_message_received", json.dumps(msg))
                             self.logger.info(f"Processed peer message from {msg['peer_ip']}")
-                            # Clear pending response flag for this peer
                             if msg['peer_ip'] in self._pending_peer_responses:
                                 self._pending_peer_responses.remove(msg['peer_ip'])
 
                     if not test_mode and last_user_input is not None:
-                        self._generate_autonomous_block(last_user_input, interrupt_event)
+                        self._generate_autonomous(last_user_input, interrupt_event)
                         time.sleep(self.AUTONOMOUS_LOOP_DELAY)
                     else:
                         time.sleep(0.1)
 
             except KeyboardInterrupt:
-                print(f"{chr(10)}Goodbye!")
+                print(f"\nGoodbye!")
                 self.end_conversation()
                 break
             except Exception as e:
@@ -584,22 +407,18 @@ Error: {str(e)}
                     time.sleep(self.MODEL_RESTART_DELAY)
                     interrupt_event.clear()
 
-    def _install_python_package(self, package: str):
-        """Install a Python package in the main environment."""
-        print(f"{chr(10)}Installing package: {package}")
+    def _log_block_received(self, block_type: str, content: str):
+        """Log a received block."""
         try:
-            subprocess.run(
-                [sys.executable, "-m", "pip", "install", package],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            print(f"{chr(10)}Successfully installed {package}")
-            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
-        except subprocess.CalledProcessError as e:
-            print(f"Failed to install {package}: {e.stderr}")
-            print(f"{chr(10)}{chr(10)}{chr(10)}>>>>> ", end='', flush=True)
-            self.logger.error(f"Failed to install package {package}: {e.stderr}")
+            log_dir = os.path.join("instance", "block_logs", "received")
+            os.makedirs(log_dir, exist_ok=True)
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            safe_type = block_type.replace("/", "_").replace(" ", "_")
+            file_path = os.path.join(log_dir, f"{timestamp}_{safe_type}.txt")
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(f"Type: {block_type}\nContent:\n{content}")
+        except Exception as e:
+            self.logger.error(f"Failed to log received block: {e}")
 
     def shutdown(self):
         """Shutdown agent cleanly."""
@@ -614,8 +433,8 @@ Error: {str(e)}
             self.comms = NetworkManager(self.config)
         self.comms.start()
         self._comms_started = True
-        self.logger.info(f"{chr(10)}Peer communication enabled")
-        print(f"{chr(10)}Peer communication enabled")
+        self.logger.info(f"\nPeer communication enabled")
+        print(f"\nPeer communication enabled")
 
     def disable_peer_communication(self):
         self.config.peer_communication_enabled = False
@@ -624,24 +443,5 @@ Error: {str(e)}
         if self.comms:
             self.comms.stop()
         self._comms_started = False
-        self.logger.info(f"{chr(10)}Peer communication disabled")
-        print(f"{chr(10)}Peer communication disabled")
-
-    def _log_block_received(self, block_type: str, content: str):
-        """Log a received block to instance/block_logs/received/"""
-        try:
-            log_dir = os.path.join("instance", "block_logs", "received")
-            os.makedirs(log_dir, exist_ok=True)
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            safe_type = block_type.replace("/", "_").replace(" ", "_")
-            file_path = os.path.join(log_dir, f"{timestamp}_{safe_type}.txt")
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(f"Type: {block_type}\nContent:\n{content}")
-        except Exception as e:
-            self.logger.error(f"Failed to log received block: {e}")
-
-    def send_peer_message(self, peer_ip: str, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Send a message to a specific peer and wait for response."""
-        if self.comms is not None:
-            return self.comms.send_to_peer(peer_ip, message)
-        return None
+        self.logger.info(f"\nPeer communication disabled")
+        print(f"\nPeer communication disabled")

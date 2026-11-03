@@ -1,4 +1,4 @@
-"""Tests for the Walbert agent with mocked LLM responses."""
+"""Tests for the Walbert agent with mocked LLM responses (TOOLS ONLY version)."""
 import pytest
 import sys
 import os
@@ -24,15 +24,16 @@ class TestWalbertAgent:
         (instance_dir / "conversations").mkdir()
         (instance_dir / "tools").mkdir()
         (instance_dir / "tools" / "registry.json").write_text(json.dumps({"custom_tools": {}}))
-        
+
         os.chdir(tmp_path)
-        
+
         agent = WalbertAgent(mock_config, model_manager=mock_model_manager)
         agent.db = mock_db
         agent.state.db = mock_db
-        agent.executor = MagicMock()
-        agent.executor.execute = MagicMock(return_value={
-            "type": "console_response_nonblocking",
+        agent.tool_executor = MagicMock()
+        agent.tool_executor.execute = MagicMock(return_value={
+            "success": True,
+            "result": "Executed",
             "content": "Executed"
         })
         return agent
@@ -41,117 +42,56 @@ class TestWalbertAgent:
         agent = WalbertAgent(mock_config)
         assert agent.config == mock_config
         assert agent.state is not None
-        assert agent.parser is not None
-        assert agent.tools is not None  # Initialized in __init__ for main-loop commands
+        assert agent.tool_parser is not None
+        assert agent.tools is not None
         assert agent.tools_enabled is True
 
     def test_start_conversation(self, agent, mock_config):
         agent.start_conversation()
         assert agent.model_ready is True
         assert agent.session_dir is not None
-        # db is replaced by _init_components, so check model_ready instead
-        assert agent.model_ready is True
 
     def test_end_conversation(self, agent, mock_config):
         agent.start_conversation()
         agent.end_conversation()
         assert agent.session_dir is None
 
-    def test_generate_response_with_console_block(self, agent, mock_llm_response):
-        """Test that agent processes a response with console block."""
-        agent.model_manager.execute_model.return_value = mock_llm_response
-        agent.start_conversation()
-        
-        # Capture what gets written
-        output = []
-        original_write = agent.write_output
-        def capture_write(text, block_type=None):
-            output.append((text, block_type))
-            original_write(text, block_type)
-        agent.write_output = capture_write
-        
-        result = agent._generate_response_block("Hello", None)
-        
-        # Should have parsed and executed blocks
-        assert len(output) > 0
-
     def test_generate_response_with_tool_calls(self, agent, mock_tool_response):
         """Test that agent processes tool calls from LLM."""
         agent.model_manager.execute_model.return_value = mock_tool_response
         agent.start_conversation()
-        
+
+        # Replace the real executor with a mock (start_conversation creates a real one)
+        agent.tool_executor = MagicMock()
+        agent.tool_executor.execute = MagicMock(return_value={
+            "success": True,
+            "result": "Executed",
+            "content": "Executed"
+        })
+
         output = []
         original_write = agent.write_output
         def capture_write(text, block_type=None):
             output.append((text, block_type))
         agent.write_output = capture_write
-        
-        result = agent._generate_response_block("Read /etc/hostname", None)
-        
-        # Should have processed tool blocks
-        assert len(output) > 0
 
-    def test_execute_pending_blocks_awareness(self, agent):
-        """Test that awareness blocks are stored in state."""
-        blocks = [
-            {"type": "self_awareness", "content": "I am Walbert."},
-            {"type": "user_awareness", "content": "User is Daniel."},
-            {"type": "immediate_task", "content": "Processing request."},
-        ]
-        agent._execute_pending_blocks(blocks)
-        
-        assert "I am Walbert." in agent.state._self_awareness
-        assert "User is Daniel." in agent.state._user_awareness
-        assert "Processing request." in agent.state._immediate_task
+        result = agent._generate_response("Read /etc/hostname", None)
 
-    def test_execute_pending_blocks_sql(self, agent):
-        """Test SQL block execution."""
-        agent.executor.execute = MagicMock(return_value={
-            "type": "sql_result",
-            "content": "OK"
-        })
-        blocks = [{"type": "sql_execute", "content": "SELECT * FROM items"}]
-        agent._execute_pending_blocks(blocks)
-        
-        agent.executor.execute.assert_called_once()
-
-    def test_execute_pending_blocks_python(self, agent):
-        """Test Python block execution."""
-        agent.config.python_execution_enabled = True
-        agent.executor.execute = MagicMock(return_value={
-            "type": "python_result",
-            "content": "stdout: hello\nExit code: 0"
-        })
-        blocks = [{"type": "python_execute", "content": "print('hello')"}]
-        agent._execute_pending_blocks(blocks)
-        
-        agent.executor.execute.assert_called_once()
-
-    def test_execute_pending_blocks_bash(self, agent):
-        """Test Bash block execution."""
-        agent.config.bash_execution_enabled = True
-        agent.executor.execute = MagicMock(return_value={
-            "type": "bash_result",
-            "content": "stdout: hello\nExit code: 0"
-        })
-        blocks = [{"type": "bash_execute", "content": "echo hello"}]
-        agent._execute_pending_blocks(blocks)
-        
-        agent.executor.execute.assert_called_once()
+        # Should have processed tool blocks and called write_output
+        assert len(output) > 0, f"No output captured. State blocks: {agent.state._recent_blocks}"
 
     def test_execute_tool_blocks(self, agent):
         """Test tool block execution."""
-        # Initialize tool executor (normally done in start_conversation)
         from walbert.tools.registry import ToolRegistry
         from walbert.tools.executor import ToolExecutor
         agent.tools = ToolRegistry()
         agent.tool_executor = ToolExecutor(agent.tools)
-        
+
         tool_calls = [
             {"name": "shell_run", "params": {"command": "echo hello", "timeout": "5"}},
         ]
         agent._execute_tool_blocks(tool_calls)
-        
+
         # Should have logged the tool call
         assert len(agent.state._recent_blocks) > 0
 
@@ -161,19 +101,19 @@ class TestWalbertAgent:
         from walbert.tools.executor import ToolExecutor
         agent.tools = ToolRegistry()
         agent.tool_executor = ToolExecutor(agent.tools)
-        
+
         tool_calls = [{"name": "nonexistent", "params": {}}]
         agent._execute_tool_blocks(tool_calls)
-        
+
         # Should log error, not crash
         assert len(agent.state._recent_blocks) > 0
 
-    def test_generate_autonomous_block(self, agent, mock_llm_response):
-        """Test autonomous mode block generation."""
+    def test_generate_autonomous(self, agent, mock_llm_response):
+        """Test autonomous mode generation."""
         agent.model_manager.execute_model.return_value = mock_llm_response
         agent.start_conversation()
-        
-        result = agent._generate_autonomous_block("last input", None)
+
+        result = agent._generate_autonomous("last input", None)
         assert result == "Continue monitoring and processing."
 
     def test_write_output_console(self, agent):
@@ -197,14 +137,6 @@ class TestWalbertAgent:
         agent._log_block_received("user_input", "hello")
         received_dir = "instance/block_logs/received"
         assert os.path.exists(received_dir)
-
-    def test_install_python_package(self, agent):
-        """Test pip install."""
-        # This will likely fail in test environment, just verify it doesn't crash
-        try:
-            agent._install_python_package("nonexistent-package-xyz")
-        except Exception:
-            pass  # Expected to fail
 
     def test_shutdown(self, agent):
         """Test clean shutdown."""
@@ -233,3 +165,73 @@ class TestWalbertAgent:
         """Test that tools can be disabled."""
         agent.tools_enabled = False
         assert agent.tools_enabled is False
+
+    def test_generate_response_no_tools(self, agent, mock_llm_response):
+        """Test response generation with tools disabled."""
+        agent.tools_enabled = False
+        agent.model_manager.execute_model.return_value = mock_llm_response
+        agent.start_conversation()
+
+        output = []
+        def capture_write(text, block_type=None):
+            output.append((text, block_type))
+        agent.write_output = capture_write
+
+        result = agent._generate_response("Hello", None)
+        # Should still return model response, just no tool execution
+        assert result == mock_llm_response
+
+    def test_log_full_prompt_and_response(self, agent):
+        """Test that prompt and response are logged."""
+        agent.start_conversation()
+        agent._log_full_prompt_and_response("test prompt", "test response")
+        assert os.path.exists(agent.session_dir)
+        files = os.listdir(agent.session_dir)
+        assert any('prompt' in f for f in files)
+        assert any('response' in f for f in files)
+
+    def test_execute_tool_blocks_error(self, agent):
+        """Test tool execution with failure result."""
+        from walbert.tools.registry import ToolRegistry
+        from walbert.tools.executor import ToolExecutor
+        agent.tools = ToolRegistry()
+        agent.tool_executor = ToolExecutor(agent.tools)
+        agent.tool_executor.execute = MagicMock(return_value={
+            "success": False,
+            "result": "",
+            "error": "Command failed"
+        })
+
+        tool_calls = [{"name": "shell_run", "params": {"command": "false"}}]
+        agent._execute_tool_blocks(tool_calls)
+
+        # Should have logged error blocks
+        assert len(agent.state._recent_blocks) > 0
+        # Check that error was recorded
+        error_blocks = [b for b in agent.state._recent_blocks if 'error' in str(b).lower()]
+        assert len(error_blocks) > 0
+
+    def test_conversation_flow(self, agent, mock_tool_response):
+        """Test a full conversation flow."""
+        agent.model_manager.execute_model.return_value = mock_tool_response
+        agent.start_conversation()
+
+        # Simulate user input
+        input_queue = queue.Queue()
+        input_queue.put(("user_input", "Hello"))
+
+        output = []
+        def capture_write(text, block_type=None):
+            output.append((text, block_type))
+        agent.write_output = capture_write
+
+        # Generate response
+        result = agent._generate_response("Hello", None)
+        assert result == mock_tool_response
+
+        # Agent should be waiting for user
+        assert agent.waiting_for_user is True
+
+        # End conversation
+        agent.end_conversation()
+        assert agent.session_dir is None

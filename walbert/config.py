@@ -7,11 +7,11 @@ from typing import Dict, Optional
 
 from walbert.model_config import ModelConfig
 
+
 @dataclass
 class Config:
     """System configuration"""
     model_configs: Dict[str, ModelConfig]
-    llama_binary_path: str
     mmproj_path: str = ""
     log_level: str = "DEBUG"
     server_port: int = 8080
@@ -31,3 +31,5 @@ class Config:
     bluetooth_device: Optional[str] = None
     user_input_timeout: int = 60
     database_path: str = "instance/walbert.db"
+    # llama-server binary path (for discovery)
+    llama_binary_path: str = "llama-server"

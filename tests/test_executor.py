@@ -23,7 +23,7 @@ class TestToolExecutor:
         test_file.write_text("Hello from test file")
         result = executor.execute("filesystem_read", {"path": str(test_file)})
         assert result["success"] is True
-        assert "Hello from test file" in result["result"]
+        assert "Hello from test file" in result["content"]
 
     def test_execute_unknown_tool(self, executor):
         result = executor.execute("nonexistent_tool", {})
@@ -36,7 +36,7 @@ class TestToolExecutor:
             "timeout": "5"
         })
         assert result["success"] is True
-        assert "hello from test" in result["result"]
+        assert "hello from test" in result["content"]
 
     def test_execute_shell_script_python(self, executor):
         result = executor.execute("shell_script", {
@@ -45,7 +45,7 @@ class TestToolExecutor:
             "timeout": "10"
         })
         assert result["success"] is True
-        assert "hello from python script" in result["result"]
+        assert "hello from python script" in result["content"]
 
     def test_execute_shell_script_bash(self, executor):
         result = executor.execute("shell_script", {
@@ -54,7 +54,7 @@ class TestToolExecutor:
             "timeout": "10"
         })
         assert result["success"] is True
-        assert "hello from bash script" in result["result"]
+        assert "hello from bash script" in result["content"]
 
     def test_execute_filesystem_write_and_read(self, executor, tmp_path):
         test_file = str(tmp_path / "test_output.txt")
@@ -67,7 +67,7 @@ class TestToolExecutor:
         # Read
         result = executor.execute("filesystem_read", {"path": test_file})
         assert result["success"] is True
-        assert "Hello, World!" in result["result"]
+        assert "Hello, World!" in result["content"]
 
     def test_execute_filesystem_list(self, executor):
         result = executor.execute("filesystem_list", {
@@ -75,17 +75,17 @@ class TestToolExecutor:
             "recursive": "false"
         })
         assert result["success"] is True
-        assert "# Contents of" in result["result"]
+        assert "# Contents of" in result["content"]
 
     def test_execute_list_tools(self, executor):
         result = executor.execute("list_tools", {})
         assert result["success"] is True
-        assert "Available Tools" in result["result"]
+        assert "Available Tools" in result["content"]
 
     def test_execute_get_tool(self, executor):
         result = executor.execute("get_tool", {"tool_name": "filesystem_read"})
         assert result["success"] is True
-        assert "filesystem_read" in result["result"]
+        assert "filesystem_read" in result["content"]
 
     def test_execute_web_get_fallback(self, executor):
         """Test web_get with curl fallback (no requests needed)."""
@@ -105,7 +105,7 @@ class TestToolExecutor:
             "handler_code": "    return f'Echo: {kwargs.get(\"text\", \"\")}'"
         })
         assert result["success"] is True
-        assert "created successfully" in result["result"]
+        assert "created successfully" in result["content"]
 
     def test_execute_custom_tool_after_creation(self, executor, tmp_path):
         """Test using a just-created custom tool."""
@@ -134,7 +134,7 @@ class TestToolExecutor:
         fresh_executor2 = ToolExecutor(ToolRegistry(reg_path))
         result = fresh_executor2.execute("test_math", {"a": "5", "b": "3"})
         assert result["success"] is True
-        assert "8" in result["result"]
+        assert "8" in result["content"]
 
     def test_execute_web_post(self, executor):
         """Test web_post with curl fallback."""
@@ -171,8 +171,8 @@ class TestToolExecutor:
             "sql": "SELECT * FROM test"
         })
         assert result["success"] is True
-        assert "walbert" in result["result"]
-        assert "id" in result["result"]
+        assert "walbert" in result["content"]
+        assert "id" in result["content"]
 
     def test_execute_db_query_insert(self, executor, tmp_path):
         """Test db_query with INSERT."""
@@ -188,7 +188,7 @@ class TestToolExecutor:
             "sql": "INSERT INTO items (value) VALUES ('test')"
         })
         assert result["success"] is True
-        assert "1 row" in result["result"]
+        assert "1" in result["content"] and ("row" in result["content"] or "affected" in result["content"])
 
     def test_execute_python_execute(self, executor):
         """Test python_execute tool."""
@@ -197,7 +197,7 @@ class TestToolExecutor:
             "timeout": "10"
         })
         assert result["success"] is True
-        assert "hello from python tool" in result["result"]
+        assert "hello from python tool" in result["content"]
 
     def test_execute_python_execute_empty(self, executor):
         """Test python_execute with empty code."""
@@ -206,7 +206,7 @@ class TestToolExecutor:
             "timeout": "10"
         })
         assert result["success"] is True
-        assert "No Python code provided" in result["result"]
+        assert "No Python code provided" in result["content"]
 
     def test_execute_peer_send_no_comms(self, executor):
         """Test peer_send when comms is not configured."""
@@ -215,4 +215,4 @@ class TestToolExecutor:
             "message": "hello"
         })
         assert result["success"] is True
-        assert "not enabled" in result["result"]
+        assert "not enabled" in result["content"]

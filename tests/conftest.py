@@ -81,44 +81,37 @@ def mock_db():
 def mock_model_manager():
     """Create a mock model manager."""
     mm = MagicMock()
-    mm.execute_model.return_value = "[walbert_console_response_nonblocking_start]\nTest response\n[walbert_console_response_nonblocking_end]"
-    mm.validate_binaries = MagicMock()
+    mm.execute_model.return_value = "Test response"
     mm.shutdown = MagicMock()
     return mm
 
 
 @pytest.fixture
 def mock_llm_response():
-    """Generate a mock LLM response with various block types."""
-    return """Here is my response:
-
-[walbert_console_response_nonblocking_start]
-I have processed your request and taken the following actions.
-[walbert_console_response_nonblocking_end]
-
-[walbert_self_awareness_start]
-I am Walbert, a local AI agent with full hardware access and autonomy.
-[walbert_self_awareness_end]
-"""
+    """Generate a mock LLM response (TOOLS ONLY format)."""
+    return "I have processed your request."
 
 
 @pytest.fixture
 def mock_tool_response():
-    """Generate a mock LLM response with tool calls."""
+    """Generate a mock LLM response with tool calls (TOOLS ONLY format)."""
     return """Let me help with that:
 
-[TOOL:filesystem_read]
-path:/etc/hostname
+[TOOL_START]
+[TOOL_NAME]filesystem_read
+[PARAM_PATH]
+[PARAM_VALUE]/etc/hostname
 [TOOL_END]
 
-[TOOL:shell_run]
-command:echo "Hello"
-timeout:5
+[TOOL_START]
+[TOOL_NAME]shell_run
+[PARAM_COMMAND]
+[PARAM_VALUE]echo "Hello"
+[PARAM_TIMEOUT]
+[PARAM_VALUE]5
 [TOOL_END]
 
-[walbert_console_response_nonblocking_start]
-Done with the operations.
-[walbert_console_response_nonblocking_end]
+I have completed the operations.
 """
 
 

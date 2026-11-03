@@ -1,161 +1,118 @@
 """
-Web tools - HTTP GET/POST and browser-based page fetching.
+Web tools - HTTP requests and browser automation.
+
+Adopted from AI-Builder engine best practices:
+- Uses ToolResult for consistent return types
+- Proper error handling and logging
 """
 
 import json
 import logging
-import subprocess
-import os
-import sys
+import requests
+from typing import Dict, Any
+
+from walbert.tools.base import BaseTool, ToolResult
 
 logger = logging.getLogger("walbert.tools.builtins.web")
 
 
-def http_get(url: str, timeout: int = 30, **kwargs) -> str:
-    """Fetch a URL using Python requests (or fallback to curl)."""
-    try:
-        timeout = int(timeout) if isinstance(timeout, str) else timeout
-        import requests
-        resp = requests.get(url, timeout=timeout, headers={
-            "User-Agent": "Walbert/1.0 (AI Agent)"
-        })
-        resp.raise_for_status()
-        content = resp.text
-        
-        # Truncate very long responses
-        if len(content) > 50000:
-            content = content[:50000] + f"\n\n# (truncated, {len(resp.text)} chars total)"
-        
-        return f"# {url}\n# Status: {resp.status_code}\n# Content-Type: {resp.headers.get('content-type', 'unknown')}\n\n{content}"
-    except ImportError:
-        # Fallback to curl
-        return _curl_get(url, timeout)
-    except Exception as e:
-        return f"Error fetching {url}: {e}"
+class HttpGetTool(BaseTool):
+    name = "web_get"
+    description = "Fetch a URL and return its HTML/text content."
+    parameters = {"url": "string", "timeout": "string?"}
+
+    def execute(self, params: dict) -> ToolResult:
+        url = params["url"]
+        timeout = int(params.get("timeout", "30")) if params.get("timeout") else 30
+
+        try:
+            response = requests.get(url, timeout=timeout, allow_redirects=True)
+            response.raise_for_status()
+
+            # Try to detect encoding
+            content_type = response.headers.get("Content-Type", "")
+            if "charset=" in content_type:
+                response.encoding = content_type.split("charset=")[-1].split(";")[0].strip()
+            elif response.text and "<meta" in response.text[:1000]:
+                import re
+                meta_match = re.search(r'<meta[^>]+charset=["\']?([^"\'>\s]+)', response.text[:1000])
+                if meta_match:
+                    response.encoding = meta_match.group(1)
+
+            content = response.text
+            return ToolResult(
+                True, content,
+                summary=f"HTTP {response.status_code}, {len(content)} bytes from {url}"
+            )
+        except requests.RequestException as e:
+            return ToolResult(False, "", error=f"HTTP request failed: {e}")
+        except Exception as e:
+            return ToolResult(False, "", error=f"Error fetching URL: {e}")
+
+
+class HttpPostTool(BaseTool):
+    name = "web_post"
+    description = "Send a POST request to a URL with optional JSON body."
+    parameters = {"url": "string", "body": "string?", "headers": "string?"}
+
+    def execute(self, params: dict) -> ToolResult:
+        url = params["url"]
+        body = params.get("body", "")
+        headers_str = params.get("headers", "")
+
+        headers = {}
+        if headers_str:
+            try:
+                headers = json.loads(headers_str)
+            except json.JSONDecodeError:
+                return ToolResult(False, "", error=f"Invalid headers JSON: {headers_str}")
+
+        try:
+            response = requests.post(url, data=body, headers=headers, timeout=30)
+            response.raise_for_status()
+
+            return ToolResult(
+                True, response.text,
+                summary=f"POST {url} -> {response.status_code}"
+            )
+        except requests.RequestException as e:
+            return ToolResult(False, "", error=f"POST request failed: {e}")
+        except Exception as e:
+            return ToolResult(False, "", error=f"Error posting to URL: {e}")
+
+
+# ===================================================================
+# Backward-compatible function wrappers
+# ===================================================================
+
+def http_get(url: str, timeout: str = "30", **kwargs) -> str:
+    """Legacy wrapper for HttpGetTool."""
+    tool = HttpGetTool(kwargs.get("root_dir", ""))
+    result = tool.execute({"url": url, "timeout": timeout})
+    return result.content if result.success else f"Error: {result.error}"
 
 
 def http_post(url: str, body: str = "", headers: str = "", **kwargs) -> str:
-    """Send a POST request."""
-    try:
-        import requests
-        hdrs = {}
-        if headers:
-            try:
-                hdrs = json.loads(headers)
-            except json.JSONDecodeError:
-                return f"Error: Invalid JSON headers: {headers}"
-
-        data = None
-        if body and body.strip():
-            try:
-                data = json.loads(body)
-            except json.JSONDecodeError:
-                # Send as raw body if not valid JSON
-                pass
-
-        resp = requests.post(url, json=data, headers=hdrs if data else {}, timeout=30, data=body if not data else None)
-        resp.raise_for_status()
-
-        try:
-            result = resp.json()
-            return f"# {url}\n# Status: {resp.status_code}\n{json.dumps(result, indent=2)}"
-        except:
-            return f"# {url}\n# Status: {resp.status_code}\n{resp.text[:5000]}"
-    except ImportError:
-        return _curl_post(url, body, headers)
-    except Exception as e:
-        return f"Error posting to {url}: {e}"
+    """Legacy wrapper for HttpPostTool."""
+    tool = HttpPostTool(kwargs.get("root_dir", ""))
+    result = tool.execute({"url": url, "body": body, "headers": headers})
+    return result.content if result.success else f"Error: {result.error}"
 
 
-def browser_get(url: str, wait_seconds: int = 2, **kwargs) -> str:
-    """Navigate to a URL and extract text content using headless browser (playwright or selenium)."""
-    # Try playwright first
+def browser_get(url: str, wait_seconds: str = "2", **kwargs) -> str:
+    """Navigate to a URL and extract page content as text."""
     try:
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = p.chromium.launch()
             page = browser.new_page()
-            page.goto(url, wait_until="networkidle", timeout=30000)
-            if wait_seconds > 0:
-                page.wait_for_timeout(wait_seconds * 1000)
-            content = page.content()
+            page.goto(url, timeout=30000)
+            page.wait_for_load_state("networkidle")
+            content = page.text_content()
             browser.close()
-            
-            # Strip HTML tags to get text
-            import re
-            text = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL)
-            text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)
-            text = re.sub(r'<[^>]+>', ' ', text)
-            text = re.sub(r'\s+', ' ', text).strip()
-            
-            if len(text) > 50000:
-                text = text[:50000] + "\n...(truncated)"
-            
-            return f"# Page: {url}\n\n{text}"
-    except ImportError:
-        pass
-    
-    # Try selenium
-    try:
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options
-        opts = Options()
-        opts.add_argument("--headless=new")
-        opts.add_argument("--no-sandbox")
-        driver = webdriver.Chrome(options=opts)
-        driver.get(url)
-        if wait_seconds > 0:
-            import time
-            time.sleep(wait_seconds)
-        content = driver.page_source
-        driver.quit()
-        
-        import re
-        text = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL)
-        text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)
-        text = re.sub(r'<[^>]+>', ' ', text)
-        text = re.sub(r'\s+', ' ', text).strip()
-        
-        if len(text) > 50000:
-            text = text[:50000] + "\n...(truncated)"
-        
-        return f"# Page: {url}\n\n{text}"
-    except ImportError:
-        pass
-    
-    # Fallback: use curl
-    return _curl_get(url, 30)
 
-
-def _curl_get(url: str, timeout: int) -> str:
-    """Fallback: fetch URL using curl."""
-    try:
-        result = subprocess.run(
-            ["curl", "-s", "-L", "--max-time", str(timeout), "-A", "Walbert/1.0", url],
-            capture_output=True, text=True, timeout=timeout + 5
-        )
-        content = result.stdout
-        # Strip HTML tags to get readable text
-        import re
-        text = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL)
-        text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)
-        text = re.sub(r'<[^>]+>', ' ', text)
-        text = re.sub(r'\s+', ' ', text).strip()
-        if len(text) > 50000:
-            text = text[:50000] + "\n...(truncated)"
-        return f"# {url}\n\n{text}"
+            if not content:
+                return "Page loaded but no text content found."
+            return content
     except Exception as e:
-        return f"Error fetching {url} (curl fallback): {e}"
-
-
-def _curl_post(url: str, body: str, headers: str) -> str:
-    """Fallback: POST using curl."""
-    try:
-        hdr_args = []
-        if headers:
-            hdr_args.extend(["-H", f"Content-Type: application/json"])
-        cmd = ["curl", "-s", "-X", "POST", "-d", body] + hdr_args + [url]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=35)
-        return f"# {url}\n{result.stdout}"
-    except Exception as e:
-        return f"Error posting to {url} (curl fallback): {e}"
+        return f"Error loading page: {e}"
