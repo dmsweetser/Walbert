@@ -407,6 +407,30 @@ Error: {str(e)}
                     time.sleep(self.MODEL_RESTART_DELAY)
                     interrupt_event.clear()
 
+    def run_autonomous(self, last_user_input: str, interrupt_event=None) -> str:
+        """Run a single autonomous cycle: generate and execute tool calls.
+
+        This is a single-shot autonomous step (not a loop). Other agents
+        can call this to trigger one autonomous iteration.
+        """
+        if not self.model_ready:
+            self.logger.warning("Model not ready, cannot run autonomous")
+            return "Error: Model not ready"
+
+        # Process any pending peer messages
+        if self.comms is not None:
+            pending_msgs = self.comms.get_pending_messages()
+            for msg in pending_msgs:
+                self.state.append_block("peer_message_received", json.dumps(msg))
+                self.logger.info(f"Processed peer message from {msg['peer_ip']}")
+                if msg['peer_ip'] in self._pending_peer_responses:
+                    self._pending_peer_responses.remove(msg['peer_ip'])
+
+        # Generate and execute
+        result = self._generate_autonomous(last_user_input, interrupt_event)
+        self.waiting_for_user = False
+        return result
+
     def _log_block_received(self, block_type: str, content: str):
         """Log a received block."""
         try:
