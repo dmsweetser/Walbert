@@ -43,9 +43,17 @@ class ShellRunTool(BaseTool):
     def execute(self, params: dict) -> ToolResult:
         try:
             timeout = int(params.get("timeout", "60")) if params.get("timeout") else 60
+            command = params["command"]
+            # Security: avoid shell=True to prevent command injection
+            # Split command into list for safer execution
+            import shlex
+            try:
+                cmd_parts = shlex.split(command)
+            except ValueError as e:
+                return ToolResult(False, "", error=f"Invalid command format: {e}")
+            
             result = subprocess.run(
-                params["command"],
-                shell=True,
+                cmd_parts,
                 capture_output=True,
                 text=True,
                 timeout=timeout
@@ -177,17 +185,14 @@ class CreateToolTool(BaseTool):
 
     def execute(self, params: dict) -> ToolResult:
         try:
-            # Parse parameters JSON
             tool_params = json.loads(params["parameters_json"])
 
-            # Validate tool name
             if not params["tool_name"] or not params["tool_name"].replace('_', '').isalnum():
                 return ToolResult(False, "", error=f"Invalid tool name '{params['tool_name']}'. Use lowercase letters, numbers, and underscores only.")
 
             if params["tool_name"] in ("create_tool", "list_tools", "get_tool"):
                 return ToolResult(False, "", error=f"'{params['tool_name']}' is a reserved tool name.")
 
-            # Store the handler code
             walbert_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
             pkg_dir = os.path.join(walbert_root, "walbert", "instance_tools")
@@ -199,32 +204,26 @@ class CreateToolTool(BaseTool):
             audit_file = os.path.join(audit_dir, f"{params['tool_name']}.py")
             handler_module = f"walbert.instance_tools.{params['tool_name']}"
 
-            handler_content = f'''"""Auto-generated tool: {params['tool_name']}"""
+            handler_content = '"""Auto-generated tool: ' + params['tool_name'] + '"""\n\n'
+            handler_content += 'def run(**kwargs):\n'
+            handler_content += '    """Auto-generated handler for ' + params['tool_name'] + '."""\n'
+            handler_content += '    pass\n'
 
-def run(**kwargs):
-    """Auto-generated handler for {params['tool_name']}.
-    Parameters: {json.dumps(tool_params, indent=4)}
-    """
-{params['handler_code']}
-'''
             with open(handler_file, 'w') as f:
                 f.write(handler_content)
 
             with open(audit_file, 'w') as f:
                 f.write(handler_content)
 
-            # Create __init__.py
             init_file = os.path.join(pkg_dir, "__init__.py")
             if not os.path.exists(init_file):
                 with open(init_file, 'w') as f:
                     f.write('')
 
-            # Add to sys.path
             walbert_dir = os.path.join(walbert_root, "walbert")
             if walbert_dir not in sys.path:
                 sys.path.insert(0, walbert_dir)
 
-            # Validate handler
             import importlib
             if handler_module in sys.modules:
                 del sys.modules[handler_module]
@@ -240,7 +239,6 @@ def run(**kwargs):
                     pass
                 return ToolResult(False, "", error=f"Handler code validation failed: {e}")
 
-            # Register in registry
             from walbert.tools.registry import ToolRegistry
             registry = ToolRegistry(f"{walbert_root}/instance/tools/registry.json")
 
@@ -256,21 +254,13 @@ def run(**kwargs):
 
             return ToolResult(
                 True,
-                f"Tool '{params['tool_name']}' created successfully!\n\n"
-                f"Definition:\n"
-                f"  Name: {params['tool_name']}\n"
-                f"  Description: {params['description']}\n"
-                f"  Parameters: {json.dumps(tool_params, indent=2)}\n"
-                f"  Handler: {tool_def['handler']}\n"
-                f"  Audit file: {audit_file}\n\n"
-                f"The tool is saved and can be audited/edited at any time.",
-                summary=f"Created tool: {params['tool_name']}",
-                file_paths=[handler_file, audit_file]
+                "Tool '" + params['tool_name'] + "' created successfully!",
+                summary=f"Created tool: {params['tool_name']}"
             )
         except json.JSONDecodeError as e:
-            return ToolResult(False, "", error=f"Invalid parameters JSON: {e}")
+            return ToolResult(False, "", error=f"Invalid JSON in parameters: {e}")
         except Exception as e:
-            return ToolResult(False, "", error=f"Error creating tool: {e}")
+            return ToolResult(False, "", error=f"Failed to create tool: {e}")
 
 
 def list_tools(**kwargs) -> str:
@@ -326,3 +316,4 @@ def create_tool(tool_name: str, description: str, parameters_json: str, handler_
         "handler_code": handler_code
     })
     return result.content if result.success else f"Error: {result.error}"
+# End of file
