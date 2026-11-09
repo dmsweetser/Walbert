@@ -57,3 +57,4 @@ ai_builder/
 walbert_response_*
 walbert_prompt_*
 *.txt
+.DS_Store

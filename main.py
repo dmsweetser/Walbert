@@ -314,7 +314,7 @@ def main():
     agent = WalbertAgent(config, input_queue=input_queue)
 
     # Start agent in autonomous mode in separate thread
-    agent_thread = threading.Thread(target=agent.run_autonomous, args=(input_queue, interrupt_event))
+    agent_thread = threading.Thread(target=agent.run_autonomous, args=("", interrupt_event))
     agent_thread.daemon = True
     agent_thread.start()
 

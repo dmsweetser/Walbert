@@ -469,3 +469,26 @@ Error: {str(e)}
         self._comms_started = False
         self.logger.info(f"\nPeer communication disabled")
         print(f"\nPeer communication disabled")
+
+    def _install_python_package(self, package: str):
+        """Install a Python package using pip."""
+        import subprocess
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "pip", "install", package],
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
+            if result.returncode == 0:
+                self.logger.info(f"Successfully installed {package}")
+                return f"Successfully installed {package}\n{result.stdout}"
+            else:
+                self.logger.error(f"Failed to install {package}: {result.stderr}")
+                return f"Failed to install {package}\n{result.stderr}"
+        except subprocess.TimeoutExpired:
+            self.logger.error(f"Installation of {package} timed out")
+            return f"Installation of {package} timed out"
+        except Exception as e:
+            self.logger.error(f"Error installing {package}: {e}")
+            return f"Error installing {package}: {str(e)}"
