@@ -87,6 +87,19 @@ def mock_model_manager():
 
 
 @pytest.fixture
+def mock_llm_client():
+    """Create a mock LLM client."""
+    llm = MagicMock()
+    llm.call.return_value = {
+        "content": "Test response",
+        "raw_request": "{}",
+        "raw_response": "Test response",
+    }
+    llm.truncate_result = lambda content, tool_name="": (content, False)
+    return llm
+
+
+@pytest.fixture
 def mock_llm_response():
     """Generate a mock LLM response (TOOLS ONLY format)."""
     return "I have processed your request."

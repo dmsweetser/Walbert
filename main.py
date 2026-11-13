@@ -47,7 +47,16 @@ def load_config() -> Config:
                 peer_communication_enabled=bool(config_data.get('peer_communication_enabled', False)),
                 python_execution_enabled=bool(config_data.get('python_execution_enabled', False)),
                 bash_execution_enabled=bool(config_data.get('bash_execution_enabled', False)),
-                user_input_timeout=int(config_data.get('user_input_timeout', 60))
+                user_input_timeout=int(config_data.get('user_input_timeout', 60)),
+                # AI-Builder patterns
+                max_context_tokens=int(config_data.get('max_context_tokens', 0)),
+                max_output_tokens=int(config_data.get('max_output_tokens', 0)),
+                max_tool_result_length=int(config_data.get('max_tool_result_length', 10000)),
+                custom_endpoint_url=config_data.get('custom_endpoint_url', ''),
+                custom_api_key=config_data.get('custom_api_key', ''),
+                custom_model_name=config_data.get('custom_model_name', ''),
+                custom_verify_ssl=config_data.get('custom_verify_ssl', True),
+                timeout=int(config_data.get('timeout', 300)),
                 )
     except FileNotFoundError:
         logger.error("instance/config.json not found")
@@ -121,6 +130,8 @@ _\   \      /  __/
     print("- bash on/off: Toggle Bash execution")
     print("- peer on/off: Toggle peer communication")
     print("- log on/off: Toggle raw block output to console")
+    print("- tools on/off: Toggle tool calling")
+    print("- live_instruction <text>: Send a live instruction to the agent while it runs")
     print("- show self_awareness: View consolidated identity, goals, and blockers")
     print("- show user_awareness: View user awareness")
     print("- show user_directive: View user directive")
@@ -232,6 +243,14 @@ def run_main_loop(agent, input_queue):
             elif user_input.lower() == 'tools off':
                 agent.tools_enabled = False
                 print(f"{chr(10)}Tool calling disabled.")
+            elif user_input.lower().startswith('live_instruction '):
+                instruction = user_input[len('live_instruction '):].strip()
+                if instruction and agent.status_dir:
+                    from walbert.status_file import set_pending_live_instruction
+                    set_pending_live_instruction(agent.status_dir, instruction)
+                    print(f"{chr(10)}Live instruction sent: {instruction[:100]}...")
+                else:
+                    print(f"{chr(10)}No live instruction directory available or instruction too long.")
             elif user_input.lower() == 'show user_awareness':
                 if hasattr(agent, 'state') and agent.state:
                     _paged_output(f"--- AWARENESS ---\n{agent.state._user_awareness}\n--- END ---")

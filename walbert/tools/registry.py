@@ -312,6 +312,28 @@ DEFAULT_TOOLS = {
         "category": "network",
         "handler": "walbert.tools.builtins.shell.peer_send"
     },
+    "compress_context": {
+        "name": "compress_context",
+        "description": "Compress conversation history to fit within the model's context window. "
+                       "Keeps the system prompt and last 3 messages intact, summarizes older messages. "
+                       "Use when the conversation is getting too long for the context window.",
+        "parameters": {
+            "max_tokens": {"type": "integer", "description": "Maximum token budget for compressed output (default 4096)", "required": False, "default": 4096}
+        },
+        "category": "system",
+        "handler": "walbert.tools.builtins.context_compression.compress_context"
+    },
+    "request_user_input": {
+        "name": "request_user_input",
+        "description": "Request interactive input from the user. The agent will pause and wait for the user to respond. "
+                       "Use this when you need human clarification or approval before proceeding.",
+        "parameters": {
+            "question": {"type": "string", "description": "The question to ask the user", "required": True},
+            "timeout": {"type": "integer", "description": "Timeout in seconds before the request expires (default 300)", "required": False, "default": 300}
+        },
+        "category": "system",
+        "handler": "walbert.tools.builtins.system.request_user_input"
+    },
 }
 
 

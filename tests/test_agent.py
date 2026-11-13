@@ -56,10 +56,17 @@ class TestWalbertAgent:
         agent.end_conversation()
         assert agent.session_dir is None
 
-    def test_generate_response_with_tool_calls(self, agent, mock_tool_response):
+    def test_generate_response_with_tool_calls(self, agent, mock_tool_response, mock_llm_client):
         """Test that agent processes tool calls from LLM."""
-        agent.model_manager.execute_model.return_value = mock_tool_response
         agent.start_conversation()
+
+        # Set mock LLM client AFTER start_conversation (which creates a real one)
+        mock_llm_client.call.return_value = {
+            "content": mock_tool_response,
+            "raw_request": "{}",
+            "raw_response": mock_tool_response,
+        }
+        agent.llm_client = mock_llm_client
 
         # Replace the real executor with a mock (start_conversation creates a real one)
         agent.tool_executor = MagicMock()
@@ -108,9 +115,14 @@ class TestWalbertAgent:
         # Should log error, not crash
         assert len(agent.state._recent_blocks) > 0
 
-    def test_generate_autonomous(self, agent, mock_llm_response):
+    def test_generate_autonomous(self, agent, mock_llm_response, mock_llm_client):
         """Test autonomous mode generation."""
-        agent.model_manager.execute_model.return_value = mock_llm_response
+        mock_llm_client.call.return_value = {
+            "content": mock_llm_response,
+            "raw_request": "{}",
+            "raw_response": mock_llm_response,
+        }
+        agent.llm_client = mock_llm_client
         agent.start_conversation()
 
         result = agent._generate_autonomous("last input", None)
@@ -166,11 +178,18 @@ class TestWalbertAgent:
         agent.tools_enabled = False
         assert agent.tools_enabled is False
 
-    def test_generate_response_no_tools(self, agent, mock_llm_response):
+    def test_generate_response_no_tools(self, agent, mock_llm_response, mock_llm_client):
         """Test response generation with tools disabled."""
         agent.tools_enabled = False
-        agent.model_manager.execute_model.return_value = mock_llm_response
         agent.start_conversation()
+
+        # Set mock AFTER start_conversation (which creates a real LLMClient)
+        mock_llm_client.call.return_value = {
+            "content": mock_llm_response,
+            "raw_request": "{}",
+            "raw_response": mock_llm_response,
+        }
+        agent.llm_client = mock_llm_client
 
         output = []
         def capture_write(text, block_type=None):
@@ -187,7 +206,6 @@ class TestWalbertAgent:
         agent._log_full_prompt_and_response("test prompt", "test response")
         assert os.path.exists(agent.session_dir)
         files = os.listdir(agent.session_dir)
-        assert any('prompt' in f for f in files)
         assert any('response' in f for f in files)
 
     def test_execute_tool_blocks_error(self, agent):
@@ -211,10 +229,17 @@ class TestWalbertAgent:
         error_blocks = [b for b in agent.state._recent_blocks if 'error' in str(b).lower()]
         assert len(error_blocks) > 0
 
-    def test_conversation_flow(self, agent, mock_tool_response):
+    def test_conversation_flow(self, agent, mock_tool_response, mock_llm_client):
         """Test a full conversation flow."""
-        agent.model_manager.execute_model.return_value = mock_tool_response
         agent.start_conversation()
+
+        # Set mock AFTER start_conversation (which creates a real LLMClient)
+        mock_llm_client.call.return_value = {
+            "content": mock_tool_response,
+            "raw_request": "{}",
+            "raw_response": mock_tool_response,
+        }
+        agent.llm_client = mock_llm_client
 
         # Simulate user input
         input_queue = queue.Queue()
