@@ -178,7 +178,7 @@ def _paged_output(text):
     print(f"{chr(10)}")
 
 
-def run_main_loop(agent, input_queue):
+def run_main_loop(agent, input_queue, interrupt_event):
     """Shared main loop logic for both headless and non-headless modes."""
     try:
         while True:
@@ -296,10 +296,16 @@ def run_main_loop(agent, input_queue):
                 # Empty line from user, ignore it
                 continue
             else:
-                # Put user input into queue for agent
+                # Process user input through the agent
                 print(f"{chr(10)}Walbert has received your request.")
                 print("Press ENTER to interrupt Walbert at any time.")
-                input_queue.put(("user_input", user_input))
+                try:
+                    response = agent._generate_response(user_input, interrupt_event)
+                    if response:
+                        print(f"{chr(10)}{response}")
+                except Exception as e:
+                    logger.error(f"Error processing user input: {e}", exc_info=True)
+                    print(f"{chr(10)}[Error: {e}]")
     except KeyboardInterrupt:
         print(f"{chr(10)}Goodbye!")
         input_queue.put(("exit",))
@@ -332,14 +338,12 @@ def main():
     # Create agent
     agent = WalbertAgent(config, input_queue=input_queue)
 
-    # Start agent in autonomous mode in separate thread
-    agent_thread = threading.Thread(target=agent.run_autonomous, args=("", interrupt_event))
-    agent_thread.daemon = True
-    agent_thread.start()
+    # Initialize conversation (starts llama-server, sets model_ready=True)
+    agent.start_conversation()
 
     print_welcome_message(agent)
 
-    run_main_loop(agent, input_queue)
+    run_main_loop(agent, input_queue, interrupt_event)
 
 
 if __name__ == "__main__":

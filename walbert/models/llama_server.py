@@ -26,16 +26,16 @@ class LlamaServerManager:
 
     def __init__(self, config):
         self.config = config
-        self.model_config = config.model_configs.get('model', {})
-        self.model_path = self.model_config.get('model_path', '')
+        self.model_config = config.model_configs.get('model')
+        self.model_path = self.model_config.model_path if self.model_config else ''
         self.mmproj_path = config.mmproj_path or ''
         self.port = config.server_port
-        self.context_size = self.model_config.get('context_size', 32768)
-        self.output_tokens = self.model_config.get('output_tokens', 16384)
-        self.temperature = self.model_config.get('temperature', 0.7)
-        self.top_p = self.model_config.get('top_p', 0.8)
-        self.top_k = self.model_config.get('top_k', 20)
-        self.min_p = self.model_config.get('min_p', 0.0)
+        self.context_size = self.model_config.context_size if self.model_config else 32768
+        self.output_tokens = self.model_config.output_tokens if self.model_config else 16384
+        self.temperature = self.model_config.temperature if self.model_config else 0.7
+        self.top_p = self.model_config.top_p if self.model_config else 0.8
+        self.top_k = self.model_config.top_k if self.model_config else 20
+        self.min_p = self.model_config.min_p if self.model_config else 0.0
         self.server_proc = None
         self._lock = threading.Lock()
         self._started = False
@@ -132,11 +132,11 @@ class LlamaServerManager:
         payload = {
             "model": "default",
             "prompt": prompt,
-            "n_predict": model_config.get('output_tokens', 16384),
-            "temperature": model_config.get('temperature', 0.7),
-            "top_p": model_config.get('top_p', 0.8),
-            "top_k": model_config.get('top_k', 20),
-            "min_p": model_config.get('min_p', 0.0),
+            "n_predict": model_config.output_tokens if model_config else 16384,
+            "temperature": model_config.temperature if model_config else 0.7,
+            "top_p": model_config.top_p if model_config else 0.8,
+            "top_k": model_config.top_k if model_config else 20,
+            "min_p": model_config.min_p if model_config else 0.0,
             "stream": True,
         }
 
