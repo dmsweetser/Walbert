@@ -159,8 +159,6 @@ else
     MIN_P=0.05
 fi
 
-if [[ "$bt_enabled" == "y" ]]; then bt_enabled=true; else bt_enabled=false; fi
-
 cat > instance/config.json << EOF
 {
     "model_configs": {
@@ -174,7 +172,7 @@ cat > instance/config.json << EOF
             "min_p": $MIN_P
         }
     },
-    "llama_binary_path": "instance/llama.cpp/bin/llama-completion",
+    "llama_binary_path": "instance/llama.cpp/bin/llama-server",
     "mmproj_path": "$MMPROJ_PATH",
     "log_level": "DEBUG",
     "server_port": 8080,
@@ -202,9 +200,9 @@ if [ ! -f "instance/llama.cpp/bin/llama-server" ]; then
     # Detect architecture
     ARCH=$(uname -m)
     if [ "$ARCH" == "arm64" ]; then
-        LLAMA_URL="https://github.com/ggml-org/llama.cpp/releases/download/b9279/llama-b9279-bin-arm64-osx.tar.gz"
+        LLAMA_URL="https://github.com/ggml-org/llama.cpp/releases/download/b12360/llama-b12360-bin-macos-arm64.tar.gz"
     else
-        LLAMA_URL="https://github.com/ggml-org/llama.cpp/releases/download/b9279/llama-b9279-bin-intel-macosx.tar.gz"
+        LLAMA_URL="https://github.com/ggml-org/llama.cpp/releases/download/b12360/llama-b12360-bin-macos-x64.tar.gz"
     fi
 
     curl -L --output llama.cpp.tar.gz "$LLAMA_URL"
@@ -220,4 +218,3 @@ echo "Installation complete"
 echo "Please edit instance/config.json with your specific paths before running Walbert"
 
 chmod +x _run.sh
-</content>
